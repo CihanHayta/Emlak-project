@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import CustomerCard from "../components/CustomerCard";
 import CustomerSheet from "../components/CustomerSheet";
+import AppointmentFormDialog from "../components/AppointmentFormDialog";
 import { getCustomers, subscribeToCustomers } from "../data/customerStore";
 import { CUSTOMER_STATUSES, LEAD_SOURCES } from "../data/constants";
 
@@ -34,6 +35,10 @@ export default function Customers() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [prefill, setPrefill] = useState({});
+  // Customer whose card's calendar icon (or context menu) was used to create
+  // an appointment directly, without opening the full edit sheet first — the
+  // new appointment shows up on Randevular immediately.
+  const [appointmentTarget, setAppointmentTarget] = useState(null);
 
   useEffect(() => subscribeToCustomers(() => setCustomers(getCustomers())), []);
 
@@ -121,13 +126,14 @@ export default function Customers() {
       {filtered.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">Bu kritere uygun müşteri bulunamadı.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
           {filtered.map((customer) => (
             <CustomerCard
               key={customer.id}
               customer={customer}
               onEdit={openEdit}
               onChanged={() => setCustomers(getCustomers())}
+              onCreateAppointment={setAppointmentTarget}
             />
           ))}
         </div>
@@ -140,6 +146,17 @@ export default function Customers() {
         prefill={prefill}
         onSaved={() => setCustomers(getCustomers())}
       />
+
+      {appointmentTarget && (
+        <AppointmentFormDialog
+          key={appointmentTarget.id}
+          open
+          onOpenChange={(o) => !o && setAppointmentTarget(null)}
+          appointment={null}
+          initialCustomerId={appointmentTarget.id}
+          onSaved={() => setCustomers(getCustomers())}
+        />
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import "swiper/css";
 import { ChevronLeft, ChevronRight, PlayCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import PropertyCard from "../common/PropertyCard";
+import "./VideoShowcase.css";
 
 /**
  * A horizontally-scrolling row of property "video tour" cards, used several
@@ -21,54 +22,41 @@ export default function VideoShowcase({ title, seeAllHref, properties }) {
   const nextId = `video-${slug}-next`;
 
   return (
-    <section className="mx-auto max-w-7xl px-6 py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-2xl font-bold text-brand-navy">
-          <PlayCircle className="h-6 w-6 text-brand-gold" />
+    <section className="video-showcase">
+      <div className="video-showcase__header">
+        <h2 className="video-showcase__title">
+          <PlayCircle className="video-showcase__title-icon" />
           {title}
         </h2>
-        <Link
-          to={seeAllHref}
-          className="flex items-center gap-1 text-sm font-medium text-brand-gold-dark hover:underline"
-        >
-          Tüm videoları izle
-          <ChevronRight className="h-4 w-4" />
+        <Link to={seeAllHref} className="video-showcase__see-all">
+          Tüm İlanları İncele
+          <ChevronRight className="icon-4" />
         </Link>
       </div>
 
-      <div className="relative">
+      <div className="video-showcase__carousel">
         <Swiper
           modules={[Navigation]}
           navigation={{ prevEl: `#${prevId}`, nextEl: `#${nextId}` }}
-          spaceBetween={20}
-          slidesPerView={1.15}
+          spaceBetween={14}
+          slidesPerView={1.35}
           breakpoints={{
-            640: { slidesPerView: 2.2 },
-            1024: { slidesPerView: 4 },
+            640: { slidesPerView: 2.2, spaceBetween: 20 },
+            1024: { slidesPerView: 4, spaceBetween: 20 },
           }}
         >
           {properties.map((property) => (
-            <SwiperSlide key={property.id} className="h-auto pb-1">
+            <SwiperSlide key={property.id} className="video-showcase__slide">
               <PropertyCard property={property} />
             </SwiperSlide>
           ))}
         </Swiper>
 
-        <button
-          id={prevId}
-          type="button"
-          aria-label="Önceki"
-          className="absolute -left-4 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-brand-navy shadow-md ring-1 ring-gray-200 transition hover:bg-gray-50 lg:flex"
-        >
-          <ChevronLeft className="h-5 w-5" />
+        <button id={prevId} type="button" aria-label="Önceki" className="video-showcase__nav-btn video-showcase__nav-btn--prev">
+          <ChevronLeft className="icon-5" />
         </button>
-        <button
-          id={nextId}
-          type="button"
-          aria-label="Sonraki"
-          className="absolute -right-4 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-brand-navy shadow-md ring-1 ring-gray-200 transition hover:bg-gray-50 lg:flex"
-        >
-          <ChevronRight className="h-5 w-5" />
+        <button id={nextId} type="button" aria-label="Sonraki" className="video-showcase__nav-btn video-showcase__nav-btn--next">
+          <ChevronRight className="icon-5" />
         </button>
       </div>
     </section>

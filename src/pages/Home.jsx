@@ -2,6 +2,7 @@ import HeroSlider from "../components/home/HeroSlider";
 import HeroSearchBar from "../components/home/HeroSearchBar";
 import VideoShowcase from "../components/home/VideoShowcase";
 import ServiceHighlights from "../components/home/ServiceHighlights";
+import AllListingsSection from "../components/home/AllListingsSection";
 import { getFeaturedVideos } from "../data/properties";
 
 /**
@@ -27,13 +28,13 @@ export default function Home() {
       <HeroSearchBar />
 
       <VideoShowcase
-        title="Satılık Evler – Video Serisi"
+        title="Satılık Evler "
         seeAllHref="/satilik"
         properties={saleVideos}
       />
 
       <VideoShowcase
-        title="Kiralık Evler – Video Serisi"
+        title="Kiralık Evler"
         seeAllHref="/kiralik"
         properties={rentVideos}
       />
@@ -41,16 +42,18 @@ export default function Home() {
       <ServiceHighlights />
 
       <VideoShowcase
-        title="Satılık Arsalar – Video Serisi"
+        title="Satılık Arsalar"
         seeAllHref="/satilik"
         properties={saleLandVideos}
       />
 
       <VideoShowcase
-        title="Kiralık Arsalar – Video Serisi"
+        title="Kiralık Arsalar "
         seeAllHref="/kiralik"
         properties={rentLandVideos}
       />
+
+      <AllListingsSection />
     </>
   );
 }

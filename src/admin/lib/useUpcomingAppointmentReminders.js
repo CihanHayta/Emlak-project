@@ -56,7 +56,7 @@ export function useUpcomingAppointmentReminders() {
         markReminded(key, remindedKeys);
 
         const customer = getCustomerById(appointment.customerId);
-        const listingTitle = appointment.listing?.title ?? "İlan";
+        const listingTitle = appointment.listing?.title ?? appointment.serviceType ?? "İlan";
         const hoursLeft = Math.max(1, Math.round(msUntil / (60 * 60 * 1000)));
         const timeLabel = new Date(appointment.dateTime).toLocaleTimeString("tr-TR", {
           hour: "2-digit",

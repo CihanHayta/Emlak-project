@@ -1,6 +1,7 @@
 import PageBanner from "../components/common/PageBanner";
 import ServiceHighlights from "../components/home/ServiceHighlights";
 import { SITE } from "../config/siteConfig";
+import "./Hizmetlerimiz.css";
 
 /**
  * "/hizmetlerimiz" — Services page.
@@ -17,7 +18,7 @@ export default function Hizmetlerimiz() {
         title="Hizmetlerimiz"
         subtitle={`${SITE.name} olarak alım, satım ve kiralama sürecinizin her adımında yanınızdayız.`}
       />
-      <div className="pt-14">
+      <div className="hizmetlerimiz__highlights">
         <ServiceHighlights />
       </div>
     </>

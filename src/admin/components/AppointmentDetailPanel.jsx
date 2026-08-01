@@ -1,27 +1,46 @@
+import { useState } from "react";
 import { toast } from "sonner";
-import { X, Play } from "lucide-react";
+import { X, Play, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { updateAppointment } from "../data/appointmentStore";
+import { updateAppointment, deleteAppointment } from "../data/appointmentStore";
 import { APPOINTMENT_STATUS_STYLES } from "../data/constants";
 import ListingThumbnail from "./ListingThumbnail";
+import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 
 /**
  * Right-hand "Randevu Detayı" panel — mirrors the reference dashboard
  * mockup: listing thumbnail, key facts, and quick actions (Düzenle/İptal
- * Et/Tamamlandı Yap) without needing to open the full edit dialog for
+ * Et/Tamamlandı Yap/Sil) without needing to open the full edit dialog for
  * common status changes.
  */
 export default function AppointmentDetailPanel({ appointment, customer, onClose, onEdit, onChanged }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   if (!appointment) return null;
 
   const { listing } = appointment;
   const isForSale = listing?.category === "satilik";
 
-  function setStatus(status) {
-    updateAppointment(appointment.id, { status });
-    toast.success(`Randevu "${status}" olarak işaretlendi.`);
-    onChanged?.();
+  async function setStatus(status) {
+    try {
+      await updateAppointment(appointment.id, { status });
+      toast.success(`Randevu "${status}" olarak işaretlendi.`);
+      onChanged?.();
+    } catch (error) {
+      toast.error(error.message || "Randevu güncellenemedi.");
+    }
+  }
+
+  async function handleDelete() {
+    try {
+      await deleteAppointment(appointment.id);
+      toast.success("Randevu silindi.");
+      onChanged?.();
+      onClose?.();
+    } catch (error) {
+      toast.error(error.message || "Randevu silinemedi.");
+    }
   }
 
   return (
@@ -61,6 +80,7 @@ export default function AppointmentDetailPanel({ appointment, customer, onClose,
       )}
 
       <dl className="space-y-2.5 border-t border-border pt-3 text-sm">
+        <Row label="Randevu Konusu" value={appointment.serviceType || "—"} />
         <Row label="Müşteri" value={customer?.name ?? "—"} />
         <Row label="Telefon" value={customer?.phone ?? "—"} />
         <Row
@@ -98,7 +118,23 @@ export default function AppointmentDetailPanel({ appointment, customer, onClose,
         >
           Tamamlandı Yap
         </Button>
+        <Button
+          variant="outline"
+          className="w-full border-red-200 text-red-600 hover:bg-red-100"
+          onClick={() => setConfirmOpen(true)}
+        >
+          <Trash2 className="h-4 w-4" />
+          Randevuyu Sil
+        </Button>
       </div>
+
+      <ConfirmDeleteDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Randevuyu sil"
+        description={`${customer?.name ?? "Bu"} randevusunu kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

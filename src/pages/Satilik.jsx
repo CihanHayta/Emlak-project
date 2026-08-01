@@ -2,9 +2,11 @@ import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import PageBanner from "../components/common/PageBanner";
 import ListingFilterBar from "../components/listings/ListingFilterBar";
+import ListingSortBar from "../components/listings/ListingSortBar";
 import PropertyGrid from "../components/listings/PropertyGrid";
-import { EMPTY_FILTERS, filterProperties } from "../components/listings/filterProperties";
+import { EMPTY_FILTERS, DEFAULT_SORT, filterProperties, sortProperties } from "../components/listings/filterProperties";
 import { getSaleProperties } from "../data/properties";
+import "./Satilik.css";
 
 /**
  * "/satilik" — satılık (for-sale) listings page.
@@ -19,9 +21,10 @@ export default function Satilik() {
   // straight here with filters already chosen, via router state.
   const location = useLocation();
   const [filters, setFilters] = useState(location.state?.filters ?? EMPTY_FILTERS);
+  const [sortBy, setSortBy] = useState(DEFAULT_SORT);
   const properties = useMemo(
-    () => filterProperties(getSaleProperties(), filters),
-    [filters],
+    () => sortProperties(filterProperties(getSaleProperties(), filters), sortBy),
+    [filters, sortBy],
   );
 
   return (
@@ -31,11 +34,12 @@ export default function Satilik() {
         subtitle="Bölgenin en güncel satılık daire, villa ve müstakil ev ilanları."
       />
 
-      <section className="mx-auto max-w-7xl px-6">
+      <section className="listing-page__filter-section">
         <ListingFilterBar filters={filters} onChange={setFilters} />
       </section>
 
-      <section className="mx-auto max-w-7xl px-6 py-12">
+      <section className="listing-page__grid-section">
+        <ListingSortBar count={properties.length} sortBy={sortBy} onSortChange={setSortBy} />
         <PropertyGrid properties={properties} />
       </section>
     </>

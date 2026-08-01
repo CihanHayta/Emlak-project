@@ -12,6 +12,10 @@ import {
 } from "../data/notificationStore";
 
 const TYPE_ICON = { randevu: CalendarClock, form: FileText, ilan: Building2 };
+// Notifications don't point at one specific record — just navigate to the
+// list page where that kind of thing lives, so clicking one actually takes
+// you somewhere useful instead of just marking it read in place.
+const TYPE_ROUTE = { randevu: "/admin/randevular", form: "/admin/basvurular", ilan: "/admin/ilanlar" };
 const PREVIEW_COUNT = 6;
 
 /**
@@ -65,7 +69,12 @@ export default function NotificationBell() {
                 <button
                   key={n.id}
                   type="button"
-                  onClick={() => markAsRead(n.id)}
+                  onClick={() => {
+                    markAsRead(n.id);
+                    setOpen(false);
+                    const route = TYPE_ROUTE[n.type];
+                    if (route) navigate(route);
+                  }}
                   className="flex w-full items-start gap-2.5 border-b border-border px-4 py-3 text-left last:border-0 hover:bg-muted/50"
                 >
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-gold/10 text-brand-gold-dark">

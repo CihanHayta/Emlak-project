@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { getSimilarProperties } from "../../data/properties";
 import { useResolvedMediaUrl } from "../../lib/useResolvedMediaUrl";
+import "./SimilarListings.css";
 
 /**
  * "Benzer İlanlar" sidebar shown next to a listing's details on the detail
@@ -15,21 +16,17 @@ export default function SimilarListings({ property }) {
 
   return (
     <aside>
-      <h2 className="mb-4 text-lg font-bold text-brand-navy">Benzer İlanlar</h2>
-      <div className="flex flex-col gap-4">
+      <h2 className="similar-listings__heading">Benzer İlanlar</h2>
+      <div className="similar-listings__list">
         {similar.map((item) => (
-          <Link
-            key={item.id}
-            to={`/ilan/${item.id}`}
-            className="group flex gap-3 rounded-xl border border-gray-100 p-2.5 shadow-sm transition hover:shadow-md"
-          >
+          <Link key={item.id} to={`/ilan/${item.id}`} className="similar-listings__item">
             <SimilarListingThumb src={item.image} alt={item.title} />
-            <div className="min-w-0 py-0.5">
-              <h3 className="truncate text-sm font-bold text-brand-navy">{item.title}</h3>
-              <p className="truncate text-xs text-gray-500">
+            <div className="similar-listings__info">
+              <h3 className="similar-listings__title">{item.title}</h3>
+              <p className="similar-listings__location">
                 {item.neighborhood}, {item.district}
               </p>
-              <p className="mt-1 text-sm font-bold text-brand-gold-dark">{item.price}</p>
+              <p className="similar-listings__price">{item.price}</p>
             </div>
           </Link>
         ))}
@@ -40,12 +37,5 @@ export default function SimilarListings({ property }) {
 
 function SimilarListingThumb({ src, alt }) {
   const url = useResolvedMediaUrl(src);
-  return (
-    <img
-      src={url ?? ""}
-      alt={alt}
-      loading="lazy"
-      className="h-20 w-24 shrink-0 rounded-lg object-cover transition duration-300 group-hover:scale-105"
-    />
-  );
+  return <img src={url ?? ""} alt={alt} loading="lazy" className="similar-listings__thumb" />;
 }

@@ -3,6 +3,7 @@
  * pages — kept in one file so the filter dropdowns, badges, and form
  * selects everywhere else always agree on the same set of values.
  */
+import { SERVICES } from "../../data/services";
 
 // Triage status for an incoming form submission, set on the Başvurular
 // page while it still sits in the inbox (before it becomes a customer card).
@@ -17,11 +18,15 @@ export const LEAD_STATUS_STYLES = {
   "Müşteri Oldu": "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
 };
 
+// Web Sitesi + the 4 service-request-popup services (see data/services.js) —
+// so a lead's card shows exactly which service they asked about instead of
+// a generic "Web Sitesi" for everyone who came through the public site.
 export const LEAD_SOURCES = [
   "Instagram",
   "WhatsApp",
   "Facebook",
   "Web Sitesi",
+  ...SERVICES.map((service) => service.title),
   "Sahibinden",
   "Hepsiemlak",
   "Arama",
@@ -64,6 +69,15 @@ export const CUSTOMER_TAGS = ["VIP", "Yatırımcı", "Sıcak Müşteri", "Soğuk
 // N aydır satılmadı" stale-listing reminder on Satıcı cards (see
 // lib/useStaleListingReminders.js).
 export const CUSTOMER_ROLES = ["Alıcı", "Satıcı"];
+
+// What the appointment is actually for — a specific listing viewing, or one
+// of our services (kredi onayı, ekspertiz onayı, 7/24 destek, ...). Lets an
+// appointment exist without being tied to a listing.
+export const APPOINTMENT_SERVICE_TYPES = [
+  "İlan Gösterimi",
+  ...SERVICES.map((service) => service.title),
+  "Genel Görüşme",
+];
 
 export const APPOINTMENT_STATUSES = ["Beklemede", "Onaylandı", "Tamamlandı", "İptal Edildi"];
 

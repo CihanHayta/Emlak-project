@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Phone, Mail, Edit, Trash2, Send, TrendingDown } from "lucide-react";
+import { Phone, Mail, Edit, Trash2, Send, TrendingDown, MapPin, CalendarPlus } from "lucide-react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -15,44 +15,88 @@ import { WhatsAppIcon, InstagramIcon } from "../../components/common/BrandIcons"
 import { buildWhatsAppLink } from "../../config/siteConfig";
 import { CUSTOMER_STATUSES, CUSTOMER_STATUS_STYLES } from "../data/constants";
 import { updateCustomer, deleteCustomer, addTimelineEntry } from "../data/customerStore";
+import { toMillis } from "../../lib/firestoreTimestamp";
 import { getStaleListingInfo } from "../lib/staleListing";
 import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { cn } from "@/lib/utils";
 
+// A customer's avatar is colored by hashing their id against this palette —
+// purely cosmetic, but it's what makes a dense grid of cards scannable at a
+// glance instead of a wall of identical navy circles.
+const AVATAR_COLORS = [
+  "bg-blue-600", "bg-violet-600", "bg-emerald-600", "bg-amber-600",
+  "bg-rose-600", "bg-cyan-600", "bg-fuchsia-600", "bg-orange-600",
+];
+function avatarColor(seed) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
+const PLACEHOLDER = "—";
+
 /**
- * One customer card in the CRM grid. Right-click (or long-press on touch)
- * opens a quick-actions context menu — change status, call, WhatsApp, edit,
- * delete — without needing to open the full edit sheet for common actions.
+ * One customer card in the CRM grid. Every card renders the exact same set
+ * of rows (Kaynağı / Bütçe / Konum / Son Aktivite) whether or not that data
+ * was actually filled in — missing values fall back to "—" / "Belirtilmemiş"
+ * instead of the row disappearing. That's deliberate: a grid where some
+ * cards have 4 rows and others have 9 (manual entries vs. bare-minimum
+ * leads converted from Başvurular) reads as broken. A fixed shell keeps
+ * every card the same size no matter which form it came from.
+ *
+ * Right-click (or long-press on touch) opens a quick-actions context menu —
+ * change status, call, WhatsApp, edit, delete. The calendar icon in the
+ * footer creates an appointment for this customer directly (same dialog
+ * Randevular uses), without needing to open the edit sheet first.
  */
-export default function CustomerCard({ customer, onEdit, onChanged }) {
+export default function CustomerCard({ customer, onEdit, onChanged, onCreateAppointment }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const staleListing = getStaleListingInfo(customer);
   const budgetLabel =
     customer.budgetMin || customer.budgetMax
       ? `${customer.budgetMin?.toLocaleString("tr-TR") ?? "?"} - ${customer.budgetMax?.toLocaleString("tr-TR") ?? "?"} TL`
-      : null;
+      : "Belirtilmemiş";
+  const locationLabel = [customer.desiredDistrict, customer.desiredProvince].filter(Boolean).join(", ") || PLACEHOLDER;
+  const lastActivityAt = toMillis(
+    customer.timeline?.length ? customer.timeline[customer.timeline.length - 1].at : customer.createdAt,
+  );
 
-  function handleStatusChange(status) {
-    updateCustomer(customer.id, { status });
-    addTimelineEntry(customer.id, `Durum güncellendi: ${status}`);
-    toast.success(`${customer.name} için durum "${status}" olarak güncellendi.`);
-    onChanged?.();
+  async function handleStatusChange(status) {
+    try {
+      await updateCustomer(customer.id, { status });
+      await addTimelineEntry(customer.id, `Durum güncellendi: ${status}`);
+      toast.success(`${customer.name} için durum "${status}" olarak güncellendi.`);
+      onChanged?.();
+    } catch (error) {
+      toast.error(error.message || "Durum güncellenemedi.");
+    }
   }
 
-  function handleDelete() {
-    deleteCustomer(customer.id);
-    toast.success("Müşteri kartı silindi.");
-    onChanged?.();
+  async function handleDelete() {
+    try {
+      await deleteCustomer(customer.id);
+      toast.success("Müşteri kartı silindi.");
+      onChanged?.();
+    } catch (error) {
+      toast.error(error.message || "Müşteri kartı silinemedi.");
+    }
   }
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="group flex flex-col gap-2.5 rounded-2xl border border-border bg-card p-3.5 shadow-sm transition hover:shadow-md">
-          {/* Header: avatar + name/phone */}
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-navy text-sm font-semibold text-white">
-              {customer.name.charAt(0)}
+        <div className="group flex h-full flex-col gap-1.5 rounded-xl border border-border bg-card p-2.5 shadow-sm transition hover:shadow-md">
+          {/* Header: avatar + name/phone — kept free of badges so a long
+              status label (e.g. "Randevu Oluşturuldu") never squeezes the
+              name/phone column. */}
+          <div className="flex items-start gap-2">
+            <span
+              className={cn(
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white",
+                avatarColor(customer.id),
+              )}
+            >
+              {customer.name.charAt(0).toUpperCase()}
             </span>
             <div className="min-w-0 flex-1">
               <button
@@ -62,17 +106,16 @@ export default function CustomerCard({ customer, onEdit, onChanged }) {
               >
                 {customer.name}
               </button>
-              <p className="truncate text-xs text-muted-foreground">{customer.phone}</p>
+              <p className="truncate text-[11px] text-muted-foreground">{customer.phone}</p>
             </div>
           </div>
 
           {/* Status + Alıcı/Satıcı — each on a fitted chip, wrapping onto
-              their own row so a long label (e.g. "Randevu Oluşturuldu")
-              never overflows the card next to the name. */}
-          <div className="flex flex-wrap items-center gap-1.5">
+              their own row so a long label never overflows the card. */}
+          <div className="flex flex-wrap items-center gap-1">
             <span
               className={cn(
-                "w-fit max-w-full truncate rounded-full px-2 py-0.5 text-[11px] font-medium",
+                "w-fit max-w-full truncate rounded-full px-1.5 py-0.5 text-[10px] font-medium",
                 CUSTOMER_STATUS_STYLES[customer.status],
               )}
             >
@@ -80,101 +123,98 @@ export default function CustomerCard({ customer, onEdit, onChanged }) {
             </span>
             <span
               className={cn(
-                "w-fit rounded-full px-2 py-0.5 text-[11px] font-medium",
-                customer.role === "Satıcı"
-                  ? "bg-orange-100 text-orange-700"
-                  : "bg-slate-100 text-slate-600",
+                "w-fit rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                customer.role === "Satıcı" ? "bg-orange-100 text-orange-700" : "bg-slate-100 text-slate-600",
               )}
             >
               {customer.role ?? "Alıcı"}
             </span>
           </div>
 
+          {/* Fixed info rows — always present, "—"/"Belirtilmemiş" when empty,
+              so every card in the grid takes up the same amount of space. */}
+          <dl className="space-y-0.5 text-[11px]">
+            <div className="flex gap-1">
+              <dt className="shrink-0 text-muted-foreground">Kaynak:</dt>
+              <dd className="truncate font-medium text-foreground">{customer.source || PLACEHOLDER}</dd>
+            </div>
+            <div className="flex gap-1">
+              <dt className="shrink-0 text-muted-foreground">Bütçe:</dt>
+              <dd className="truncate font-medium text-foreground">{budgetLabel}</dd>
+            </div>
+            <div className="flex items-center gap-1">
+              <MapPin className="h-3 w-3 shrink-0 text-muted-foreground" />
+              <dd className="truncate font-medium text-foreground">{locationLabel}</dd>
+            </div>
+          </dl>
+
           {/* Stale-listing nudge: this customer's own for-sale/for-rent
-              listing has been sitting for N+ months — suggest a price change. */}
+              listing has been sitting for N+ months — suggest a price change.
+              Appended after the fixed rows so it only grows the rare card it
+              applies to, instead of reserving space on every card. */}
           {staleListing && (
-            <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
-              <TrendingDown className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <p>
-                “{staleListing.listing.title}” ilanı {staleListing.monthsElapsed} aydır satılmadı/kiralanmadı.
-                Fiyatta değişiklik yapmak ister mi?
+            <div className="flex items-start gap-1.5 rounded-lg bg-amber-50 p-1.5 text-[11px] text-amber-800">
+              <TrendingDown className="mt-0.5 h-3 w-3 shrink-0" />
+              <p className="line-clamp-2">
+                “{staleListing.listing.title}” {staleListing.monthsElapsed} aydır satılmadı. Fiyat değişikliği?
               </p>
             </div>
           )}
 
-          {/* Contact icons */}
-          <div className="flex items-center gap-1.5">
-            <a
-              href={`tel:${customer.phone.replace(/\s/g, "")}`}
-              title="Ara"
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-blue-100 hover:text-blue-600"
-            >
-              <Phone className="h-3.5 w-3.5" />
-            </a>
-            <a
-              href={buildWhatsAppLink(`Merhaba ${customer.name}, Şahin Emlak'tan yazıyorum.`)}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="WhatsApp"
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-emerald-100 hover:text-emerald-600"
-            >
-              <WhatsAppIcon className="h-3.5 w-3.5" />
-            </a>
-            {customer.instagram && (
+          {/* Footer: last activity + quick actions, pinned to the bottom via
+              mt-auto so it lines up across cards regardless of the content above. */}
+          <div className="mt-auto flex items-center justify-between gap-1 border-t border-border pt-1.5">
+            <span className="truncate text-[10px] text-muted-foreground">
+              Son aktivite: {new Date(lastActivityAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}
+            </span>
+            <div className="flex shrink-0 items-center gap-1">
               <a
-                href={`https://instagram.com/${customer.instagram.replace("@", "")}`}
+                href={`tel:${customer.phone.replace(/\s/g, "")}`}
+                title="Ara"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-blue-100 hover:text-blue-600"
+              >
+                <Phone className="h-3 w-3" />
+              </a>
+              <a
+                href={buildWhatsAppLink(`Merhaba ${customer.name}, Şahin Emlak'tan yazıyorum.`)}
                 target="_blank"
                 rel="noopener noreferrer"
-                title="Instagram"
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-pink-100 hover:text-pink-600"
+                title="WhatsApp"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-emerald-100 hover:text-emerald-600"
               >
-                <InstagramIcon className="h-3.5 w-3.5" />
+                <WhatsAppIcon className="h-3 w-3" />
               </a>
-            )}
-            {customer.email && (
-              <a
-                href={`mailto:${customer.email}`}
-                title="Mail"
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-violet-100 hover:text-violet-600"
+              {customer.instagram && (
+                <a
+                  href={`https://instagram.com/${customer.instagram.replace("@", "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Instagram"
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-pink-100 hover:text-pink-600"
+                >
+                  <InstagramIcon className="h-3 w-3" />
+                </a>
+              )}
+              {customer.email && (
+                <a
+                  href={`mailto:${customer.email}`}
+                  title="Mail"
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-violet-100 hover:text-violet-600"
+                >
+                  <Mail className="h-3 w-3" />
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => onCreateAppointment(customer)}
+                title="Randevu oluştur"
+                aria-label="Randevu oluştur"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-brand-gold/15 hover:text-brand-gold-dark"
               >
-                <Mail className="h-3.5 w-3.5" />
-              </a>
-            )}
-            <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              {customer.source}
-            </span>
+                <CalendarPlus className="h-3 w-3" />
+              </button>
+            </div>
           </div>
-
-          {/* Interests */}
-          {customer.interests?.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {customer.interests.map((interest) => (
-                <span key={interest} className="rounded-full bg-brand-gold/10 px-2 py-0.5 text-[11px] font-medium text-brand-gold-dark">
-                  {interest}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {budgetLabel && <p className="text-sm font-semibold text-foreground">{budgetLabel}</p>}
-
-          {(customer.desiredProvince || customer.desiredDistrict) && (
-            <p className="text-xs text-muted-foreground">
-              📍 {[customer.desiredDistrict, customer.desiredProvince].filter(Boolean).join(", ")}
-            </p>
-          )}
-
-          {customer.notes && <p className="line-clamp-2 text-xs text-muted-foreground">{customer.notes}</p>}
-
-          {customer.tags?.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 border-t border-border pt-2">
-              {customer.tags.map((tag) => (
-                <span key={tag} className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       </ContextMenuTrigger>
 
@@ -182,6 +222,10 @@ export default function CustomerCard({ customer, onEdit, onChanged }) {
         <ContextMenuItem onSelect={() => onEdit(customer)}>
           <Edit className="h-4 w-4" />
           Kartı Düzenle
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => onCreateAppointment(customer)}>
+          <CalendarPlus className="h-4 w-4" />
+          Randevu Oluştur
         </ContextMenuItem>
         <ContextMenuSub>
           <ContextMenuSubTrigger>Durumu Güncelle</ContextMenuSubTrigger>

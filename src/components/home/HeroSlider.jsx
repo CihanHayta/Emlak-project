@@ -9,6 +9,7 @@ import { HERO_SLIDES } from "../../data/heroSlides";
 import { WhatsAppIcon } from "../common/BrandIcons";
 import { buildWhatsAppLink } from "../../config/siteConfig";
 import StatsBar from "./StatsBar";
+import "./HeroSlider.css";
 
 /**
  * The full-width, auto-sliding hero banner at the top of the homepage.
@@ -18,14 +19,13 @@ import StatsBar from "./StatsBar";
  */
 export default function HeroSlider() {
   return (
-    <section className="relative">
+    <section className="hero-slider">
       <Swiper
         modules={[Autoplay, Navigation, Pagination]}
         autoplay={{ delay: 6000, disableOnInteraction: false }}
         loop
         navigation={{ prevEl: "#hero-prev", nextEl: "#hero-next" }}
         pagination={{ clickable: true }}
-        className="h-110 w-full sm:h-120"
       >
         {HERO_SLIDES.map((slide) => (
           <SwiperSlide key={slide.id}>
@@ -35,21 +35,11 @@ export default function HeroSlider() {
       </Swiper>
 
       {/* Custom circular prev/next buttons (Swiper targets them via the ids above) */}
-      <button
-        id="hero-prev"
-        type="button"
-        aria-label="Önceki"
-        className="absolute left-3 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur transition hover:bg-white/25 sm:flex"
-      >
-        <ChevronLeft className="h-6 w-6" />
+      <button id="hero-prev" type="button" aria-label="Önceki" className="hero-slider__nav-btn hero-slider__nav-btn--prev">
+        <ChevronLeft className="icon-6" />
       </button>
-      <button
-        id="hero-next"
-        type="button"
-        aria-label="Sonraki"
-        className="absolute right-3 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur transition hover:bg-white/25 sm:flex"
-      >
-        <ChevronRight className="h-6 w-6" />
+      <button id="hero-next" type="button" aria-label="Sonraki" className="hero-slider__nav-btn hero-slider__nav-btn--next">
+        <ChevronRight className="icon-6" />
       </button>
     </section>
   );
@@ -58,48 +48,41 @@ export default function HeroSlider() {
 /** One hero slide: background photo + gradient overlay + headline + CTAs. */
 function HeroSlideContent({ slide }) {
   return (
-    <div className="relative flex h-full w-full flex-col justify-center overflow-hidden bg-brand-navy">
-      <img
-        src={slide.image}
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover"
-      />
+    <div className="hero-slide">
+      <img src={slide.image} alt="" className="hero-slide__image" />
       {/* Dark gradient so the white text stays readable over any photo */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/20" />
+      <div className="hero-slide__gradient" />
 
-      <div className="relative mx-auto w-full max-w-7xl px-6 pb-14 pt-8">
-        <div className="max-w-2xl">
-          <p className="mb-2 text-base text-gray-200">{slide.eyebrow}</p>
-          <h1 className="mb-3 text-3xl font-extrabold leading-tight text-white sm:text-4xl">
+      <div className="hero-slide__content">
+        <div className="hero-slide__text">
+          <p className="hero-slide__eyebrow">{slide.eyebrow}</p>
+          <h1 className="hero-slide__title">
             {slide.highlight}
             <br />
-            <span className="text-brand-gold">{slide.titleSuffix}</span>
+            <span className="hero-slide__title-suffix">{slide.titleSuffix}</span>
           </h1>
-          <p className="mb-5 max-w-lg text-gray-200">{slide.description}</p>
+          <p className="hero-slide__description">{slide.description}</p>
 
-          <div className="flex flex-wrap gap-4">
+          <div className="hero-slide__ctas">
             <a
               href={buildWhatsAppLink("Merhaba, Şahin Emlak hakkında bilgi almak istiyorum.")}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-lg bg-brand-gold px-6 py-3 font-semibold text-white transition hover:bg-brand-gold-dark"
+              className="hero-slide__cta hero-slide__cta--primary"
             >
-              <WhatsAppIcon className="h-5 w-5" />
+              <WhatsAppIcon className="icon-5" />
               İletişime Geç
             </a>
-            <Link
-              to="/satilik"
-              className="flex items-center gap-2 rounded-lg bg-white px-6 py-3 font-semibold text-brand-navy transition hover:bg-gray-100"
-            >
+            <Link to="/satilik" className="hero-slide__cta hero-slide__cta--secondary">
               İlanları İncele
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="icon-4" />
             </Link>
           </div>
         </div>
       </div>
 
       {/* Trust stats overlaid on the bottom of the hero, like the reference design */}
-      <div className="relative mx-auto w-full max-w-7xl px-6">
+      <div className="hero-slide__stats-wrap">
         <StatsBar />
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ShieldCheck, HandCoins, FileCheck2, Clock } from "lucide-react";
 import { SERVICES } from "../../data/services";
 import ServiceRequestModal from "../common/ServiceRequestModal";
+import "./ServiceHighlights.css";
 
 // Maps the plain-string `icon` key from data/services.js to an actual
 // lucide-react icon component (keeps the data file JSX-free).
@@ -23,8 +24,8 @@ export default function ServiceHighlights() {
   const [activeService, setActiveService] = useState(null);
 
   return (
-    <section className="mx-auto max-w-7xl px-6 pb-16">
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <section className="service-highlights">
+      <div className="service-highlights__grid">
         {SERVICES.map((service) => {
           const Icon = ICONS[service.icon];
           return (
@@ -32,13 +33,13 @@ export default function ServiceHighlights() {
               key={service.id}
               type="button"
               onClick={() => setActiveService(service)}
-              className="flex flex-col items-start gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+              className="service-highlights__card"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-gold/10 text-brand-gold">
-                <Icon className="h-6 w-6" />
+              <span className="service-highlights__icon">
+                <Icon className="icon-6" />
               </span>
-              <h3 className="font-bold text-brand-navy">{service.title}</h3>
-              <p className="text-sm text-gray-500">{service.description}</p>
+              <h3 className="service-highlights__title">{service.title}</h3>
+              <p className="service-highlights__desc">{service.description}</p>
             </button>
           );
         })}

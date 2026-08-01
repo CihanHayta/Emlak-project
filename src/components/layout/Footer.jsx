@@ -4,6 +4,7 @@ import { FacebookIcon, InstagramIcon, YoutubeIcon, LinkedinIcon } from "../commo
 import { NAV_LINKS } from "../../config/navigation";
 import { SITE } from "../../config/siteConfig";
 import { PROPERTIES } from "../../data/properties";
+import "./Footer.css";
 
 // Footer-specific service list. Deliberately separate from data/services.js
 // because the footer shows "Gayrimenkul Danışmanlığı" instead of "7/24
@@ -30,22 +31,20 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-brand-navy text-gray-300">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-10 px-6 py-14 sm:grid-cols-2 lg:grid-cols-5">
+    <footer className="footer">
+      <div className="footer__grid">
         {/* Brand column */}
-        <div className="sm:col-span-2 lg:col-span-1">
-          <div className="mb-3 flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-brand-gold text-brand-gold">
-              <HomeIcon className="h-5 w-5" />
+        <div className="footer__brand-col">
+          <div className="footer__brand-header">
+            <span className="footer__brand-icon">
+              <HomeIcon className="icon-5" />
             </span>
-            <span className="text-lg font-extrabold tracking-wide text-white">
-              {SITE.shortName}
-            </span>
+            <span className="footer__brand-name">{SITE.shortName}</span>
           </div>
-          <p className="mb-4 text-sm text-gray-400">
+          <p className="footer__brand-desc">
             {SITE.name}, hayalinizdeki eve ulaşmanız için profesyonel çözümler sunar.
           </p>
-          <div className="flex gap-3">
+          <div className="footer__social-row">
             {SOCIAL_LINKS.map(({ key, Icon, label }) => (
               <a
                 key={key}
@@ -53,9 +52,9 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={label}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-gray-300 transition hover:bg-brand-gold hover:text-white"
+                className="footer__social-link"
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="icon-4" />
               </a>
             ))}
           </div>
@@ -63,13 +62,11 @@ export default function Footer() {
 
         {/* Quick links column */}
         <div>
-          <h4 className="mb-4 font-bold text-white">Hızlı Linkler</h4>
-          <ul className="space-y-2.5 text-sm">
+          <h4 className="footer__heading">Hızlı Linkler</h4>
+          <ul className="footer__list">
             {NAV_LINKS.map((link) => (
               <li key={link.to}>
-                <Link to={link.to} className="transition hover:text-brand-gold">
-                  {link.label}
-                </Link>
+                <Link to={link.to}>{link.label}</Link>
               </li>
             ))}
           </ul>
@@ -77,13 +74,11 @@ export default function Footer() {
 
         {/* Services column */}
         <div>
-          <h4 className="mb-4 font-bold text-white">Hizmetlerimiz</h4>
-          <ul className="space-y-2.5 text-sm">
+          <h4 className="footer__heading">Hizmetlerimiz</h4>
+          <ul className="footer__list">
             {FOOTER_SERVICES.map((service) => (
               <li key={service}>
-                <Link to="/hizmetlerimiz" className="transition hover:text-brand-gold">
-                  {service}
-                </Link>
+                <Link to="/hizmetlerimiz">{service}</Link>
               </li>
             ))}
           </ul>
@@ -91,22 +86,18 @@ export default function Footer() {
 
         {/* Contact column */}
         <div>
-          <h4 className="mb-4 font-bold text-white">İletişim</h4>
-          <ul className="space-y-3 text-sm">
-            <li className="flex items-start gap-2.5">
-              <Phone className="mt-0.5 h-4 w-4 shrink-0 text-brand-gold" />
-              <a href={SITE.phoneHref} className="transition hover:text-brand-gold">
-                {SITE.phoneDisplay}
-              </a>
+          <h4 className="footer__heading">İletişim</h4>
+          <ul className="footer__list footer__list--contact">
+            <li className="footer__contact-item">
+              <Phone className="footer__contact-icon" />
+              <a href={SITE.phoneHref}>{SITE.phoneDisplay}</a>
             </li>
-            <li className="flex items-start gap-2.5">
-              <Mail className="mt-0.5 h-4 w-4 shrink-0 text-brand-gold" />
-              <a href={`mailto:${SITE.email}`} className="transition hover:text-brand-gold">
-                {SITE.email}
-              </a>
+            <li className="footer__contact-item">
+              <Mail className="footer__contact-icon" />
+              <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
             </li>
-            <li className="flex items-start gap-2.5">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-gold" />
+            <li className="footer__contact-item">
+              <MapPin className="footer__contact-icon" />
               <span>{SITE.address}</span>
             </li>
           </ul>
@@ -114,22 +105,17 @@ export default function Footer() {
 
         {/* "Follow us" preview grid column */}
         <div>
-          <h4 className="mb-4 font-bold text-white">Bizi Takip Edin</h4>
-          <div className="grid grid-cols-2 gap-2">
+          <h4 className="footer__heading">Bizi Takip Edin</h4>
+          <div className="footer__follow-grid">
             {FOLLOW_PREVIEW_IMAGES.map((property) => (
               <a
                 key={property.id}
                 href={SITE.social.instagram}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block aspect-square overflow-hidden rounded-lg"
+                className="footer__follow-item"
               >
-                <img
-                  src={property.image}
-                  alt={property.title}
-                  loading="lazy"
-                  className="h-full w-full object-cover transition hover:scale-110"
-                />
+                <img src={property.image} alt={property.title} loading="lazy" />
               </a>
             ))}
           </div>
@@ -137,23 +123,18 @@ export default function Footer() {
       </div>
 
       {/* Bottom bar */}
-      <div className="border-t border-white/10">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 py-5 text-sm text-gray-400 sm:flex-row">
+      <div className="footer__bottom">
+        <div className="footer__bottom-inner">
           <p>
             © {currentYear} {SITE.name}. Tüm hakları saklıdır.
           </p>
           {/* TODO(owner): link these to real legal pages once they're written. */}
-          <div className="flex items-center gap-5">
-            <a href="#" className="transition hover:text-brand-gold">KVKK</a>
-            <a href="#" className="transition hover:text-brand-gold">Gizlilik Politikası</a>
-            <a href="#" className="transition hover:text-brand-gold">Çerez Politikası</a>
-            <Link
-              to="/admin"
-              title="Yönetici Girişi"
-              aria-label="Yönetici Girişi"
-              className="flex items-center gap-1.5 transition hover:text-brand-gold"
-            >
-              <ShieldCheck className="h-4 w-4" />
+          <div className="footer__bottom-links">
+            <a href="#">KVKK</a>
+            <a href="#">Gizlilik Politikası</a>
+            <a href="#">Çerez Politikası</a>
+            <Link to="/admin" title="Yönetici Girişi" aria-label="Yönetici Girişi">
+              <ShieldCheck className="icon-4" />
               Yönetici Girişi
             </Link>
           </div>

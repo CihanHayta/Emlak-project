@@ -631,20 +631,26 @@ const ADMIN_LISTINGS_KEY = "sahin-admin-listings";
 
 /**
  * The admin panel has no backend: everything it creates/edits lives in this
- * browser's localStorage (admin/data/listingStore.js). A brand-new listing
- * (one that isn't part of the static PROPERTIES seed) should still show up
- * on the public site immediately — same tab, no reload needed — so every
- * getter below reads through this instead of the raw PROPERTIES constant.
- * Edits to an already-seeded listing are intentionally NOT reflected here:
- * only listings the admin panel actually created are "new" by id.
+ * browser's localStorage (admin/data/listingStore.js). listingStore seeds
+ * itself from every listing in PROPERTIES (same id), so editing ANY listing
+ * through the admin panel — including one of the sample/seed ones, e.g. to
+ * upload real photos/video onto it — writes back under that same id. Every
+ * getter below reads through this instead of the raw PROPERTIES constant,
+ * and admin data always WINS over the static seed for a matching id, so
+ * those edits actually show up on the public site instead of being silently
+ * discarded.
  */
 function getAllProperties() {
   try {
     const raw = localStorage.getItem(ADMIN_LISTINGS_KEY);
     if (!raw) return PROPERTIES;
+    const adminListings = JSON.parse(raw);
+    const adminById = new Map(adminListings.map((listing) => [listing.id, listing]));
     const staticIds = new Set(PROPERTIES.map((p) => p.id));
-    const adminOnly = JSON.parse(raw).filter((listing) => !staticIds.has(listing.id));
-    return [...PROPERTIES, ...adminOnly];
+
+    const merged = PROPERTIES.map((property) => adminById.get(property.id) ?? property);
+    const newFromAdmin = adminListings.filter((listing) => !staticIds.has(listing.id));
+    return [...merged, ...newFromAdmin];
   } catch {
     return PROPERTIES;
   }

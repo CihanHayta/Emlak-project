@@ -2,10 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ListingFilterBar from "../listings/ListingFilterBar";
 import { EMPTY_FILTERS } from "../listings/filterProperties";
-import { cn } from "@/lib/utils";
+import "./HeroSearchBar.css";
 
 const CATEGORY_TABS = [
-  { value: "satilik", label: "Satılık" },
+  { value: "satilik", label: "" },
   { value: "kiralik", label: "Kiralık" },
 ];
 
@@ -27,19 +27,14 @@ export default function HeroSearchBar() {
   }
 
   return (
-    <div className="relative z-10 mx-auto w-full max-w-5xl px-6">
-      <div className="flex gap-1.5">
+    <div className="hero-search">
+      <div className="hero-search__tabs">
         {CATEGORY_TABS.map((tab) => (
           <button
             key={tab.value}
             type="button"
             onClick={() => setCategory(tab.value)}
-            className={cn(
-              "rounded-t-lg px-5 py-2 text-sm font-semibold transition",
-              category === tab.value
-                ? "bg-white text-brand-navy"
-                : "bg-white/15 text-white hover:bg-white/25",
-            )}
+            className={`hero-search__tab${category === tab.value ? " hero-search__tab--active" : ""}`}
           >
             {tab.label}
           </button>

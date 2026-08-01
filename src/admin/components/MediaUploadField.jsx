@@ -1,15 +1,16 @@
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { Plus, X, Loader2, UploadCloud } from "lucide-react";
-import { putMediaFile, toMediaRef } from "../../lib/mediaStore";
+import { uploadMediaFile } from "../../lib/mediaStore";
 import { useResolvedMediaUrl } from "../../lib/useResolvedMediaUrl";
 import { cn } from "@/lib/utils";
 
 /**
  * Multi-file upload field for a listing's photos or videos — actual files
  * (dragged/picked from disk), not a URL text box. Each selected file is
- * stored in IndexedDB (see lib/mediaStore.js) and represented in `value`
- * as an "idb:<uuid>" reference; existing plain-URL entries (the public
- * site's sample photos) display exactly the same way.
+ * uploaded to the backend (see lib/mediaStore.js's uploadMediaFile) and
+ * `value` holds the real URL it returns; existing plain-URL entries (the
+ * public site's sample photos) display exactly the same way.
  *
  * Bulk-friendly by design: the file input already accepts multiple files
  * per pick (ctrl/shift-click in the OS dialog), and the whole dropzone also
@@ -19,13 +20,26 @@ import { cn } from "@/lib/utils";
 export default function MediaUploadField({ label, accept, isVideo = false, value, onChange }) {
   const inputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
 
   async function handleFiles(fileList) {
     const files = [...fileList];
-    const newRefs = await Promise.all(
-      files.map(async (file) => toMediaRef(await putMediaFile(file))),
-    );
-    onChange([...value, ...newRefs]);
+    const kind = isVideo ? "video" : "image";
+    setUploadingCount((count) => count + files.length);
+    // uploadMediaFile bir ağ isteği — büyüsün küçüsün her dosya reddedilebilir
+    // (bağlantı kesilir, sunucu kapalıdır, dosya izin verilen boyutu aşar).
+    // Önceki (IndexedDB) sürümde bu hiçbir yere yakalanmıyordu: hiçbir şey
+    // eklenmez, hiçbir hata görünmezdi — "yükleyemiyorum ama neden
+    // bilmiyorum" tam olarak bu yüzden oluyordu.
+    try {
+      const newUrls = await Promise.all(files.map((file) => uploadMediaFile(file, kind)));
+      onChange([...value, ...newUrls]);
+    } catch (error) {
+      console.error("Medya dosyası yüklenemedi:", error);
+      toast.error(error.message || "Dosya yüklenemedi. Lütfen tekrar deneyin.");
+    } finally {
+      setUploadingCount((count) => count - files.length);
+    }
   }
 
   function handleRemove(index) {
@@ -58,14 +72,22 @@ export default function MediaUploadField({ label, accept, isVideo = false, value
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border text-muted-foreground transition hover:border-brand-gold hover:text-brand-gold-dark"
+          disabled={uploadingCount > 0}
+          className="flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border text-muted-foreground transition hover:border-brand-gold hover:text-brand-gold-dark disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isDragOver ? <UploadCloud className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-          <span className="text-[10px]">{isDragOver ? "Bırakın" : "Ekle"}</span>
+          {uploadingCount > 0 ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : isDragOver ? (
+            <UploadCloud className="h-5 w-5" />
+          ) : (
+            <Plus className="h-5 w-5" />
+          )}
+          <span className="text-[10px]">{uploadingCount > 0 ? "Yükleniyor..." : isDragOver ? "Bırakın" : "Ekle"}</span>
         </button>
       </div>
       <p className="text-[11px] text-muted-foreground">
         Birden fazla dosyayı aynı anda seçebilir veya buraya sürükleyip bırakabilirsiniz.
+        {isVideo && " Videolar sunucuya yüklendiği için büyük dosyalarda birkaç saniye sürebilir."}
       </p>
 
       <input

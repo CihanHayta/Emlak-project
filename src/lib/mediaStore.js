@@ -1,22 +1,36 @@
 /**
  * Client-side file storage for uploaded listing photos/videos.
  *
- * There's no backend/object storage yet, and localStorage is both too
- * small (~5-10MB) and string-only — useless for actual image/video
- * bytes. IndexedDB has a much larger quota and stores Blobs natively, so
- * uploaded files are kept here instead, referenced from a listing by a
- * small "idb:<uuid>" string (see toMediaRef/isMediaRef/fromMediaRef)
- * rather than embedding the file itself in the listing record.
+ * `uploadMediaFile` (the one MediaUploadField.jsx actually calls now) POSTs
+ * the file to the backend (server/, see src/routes/upload.routes.js), which
+ * stores it in Firebase Storage — or, until that's configured
+ * (FIREBASE_MODE=mock), on the backend's own disk — and returns a real,
+ * publicly-loadable URL. That URL is what gets saved on the listing
+ * directly, no indirection needed.
  *
- * A listing's `image`/`images`/`videoUrl` fields can hold EITHER a real
- * URL (the public site's existing Unsplash-based sample listings) OR one
- * of these "idb:" references (freshly uploaded files) — resolve whichever
- * you get with lib/useResolvedMediaUrl.js, which handles both transparently.
- *
- * Lives under the shared src/lib/ (not admin/lib/) because both the admin
- * panel (uploading) and the public site (displaying an admin-created
- * listing's photos) need to resolve these references.
+ * The IndexedDB-based functions below (putMediaFile/getMediaBlob/
+ * toMediaRef/isMediaRef/fromMediaRef) are kept ONLY so listings created
+ * before this change (whose `image`/`images`/`videoUrl` still hold an
+ * "idb:<uuid>" reference) keep resolving — see lib/useResolvedMediaUrl.js,
+ * which tries an idb: lookup first and falls back to treating the value as
+ * a plain URL otherwise. IndexedDB storage never left the visiting
+ * browser, so anything still using it is invisible to anyone on another
+ * device — don't reintroduce it for new uploads.
  */
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api/v1";
+
+/** Uploads a File to the backend and returns its public URL. Throws on failure — caller shows the error. */
+export async function uploadMediaFile(file, kind) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_URL}/uploads/${kind}`, { method: "POST", credentials: "include", body: formData });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body?.success) {
+    throw new Error(body?.error?.message ?? `Yükleme başarısız oldu (HTTP ${response.status}).`);
+  }
+  return body.data.url;
+}
 const DB_NAME = "sahin-admin-media";
 const STORE_NAME = "files";
 const DB_VERSION = 1;

@@ -1,5 +1,6 @@
 import { WhatsAppIcon } from "./BrandIcons";
 import { buildWhatsAppLink } from "../../config/siteConfig";
+import "./WhatsAppButton.css";
 
 /**
  * Floating WhatsApp button, fixed to the bottom-right corner on every page
@@ -13,9 +14,9 @@ export default function WhatsAppButton() {
       target="_blank"
       rel="noopener noreferrer"
       aria-label="WhatsApp üzerinden bize ulaşın"
-      className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg shadow-black/20 transition hover:scale-105 hover:shadow-xl"
+      className="whatsapp-button"
     >
-      <WhatsAppIcon className="h-7 w-7" />
+      <WhatsAppIcon className="icon-7" />
     </a>
   );
 }

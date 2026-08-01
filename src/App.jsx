@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import RequireAuth from "./admin/components/RequireAuth";
 import AdminLayout from "./admin/layouts/AdminLayout";
 import Login from "./admin/pages/Login";
+import Register from "./admin/pages/Register";
 import Dashboard from "./admin/pages/Dashboard";
 import Listings from "./admin/pages/Listings";
 import ListingForm from "./admin/pages/ListingForm";
@@ -44,6 +45,7 @@ export default function App() {
 
         {/* Admin panel */}
         <Route path="admin/login" element={<Login />} />
+        <Route path="admin/register" element={<Register />} />
         <Route path="admin" element={<RequireAuth />}>
           <Route element={<AdminLayout />}>
             <Route index element={<Dashboard />} />

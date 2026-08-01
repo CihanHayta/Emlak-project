@@ -8,6 +8,7 @@ import { getSaleProperties, getRentProperties } from "../../data/properties";
 import { getCustomers, subscribeToCustomers } from "../data/customerStore";
 import { getAppointments, subscribeToAppointments } from "../data/appointmentStore";
 import { getLeads, subscribeToLeads } from "../../lib/leadStore";
+import { toMillis } from "../../lib/firestoreTimestamp";
 import { APPOINTMENT_STATUS_STYLES } from "../data/constants";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +29,9 @@ export default function Dashboard() {
     };
   }, []);
 
-  const totalListings = getSaleProperties().length + getRentProperties().length;
+  const saleCount = getSaleProperties().length;
+  const rentCount = getRentProperties().length;
+  const totalListings = saleCount + rentCount;
   const upcomingAppointments = appointments.filter(
     (a) => a.dateTime > Date.now() && a.status !== "İptal Edildi",
   );
@@ -37,7 +40,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Building2} tone="blue" value={totalListings} label="Toplam İlan" sublabel="Satılık + Kiralık" />
+        <StatCard icon={Building2} tone="blue" value={totalListings} label="Toplam İlan" sublabel={`${saleCount} Satılık · ${rentCount} Kiralık`} />
         <StatCard icon={Users} tone="violet" value={customers.length} label="Müşteri" sublabel="CRM kayıtları" />
         <StatCard
           icon={CalendarDays}
@@ -97,16 +100,16 @@ export default function Dashboard() {
               Tümünü Gör <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="max-h-72 space-y-2.5 overflow-y-auto sm:max-h-80">
             {leads.length === 0 && (
               <p className="py-6 text-center text-sm text-muted-foreground">Henüz form gelmedi.</p>
             )}
-            {leads.slice(0, 5).map((lead) => (
-              <div key={lead.id} className="rounded-lg border border-border p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="truncate text-sm font-medium">{lead.name}</p>
+            {leads.slice(0, 8).map((lead) => (
+              <div key={lead.id} className="rounded-lg border border-border p-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="min-w-0 truncate text-sm font-medium">{lead.name}</p>
                   <span className="shrink-0 text-xs text-muted-foreground">
-                    {new Date(lead.createdAt).toLocaleDateString("tr-TR")}
+                    {new Date(toMillis(lead.createdAt)).toLocaleDateString("tr-TR")}
                   </span>
                 </div>
                 <p className="truncate text-xs text-muted-foreground">{lead.context}</p>
@@ -124,7 +127,7 @@ export default function Dashboard() {
           </p>
         </CardHeader>
         <CardContent>
-          <SalesPipeline customers={customers} onChanged={() => setCustomers(getCustomers())} />
+          <SalesPipeline customers={customers} leads={leads} onChanged={() => setCustomers(getCustomers())} />
         </CardContent>
       </Card>
     </div>

@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import Header from "./Header";
 import Footer from "./Footer";
 import WhatsAppButton from "../common/WhatsAppButton";
+import "./Layout.css";
 
 /**
  * Shared page shell rendered by every route (see App.jsx).
@@ -10,9 +11,9 @@ import WhatsAppButton from "../common/WhatsAppButton";
  */
 export default function Layout() {
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="layout">
       <Header />
-      <main className="flex-1">
+      <main className="layout__main">
         <Outlet />
       </main>
       <Footer />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Inbox, UserPlus, X } from "lucide-react";
+import { Inbox, UserPlus, Trash2, CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,8 +10,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getLeads, removeLead, updateLeadStatus, subscribeToLeads } from "../../lib/leadStore";
+import { toMillis } from "../../lib/firestoreTimestamp";
 import { LEAD_STATUSES, LEAD_STATUS_STYLES } from "../data/constants";
 import { cn } from "@/lib/utils";
+import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 
 /**
  * "/admin/basvurular" content — public-site form submissions (service
@@ -20,15 +22,35 @@ import { cn } from "@/lib/utils";
  * their own page" integration the agency owner asked for: submit a form
  * on the public site, see it here immediately (shared localStorage, see
  * lib/leadStore.js).
+ *
+ * A lead only ever disappears from here via the explicit trash icon below
+ * (with a confirm step) — converting it to a customer card does NOT remove
+ * it, so an accidental click or a cancelled CustomerSheet never loses the
+ * original submission.
  */
-export default function IncomingLeads({ onConvert }) {
+export default function IncomingLeads({ onConvert, onCreateAppointment }) {
   const [leads, setLeads] = useState(getLeads());
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => subscribeToLeads(() => setLeads(getLeads())), []);
 
-  function dismiss(id) {
-    removeLead(id);
-    toast("Başvuru kaldırıldı.");
+  async function confirmDelete() {
+    const id = pendingDelete.id;
+    setPendingDelete(null);
+    try {
+      await removeLead(id);
+      toast("Başvuru silindi.");
+    } catch (error) {
+      toast.error(error.message || "Başvuru silinemedi.");
+    }
+  }
+
+  async function handleStatusChange(leadId, status) {
+    try {
+      await updateLeadStatus(leadId, status);
+    } catch (error) {
+      toast.error(error.message || "Durum güncellenemedi.");
+    }
   }
 
   if (leads.length === 0) {
@@ -46,24 +68,36 @@ export default function IncomingLeads({ onConvert }) {
         <div key={lead.id} className="flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="mb-1 flex items-start justify-between gap-2">
             <p className="truncate text-sm font-semibold">{lead.name}</p>
-            <button
-              type="button"
-              onClick={() => dismiss(lead.id)}
-              aria-label="Kaldır"
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onCreateAppointment(lead)}
+                aria-label="Randevu oluştur"
+                title="Randevu oluştur"
+                className="text-muted-foreground hover:text-brand-gold-dark"
+              >
+                <CalendarPlus className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingDelete(lead)}
+                aria-label="Başvuruyu sil"
+                title="Başvuruyu sil"
+                className="text-muted-foreground hover:text-red-600"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
           <p className="truncate text-xs text-muted-foreground">{lead.phone}</p>
           <p className="mt-1 truncate text-xs text-muted-foreground">{lead.context}</p>
           {lead.message && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">“{lead.message}”</p>}
           <span className="mt-2 text-[11px] text-muted-foreground">
-            {new Date(lead.createdAt).toLocaleString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+            {new Date(toMillis(lead.createdAt)).toLocaleString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
           </span>
 
           <div className="mt-3 space-y-1.5">
-            <Select value={lead.status ?? "Yeni"} onValueChange={(status) => updateLeadStatus(lead.id, status)}>
+            <Select value={lead.status ?? "Yeni"} onValueChange={(status) => handleStatusChange(lead.id, status)}>
               <SelectTrigger
                 className={cn(
                   "h-8 w-full border-none px-2 text-xs font-medium",
@@ -90,6 +124,14 @@ export default function IncomingLeads({ onConvert }) {
           </Button>
         </div>
       ))}
+
+      <ConfirmDeleteDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Başvuruyu sil"
+        description={pendingDelete ? `"${pendingDelete.name}" adlı başvuruyu kalıcı olarak silmek istediğinize emin misiniz?` : ""}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

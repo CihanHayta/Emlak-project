@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Play, Tag } from "lucide-react";
 import { useResolvedMediaUrl } from "../../lib/useResolvedMediaUrl";
+import "./PropertyCard.css";
 
 /**
  * A single property card: photo + title + location + specs (rooms/area/floor)
@@ -27,50 +28,38 @@ export default function PropertyCard({ property }) {
   const resolvedImage = useResolvedMediaUrl(image);
 
   return (
-    <Link
-      to={`/ilan/${id}`}
-      className="group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 transition hover:shadow-lg"
-    >
-      <div className="relative aspect-4/3 w-full overflow-hidden bg-gray-100">
-        <img
-          src={resolvedImage ?? ""}
-          alt={title}
-          loading="lazy"
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-        />
+    <Link to={`/ilan/${id}`} className="property-card">
+      <div className="property-card__media">
+        <img src={resolvedImage ?? ""} alt={title} loading="lazy" className="property-card__image" />
 
         {hasVideo && (
           <>
             {/* Center "play" affordance — the real video plays on the detail page. */}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 shadow-md transition group-hover:scale-110">
-                <Play className="ml-1 h-6 w-6 fill-brand-navy text-brand-navy" />
+            <div className="property-card__play-overlay">
+              <span className="property-card__play-btn">
+                <Play className="property-card__play-icon" />
               </span>
             </div>
-            {videoDuration && (
-              <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-xs font-medium text-white">
-                {videoDuration}
-              </span>
-            )}
+            {videoDuration && <span className="property-card__duration">{videoDuration}</span>}
           </>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col p-4">
-        <h3 className="mb-1 truncate font-bold text-brand-navy">{title}</h3>
-        <p className="mb-2 text-sm text-gray-500">{location}</p>
-        <p className="mb-1 text-sm text-gray-600">
+      <div className="property-card__body">
+        <h3 className="property-card__title">{title}</h3>
+        <p className="property-card__location">{location}</p>
+        <p className="property-card__specs">
           {isArsa ? (
             <>{area} m² &nbsp;•&nbsp; {zoningStatus}</>
           ) : (
             <>{rooms} &nbsp;•&nbsp; {area} m² &nbsp;•&nbsp; {floor}</>
           )}
         </p>
-        <p className="mb-3 flex items-center gap-1 text-xs text-gray-400">
-          <Tag className="h-3 w-3" />
+        <p className="property-card__listing-no">
+          <Tag className="property-card__listing-no-icon" />
           İlan No: {listingNo}
         </p>
-        <p className="mt-auto text-lg font-bold text-brand-gold-dark">{price}</p>
+        <p className="property-card__price">{price}</p>
       </div>
     </Link>
   );

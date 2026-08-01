@@ -22,7 +22,7 @@ import {
 import { getCustomers } from "../data/customerStore";
 import { addAppointment, updateAppointment } from "../data/appointmentStore";
 import { getSaleProperties, getRentProperties } from "../../data/properties";
-import { APPOINTMENT_STATUSES } from "../data/constants";
+import { APPOINTMENT_STATUSES, APPOINTMENT_SERVICE_TYPES } from "../data/constants";
 
 function toDateTimeLocalValue(timestamp) {
   const d = new Date(timestamp);
@@ -31,22 +31,39 @@ function toDateTimeLocalValue(timestamp) {
 }
 
 /**
- * Create/edit dialog for a single appointment: pick a customer + a listing,
- * date & time, status and a free-text note. Same dialog for both "+ Yeni
- * Randevu" and editing an existing row from the table/detail panel.
+ * Create/edit dialog for a single appointment: pick a customer, a randevu
+ * konusu (service type — a listing viewing or one of our services), date &
+ * time, status and a free-text note. Same dialog for both "+ Yeni Randevu"
+ * and editing an existing row from the table/detail panel.
+ *
+ * The listing itself is optional — plenty of appointments (kredi
+ * danışmanlığı, ekspertiz, 7/24 destek, ...) aren't about a specific
+ * property, so the agent shouldn't be forced to pick one just to save the
+ * appointment.
  *
  * `initialCustomerId` pre-selects a customer without needing a full
  * `appointment` object — used right after converting a lead/creating a
  * customer card, to offer "schedule their first appointment now".
+ * `initialServiceType` pre-selects the randevu konusu the same way — used
+ * when the lead already said what they wanted (e.g. "Kredi Danışmanlığı").
  * `initialDateTime` (a Date) pre-fills the date/time — used when creating
  * an appointment straight from a calendar day cell.
  */
-export default function AppointmentFormDialog({ open, onOpenChange, appointment, initialCustomerId, initialDateTime, onSaved }) {
+export default function AppointmentFormDialog({
+  open,
+  onOpenChange,
+  appointment,
+  initialCustomerId,
+  initialServiceType,
+  initialDateTime,
+  onSaved,
+}) {
   const isEditing = Boolean(appointment);
   const customers = getCustomers();
   const listings = [...getSaleProperties(), ...getRentProperties()];
 
   const [customerId, setCustomerId] = useState(appointment?.customerId ?? initialCustomerId ?? "");
+  const [serviceType, setServiceType] = useState(appointment?.serviceType ?? initialServiceType ?? "İlan Gösterimi");
   const [listingId, setListingId] = useState(appointment?.listingId ?? "");
   const [dateTime, setDateTime] = useState(
     toDateTimeLocalValue(appointment?.dateTime ?? initialDateTime?.getTime() ?? Date.now() + 60 * 60 * 1000),
@@ -54,25 +71,30 @@ export default function AppointmentFormDialog({ open, onOpenChange, appointment,
   const [status, setStatus] = useState(appointment?.status ?? "Beklemede");
   const [note, setNote] = useState(appointment?.note ?? "");
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const payload = {
       customerId,
+      serviceType,
       listingId,
       dateTime: new Date(dateTime).getTime(),
       status,
       note,
     };
 
-    if (isEditing) {
-      updateAppointment(appointment.id, payload);
-      toast.success("Randevu güncellendi.");
-    } else {
-      addAppointment(payload);
-      toast.success("Randevu oluşturuldu.");
+    try {
+      if (isEditing) {
+        await updateAppointment(appointment.id, payload);
+        toast.success("Randevu güncellendi.");
+      } else {
+        await addAppointment(payload);
+        toast.success("Randevu oluşturuldu.");
+      }
+      onSaved?.();
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error.message || "Randevu kaydedilemedi.");
     }
-    onSaved?.();
-    onOpenChange(false);
   }
 
   return (
@@ -80,7 +102,7 @@ export default function AppointmentFormDialog({ open, onOpenChange, appointment,
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Randevuyu Düzenle" : "Yeni Randevu"}</DialogTitle>
-          <DialogDescription>Müşteri, ilan ve randevu zamanını seçin.</DialogDescription>
+          <DialogDescription>Müşteri ve randevu zamanını seçin — ilgili bir ilan varsa ekleyebilirsiniz.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -101,16 +123,28 @@ export default function AppointmentFormDialog({ open, onOpenChange, appointment,
           </div>
 
           <div className="space-y-1.5">
-            <Label>İlan</Label>
-            <Select value={listingId} onValueChange={setListingId} required>
+            <Label>İlan <span className="font-normal text-muted-foreground">(opsiyonel)</span></Label>
+            <Select value={listingId} onValueChange={setListingId}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="İlan seçin">
+                <SelectValue placeholder="İlgili bir ilan varsa seçin">
                   {listings.find((l) => l.id === listingId)?.title}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent className="max-h-72">
                 {listings.map((l) => (
                   <SelectItem key={l.id} value={l.id}>{l.title} — #{l.listingNo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Randevu Konusu</Label>
+            <Select value={serviceType} onValueChange={setServiceType}>
+              <SelectTrigger className="w-full"><SelectValue>{serviceType}</SelectValue></SelectTrigger>
+              <SelectContent>
+                {APPOINTMENT_SERVICE_TYPES.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

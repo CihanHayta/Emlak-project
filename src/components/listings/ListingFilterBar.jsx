@@ -1,5 +1,7 @@
 import { Search } from "lucide-react";
 import { ISTANBUL_DISTRICTS } from "../../data/istanbulLocations";
+import { TURKEY_PROVINCES } from "../../data/turkeyLocations";
+import "./ListingFilterBar.css";
 
 const ALL_DISTRICTS_VALUE = "";
 const ALL_NEIGHBORHOODS_VALUE = "";
@@ -9,22 +11,34 @@ const PROPERTY_TYPES = ["Daire", "Müstakil", "Arsa"];
 
 /**
  * Search/filter bar shown at the top of the Satılık and Kiralık listing
- * pages: Semt (district) -> Mahalle (neighborhood, cascading based on the
- * chosen district) + Tip (Daire/Müstakil/Arsa) + İlan No. Combining Semt and
- * Tip is what lets a visitor search for something like "Esenyurt" +
- * "Müstakil" or "Esenyurt" + "Arsa".
+ * pages (and, in a Satılık/Kiralık-toggle wrapper, on the homepage): Şehir
+ * (province) -> Semt (district, cascading on the chosen province) ->
+ * Mahalle (neighborhood, cascading on the chosen district — only available
+ * for İstanbul, since that's the only province with neighborhood-level
+ * data) + Tip (Daire/Müstakil/Arsa) + İlan No.
  *
- * Fully controlled: the parent page (Satilik.jsx/Kiralik.jsx) owns the
- * `filters` state and does the actual filtering of the property list —
- * this component only renders the inputs and reports changes upward via
- * `onChange`. That keeps this file about the UI, and the page about "what
- * counts as a match."
+ * Fully controlled: the parent page (Satilik.jsx/Kiralik.jsx/HeroSearchBar)
+ * owns the `filters` state and does the actual filtering of the property
+ * list — this component only renders the inputs and reports changes
+ * upward via `onChange`. That keeps this file about the UI, and the page
+ * about "what counts as a match."
  */
 export default function ListingFilterBar({ filters, onChange, onSubmit }) {
-  const { district, neighborhood, type, listingNo } = filters;
+  const { province, district, neighborhood, type, listingNo } = filters;
+  const isIstanbul = province === "İstanbul";
 
-  const selectedDistrict = ISTANBUL_DISTRICTS.find((d) => d.name === district);
-  const neighborhoods = selectedDistrict?.neighborhoods ?? [];
+  const districts = isIstanbul
+    ? ISTANBUL_DISTRICTS.map((d) => d.name)
+    : (TURKEY_PROVINCES.find((p) => p.name === province)?.districts ?? []);
+
+  const selectedIstanbulDistrict = isIstanbul ? ISTANBUL_DISTRICTS.find((d) => d.name === district) : null;
+  const neighborhoods = selectedIstanbulDistrict?.neighborhoods ?? [];
+
+  function handleProvinceChange(event) {
+    // Changing the city invalidates whatever district/neighborhood was
+    // picked before (they likely belong to a different city), so reset both.
+    onChange({ ...filters, province: event.target.value, district: ALL_DISTRICTS_VALUE, neighborhood: ALL_NEIGHBORHOODS_VALUE });
+  }
 
   function handleDistrictChange(event) {
     // Changing the district invalidates whatever neighborhood was picked
@@ -54,32 +68,36 @@ export default function ListingFilterBar({ filters, onChange, onSubmit }) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mx-auto -mt-8 flex max-w-5xl flex-col gap-3 rounded-2xl bg-white p-4 shadow-lg ring-1 ring-gray-100 sm:flex-row sm:flex-wrap sm:items-end"
-    >
-      <div className="flex-1">
-        <label htmlFor="semt" className="mb-1 block text-xs font-medium text-gray-500">
-          Semt
+    <form onSubmit={handleSubmit} className="filter-bar">
+      <div className="filter-bar__field filter-bar__field--city">
+        <label htmlFor="sehir" className="filter-bar__label">
+          Şehir
         </label>
-        <select
-          id="semt"
-          name="semt"
-          value={district}
-          onChange={handleDistrictChange}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30"
-        >
-          <option value={ALL_DISTRICTS_VALUE}>Tüm Semtler</option>
-          {ISTANBUL_DISTRICTS.map((d) => (
-            <option key={d.name} value={d.name}>
-              {d.name}
+        <select id="sehir" name="sehir" value={province} onChange={handleProvinceChange} className="filter-bar__input">
+          {TURKEY_PROVINCES.map((p) => (
+            <option key={p.name} value={p.name}>
+              {p.name}
             </option>
           ))}
         </select>
       </div>
 
-      <div className="flex-1">
-        <label htmlFor="mahalle" className="mb-1 block text-xs font-medium text-gray-500">
+      <div className="filter-bar__field">
+        <label htmlFor="semt" className="filter-bar__label">
+          Semt
+        </label>
+        <select id="semt" name="semt" value={district} onChange={handleDistrictChange} className="filter-bar__input">
+          <option value={ALL_DISTRICTS_VALUE}>Tüm Semtler</option>
+          {districts.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="filter-bar__field">
+        <label htmlFor="mahalle" className="filter-bar__label">
           Mahalle
         </label>
         <select
@@ -87,11 +105,11 @@ export default function ListingFilterBar({ filters, onChange, onSubmit }) {
           name="mahalle"
           value={neighborhood}
           onChange={handleNeighborhoodChange}
-          disabled={!district}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+          disabled={!district || !isIstanbul}
+          className="filter-bar__input"
         >
           <option value={ALL_NEIGHBORHOODS_VALUE}>
-            {district ? "Tüm Mahalleler" : "Önce semt seçin"}
+            {!isIstanbul ? "Mahalle verisi yok" : district ? "Tüm Mahalleler" : "Önce semt seçin"}
           </option>
           {neighborhoods.map((n) => (
             <option key={n} value={n}>
@@ -101,17 +119,11 @@ export default function ListingFilterBar({ filters, onChange, onSubmit }) {
         </select>
       </div>
 
-      <div className="min-w-35 flex-1">
-        <label htmlFor="tip" className="mb-1 block text-xs font-medium text-gray-500">
+      <div className="filter-bar__field filter-bar__field--narrow">
+        <label htmlFor="tip" className="filter-bar__label">
           Tip
         </label>
-        <select
-          id="tip"
-          name="tip"
-          value={type}
-          onChange={handleTypeChange}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30"
-        >
+        <select id="tip" name="tip" value={type} onChange={handleTypeChange} className="filter-bar__input">
           <option value={ALL_TYPES_VALUE}>Tüm Tipler</option>
           {PROPERTY_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -121,8 +133,8 @@ export default function ListingFilterBar({ filters, onChange, onSubmit }) {
         </select>
       </div>
 
-      <div className="min-w-35 flex-1">
-        <label htmlFor="ilanNo" className="mb-1 block text-xs font-medium text-gray-500">
+      <div className="filter-bar__field filter-bar__field--narrow">
+        <label htmlFor="ilanNo" className="filter-bar__label">
           İlan No
         </label>
         <input
@@ -132,15 +144,12 @@ export default function ListingFilterBar({ filters, onChange, onSubmit }) {
           value={listingNo}
           onChange={handleListingNoChange}
           placeholder="Örn: 10245"
-          className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-brand-gold focus:ring-2 focus:ring-brand-gold/30"
+          className="filter-bar__input"
         />
       </div>
 
-      <button
-        type="submit"
-        className="flex items-center justify-center gap-2 rounded-lg bg-brand-gold px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-gold-dark"
-      >
-        <Search className="h-4 w-4" />
+      <button type="submit" className="filter-bar__submit">
+        <Search className="icon-4" />
         Ara
       </button>
     </form>

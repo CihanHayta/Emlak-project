@@ -79,6 +79,20 @@ export function markAllAsRead() {
   writeAll(readAll().map((n) => ({ ...n, read: true })));
 }
 
+export function deleteNotification(id) {
+  writeAll(readAll().filter((n) => n.id !== id));
+}
+
+/** Deletes several notifications at once — used by the Bildirimler page's bulk-select toolbar. */
+export function deleteNotifications(ids) {
+  const idSet = new Set(ids);
+  writeAll(readAll().filter((n) => !idSet.has(n.id)));
+}
+
+export function deleteAllNotifications() {
+  writeAll([]);
+}
+
 export function subscribeToNotifications(callback) {
   window.addEventListener("notificationstore:change", callback);
   window.addEventListener("storage", callback);

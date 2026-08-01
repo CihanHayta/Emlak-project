@@ -1,9 +1,7 @@
 import { useState } from "react";
 import {
   addDays,
-  addWeeks,
   addMonths,
-  startOfWeek,
   isSameDay,
   isSameMonth,
   format,
@@ -16,22 +14,20 @@ import { cn } from "@/lib/utils";
 import { APPOINTMENT_STATUS_STYLES } from "../data/constants";
 
 /**
- * "Takvim" (calendar) view for Randevular — three modes (günlük/haftalık/
- * aylık) over the same appointment list, Google-Calendar-style. Kept as
- * agenda-style day/week columns rather than a precise hour-by-hour grid:
- * simpler to get right, and still shows exactly what's scheduled when.
+ * "Takvim" (calendar) view for Randevular — two modes (günlük/aylık) over
+ * the same appointment list, Google-Calendar-style. Kept as agenda-style
+ * day columns rather than a precise hour-by-hour grid: simpler to get
+ * right, and still shows exactly what's scheduled when.
  */
 export default function AppointmentCalendar({ mode, appointments, customersById, onSelect, onCreate }) {
   const [anchorDate, setAnchorDate] = useState(new Date());
 
   function goPrev() {
     if (mode === "gunluk") setAnchorDate((d) => addDays(d, -1));
-    else if (mode === "haftalik") setAnchorDate((d) => addWeeks(d, -1));
     else setAnchorDate((d) => addMonths(d, -1));
   }
   function goNext() {
     if (mode === "gunluk") setAnchorDate((d) => addDays(d, 1));
-    else if (mode === "haftalik") setAnchorDate((d) => addWeeks(d, 1));
     else setAnchorDate((d) => addMonths(d, 1));
   }
   function goToday() {
@@ -61,16 +57,6 @@ export default function AppointmentCalendar({ mode, appointments, customersById,
         />
       )}
 
-      {mode === "haftalik" && (
-        <WeekGrid
-          anchorDate={anchorDate}
-          appointments={appointments}
-          customersById={customersById}
-          onSelect={onSelect}
-          onCreate={onCreate}
-        />
-      )}
-
       {mode === "aylik" && (
         <MonthView
           anchorDate={anchorDate}
@@ -87,11 +73,6 @@ export default function AppointmentCalendar({ mode, appointments, customersById,
 
 function formatHeading(mode, date) {
   if (mode === "gunluk") return format(date, "d MMMM yyyy, EEEE", { locale: tr });
-  if (mode === "haftalik") {
-    const start = startOfWeek(date, { weekStartsOn: 1 });
-    const end = addDays(start, 6);
-    return `${format(start, "d MMM", { locale: tr })} – ${format(end, "d MMM yyyy", { locale: tr })}`;
-  }
   return format(date, "MMMM yyyy", { locale: tr });
 }
 
@@ -104,7 +85,7 @@ function AppointmentChip({ appointment, customersById, onSelect }) {
       className="flex w-full flex-col items-start gap-0.5 rounded-lg border border-border bg-card p-2 text-left text-xs shadow-sm transition hover:shadow-md"
     >
       <span className="font-semibold">{format(appointment.dateTime, "HH:mm")} · {customer?.name ?? "Müşteri"}</span>
-      <span className="truncate text-muted-foreground">{appointment.listing?.title ?? "İlan"}</span>
+      <span className="truncate text-muted-foreground">{appointment.listing?.title ?? appointment.serviceType ?? "Randevu"}</span>
       <span className={cn("mt-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium", APPOINTMENT_STATUS_STYLES[appointment.status])}>
         {appointment.status}
       </span>
@@ -135,46 +116,6 @@ function DayAgenda({ appointments, customersById, onSelect, day, onCreate }) {
         <Plus className="h-3.5 w-3.5" />
         Randevu Ekle
       </Button>
-    </div>
-  );
-}
-
-function WeekGrid({ anchorDate, appointments, customersById, onSelect, onCreate }) {
-  const start = startOfWeek(anchorDate, { weekStartsOn: 1 });
-  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7">
-      {days.map((day) => {
-        const dayAppointments = appointments.filter((a) => isSameDay(a.dateTime, day));
-        const isToday = isSameDay(day, new Date());
-        return (
-          <div key={day.toISOString()} className="min-h-35 rounded-xl border border-border p-2">
-            <div className="mb-2 flex items-center justify-between">
-              <p className={cn("text-xs font-semibold", isToday && "text-brand-gold-dark")}>
-                {format(day, "EEE d", { locale: tr })}
-              </p>
-              <button
-                type="button"
-                onClick={() => onCreate?.(day)}
-                aria-label="Randevu ekle"
-                className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <Plus className="h-3 w-3" />
-              </button>
-            </div>
-            <div className="space-y-1.5">
-              {dayAppointments.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">—</p>
-              ) : (
-                dayAppointments
-                  .sort((a, b) => a.dateTime - b.dateTime)
-                  .map((a) => <AppointmentChip key={a.id} appointment={a} customersById={customersById} onSelect={onSelect} />)
-              )}
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }

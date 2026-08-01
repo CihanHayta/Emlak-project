@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Home as HomeIcon, Lock, User } from "lucide-react";
+import { Home as HomeIcon, Lock, Mail, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,28 +9,35 @@ import { login } from "../lib/auth";
 
 /**
  * "/admin/login" — the only unguarded admin route (see RequireAuth.jsx).
- *
- * Demo credentials: kullanıcı adı "admin", şifre "1234" (see lib/auth.js).
- * There's no real backend yet, so this is a local-only mock session — good
- * enough to gate the panel for a demo, not for production security.
+ * Real Firebase Authentication (email/password) + the backend's session
+ * cookie — see lib/auth.js.
  */
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    const session = login(username, password);
-    if (!session) {
-      setError("Kullanıcı adı veya şifre hatalı.");
-      return;
+    setError("");
+    setIsSubmitting(true);
+    try {
+      const session = await login(email, password);
+      toast.success(`Hoş geldiniz, ${session.name}!`);
+      const redirectTo = location.state?.from ?? "/admin";
+      navigate(redirectTo, { replace: true });
+    } catch (err) {
+      setError(
+        err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found"
+          ? "E-posta veya şifre hatalı."
+          : err.message || "Giriş yapılamadı, lütfen tekrar deneyin.",
+      );
+    } finally {
+      setIsSubmitting(false);
     }
-    toast.success(`Hoş geldiniz, ${session.name}!`);
-    const redirectTo = location.state?.from ?? "/admin";
-    navigate(redirectTo, { replace: true });
   }
 
   return (
@@ -51,16 +58,17 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="username" className="text-gray-300">
-              Kullanıcı Adı
+            <Label htmlFor="email" className="text-gray-300">
+              E-posta
             </Label>
             <div className="relative">
-              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ornek@sahinemlak.com"
                 autoComplete="username"
                 required
                 className="h-10 border-white/15 bg-white/5 pl-9 text-white placeholder:text-gray-500 focus-visible:ring-brand-gold/40"
@@ -89,18 +97,24 @@ export default function Login() {
 
           {error && <p className="text-sm text-red-400">{error}</p>}
 
-          <Button type="submit" className="h-10 w-full bg-brand-gold text-white hover:bg-brand-gold-dark">
-            Giriş Yap
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="h-10 w-full bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60"
+          >
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Giriş Yap"}
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-gray-500">
-          Demo hesap: <span className="text-gray-300">admin</span> / <span className="text-gray-300">1234</span>
-        </p>
-
+        <Link
+          to="/admin/register"
+          className="mt-6 block text-center text-xs text-gray-400 transition hover:text-brand-gold"
+        >
+          Yeni emlak ofisi misiniz? Hesap oluşturun
+        </Link>
         <Link
           to="/"
-          className="mt-4 block text-center text-xs text-gray-500 transition hover:text-gray-300"
+          className="mt-2 block text-center text-xs text-gray-500 transition hover:text-gray-300"
         >
           ← Siteye dön
         </Link>

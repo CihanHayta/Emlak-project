@@ -178,7 +178,7 @@ function CustomerSheetForm({ customer, prefill, onOpenChange, onSaved, onCreated
     }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const payload = {
       ...form,
@@ -186,26 +186,34 @@ function CustomerSheetForm({ customer, prefill, onOpenChange, onSaved, onCreated
       budgetMax: form.budgetMax === "" ? 0 : Number(form.budgetMax),
     };
 
-    if (isEditing) {
-      const statusChanged = customer.status !== payload.status;
-      updateCustomer(customer.id, payload);
-      if (statusChanged) addTimelineEntry(customer.id, `Durum güncellendi: ${payload.status}`);
-      toast.success("Müşteri kartı güncellendi.");
-    } else {
-      const newCustomer = addCustomer(payload);
-      toast.success("Müşteri kartı oluşturuldu.");
-      if (scheduleAppointment) onCreatedWantsAppointment?.(newCustomer);
+    try {
+      if (isEditing) {
+        const statusChanged = customer.status !== payload.status;
+        await updateCustomer(customer.id, payload);
+        if (statusChanged) await addTimelineEntry(customer.id, `Durum güncellendi: ${payload.status}`);
+        toast.success("Müşteri kartı güncellendi.");
+      } else {
+        const newCustomer = await addCustomer(payload);
+        toast.success("Müşteri kartı oluşturuldu.");
+        if (scheduleAppointment) onCreatedWantsAppointment?.(newCustomer);
+      }
+      onSaved?.();
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error.message || "Müşteri kartı kaydedilemedi.");
     }
-    onSaved?.();
-    onOpenChange(false);
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!customer) return;
-    deleteCustomer(customer.id);
-    toast.success("Müşteri kartı silindi.");
-    onSaved?.();
-    onOpenChange(false);
+    try {
+      await deleteCustomer(customer.id);
+      toast.success("Müşteri kartı silindi.");
+      onSaved?.();
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error.message || "Müşteri kartı silinemedi.");
+    }
   }
 
   return (

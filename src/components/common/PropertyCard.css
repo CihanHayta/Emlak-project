@@ -1,0 +1,126 @@
+.property-card {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1rem;
+  background-color: #fff;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--gray-100);
+  text-decoration: none;
+  transition: box-shadow 0.2s;
+}
+.property-card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+.property-card__media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--gray-100);
+}
+
+.property-card__image {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+.property-card:hover .property-card__image {
+  transform: scale(1.05);
+}
+
+.property-card__play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.property-card__play-btn {
+  display: flex;
+  height: 3.5rem;
+  width: 3.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+.property-card:hover .property-card__play-btn {
+  transform: scale(1.1);
+}
+
+.property-card__play-icon {
+  margin-left: 0.25rem;
+  height: 1.5rem;
+  width: 1.5rem;
+  fill: var(--brand-navy);
+  color: var(--brand-navy);
+}
+
+.property-card__duration {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  border-radius: 0.25rem;
+  background-color: rgba(0, 0, 0, 0.7);
+  padding: 0.125rem 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #fff;
+}
+
+.property-card__body {
+  display: flex;
+  flex: 1 1 0%;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.property-card__title {
+  margin: 0 0 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.property-card__location {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: var(--gray-500);
+}
+
+.property-card__specs {
+  margin: 0 0 0.25rem;
+  font-size: 0.875rem;
+  color: var(--gray-600);
+}
+
+.property-card__listing-no {
+  margin: 0 0 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--gray-400);
+}
+
+.property-card__listing-no-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.property-card__price {
+  margin-top: auto;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--brand-gold-dark);
+}

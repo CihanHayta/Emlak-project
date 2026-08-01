@@ -1,40 +1,147 @@
 /**
- * Mock admin authentication.
+ * Real admin authentication, backed by Firebase Authentication + the
+ * backend's httpOnly session cookie (see server/src/services/auth.service.js).
  *
- * There's no backend yet, so this is intentionally NOT real security — it
- * just gates the /admin/* routes behind a login screen so the panel feels
- * like a real product instead of being wide open. Demo credentials:
- * kullanıcı adı "admin", şifre "1234". Once a real backend exists, replace
- * `login()` with an actual API call + a signed session token; nothing that
- * imports this module (RequireAuth, Topbar's user menu) needs to change shape.
+ * Firebase Auth's own state check is asynchronous (it has to read/restore
+ * the persisted session before it knows anything), so — unlike the old
+ * localStorage-only mock this replaced — `isLoggedIn()`/`getSession()` can
+ * be stale for a brief moment on first load. Anything that needs to *react*
+ * to the real state (RequireAuth.jsx) should use `subscribeToAuthState`
+ * instead of polling these getters.
  */
-const SESSION_KEY = "sahin-admin-session";
-const DEMO_USERNAME = "admin";
-const DEMO_PASSWORD = "1234";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { firebaseAuth } from "../../lib/firebase";
 
-export function getSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api/v1";
+
+let currentSession = null;
+let initialized = false;
+const listeners = new Set();
+
+function setSession(next) {
+  currentSession = next;
+  initialized = true;
+  listeners.forEach((callback) => callback(currentSession));
+}
+
+async function fetchMe() {
+  const response = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
+  if (!response.ok) return null;
+  const body = await response.json();
+  return body.data;
+}
+
+// Backend'in httpOnly cookie'si tarayıcı kapansa da kalıcıdır (bkz.
+// SESSION_COOKIE_EXPIRY_DAYS) — bu yüzden gerçek kaynak her zaman
+// `/auth/me`'dir; Firebase'in kendi oturum durumu sadece "en azından bir
+// idToken üretebiliyor muyum" sinyali olarak kullanılır.
+onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+  if (!firebaseUser) {
+    setSession(null);
+    return;
   }
+  const me = await fetchMe();
+  if (!me) {
+    setSession(null);
+    return;
+  }
+  setSession({
+    uid: me.user.id,
+    email: me.user.email,
+    name: me.user.displayName || me.user.email,
+    role: me.user.role,
+    tenantId: me.tenant?.id ?? null,
+    tenantName: me.tenant?.name ?? null,
+  });
+});
+
+/** Anlık durumu bilmek yeterliyse bunu kullanın; değişiklikleri dinlemek için subscribeToAuthState. */
+export function getSession() {
+  return currentSession;
 }
 
 export function isLoggedIn() {
-  return getSession() !== null;
+  return currentSession !== null;
 }
 
-/** Returns the session on success, or `null` if the credentials are wrong. */
-export function login(username, password) {
-  if (username.trim().toLowerCase() !== DEMO_USERNAME || password !== DEMO_PASSWORD) {
-    return null;
+/** Firebase'in ilk oturum kontrolü tamamlandı mı — RequireAuth bu bitene kadar bir yükleniyor ekranı gösterir. */
+export function isAuthInitialized() {
+  return initialized;
+}
+
+/** callback'i hemen mevcut durumla, sonra her değişiklikte çağırır. Unsubscribe fonksiyonu döner. */
+export function subscribeToAuthState(callback) {
+  listeners.add(callback);
+  callback(currentSession);
+  return () => listeners.delete(callback);
+}
+
+/** POST /auth/session + /auth/me, sonucu currentSession'a yazar. login() ve registerTenant() ortak son adımı. */
+async function establishSession(idToken) {
+  const response = await fetch(`${API_URL}/auth/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ idToken }),
+  });
+
+  if (!response.ok) {
+    await signOut(firebaseAuth);
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error?.message ?? "Giriş başarısız oldu.");
   }
-  const session = { username: DEMO_USERNAME, name: "Admin", role: "Admin", loggedInAt: Date.now() };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  return session;
+
+  const me = await fetchMe();
+  if (!me) throw new Error("Oturum oluşturuldu ama kullanıcı bilgisi alınamadı.");
+  setSession({
+    uid: me.user.id,
+    email: me.user.email,
+    name: me.user.displayName || me.user.email,
+    role: me.user.role,
+    tenantId: me.tenant?.id ?? null,
+    tenantName: me.tenant?.name ?? null,
+  });
+  return currentSession;
 }
 
-export function logout() {
-  localStorage.removeItem(SESSION_KEY);
+/** Başarısızlıkta fırlatır (mesajı Login.jsx'in göstereceği hata) — eski sürümün "null dönerse hata" sözleşmesinden farklı, çünkü artık neden başarısız olduğunu (yanlış şifre mi, ofise bağlı değil mi) ayırt etmemiz gerekiyor. */
+export async function login(email, password) {
+  const credential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+  const idToken = await credential.user.getIdToken();
+  return establishSession(idToken);
+}
+
+/**
+ * Yeni bir emlak ofisi kaydı: önce Firebase'de gerçek bir hesap açar, sonra
+ * backend'e (`POST /auth/register-tenant`) o hesabı owner yapan bir tenant
+ * kurdurur. Custom claims sunucuda SONRADAN set edildiği için elimizdeki ilk
+ * idToken'da henüz yok — `getIdToken(true)` ile zorla yenilemeden oturum
+ * kurmaya çalışırsak "ofise bağlı değil" hatası alırız, bu yüzden session'ı
+ * o yenilenmiş token'la kuruyoruz.
+ */
+export async function registerTenant({ email, password, companyName, phone }) {
+  const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+  const idToken = await credential.user.getIdToken();
+
+  const response = await fetch(`${API_URL}/auth/register-tenant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ idToken, companyName, phone }),
+  });
+
+  if (!response.ok) {
+    await credential.user.delete().catch(() => {});
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error?.message ?? "Kayıt başarısız oldu.");
+  }
+
+  const freshIdToken = await credential.user.getIdToken(true);
+  return establishSession(freshIdToken);
+}
+
+export async function logout() {
+  await fetch(`${API_URL}/auth/logout`, { method: "POST", credentials: "include" }).catch(() => {});
+  await signOut(firebaseAuth);
+  setSession(null);
 }

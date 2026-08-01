@@ -5,6 +5,7 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useResolvedMediaUrl } from "../../lib/useResolvedMediaUrl";
+import "./PropertyGallery.css";
 
 /**
  * Media gallery for the listing detail page: a swipeable/slidable carousel
@@ -24,24 +25,26 @@ export default function PropertyGallery({ property }) {
   const videoSrc = useResolvedMediaUrl(property.videoUrl);
 
   return (
-    <div className="relative">
+    <div className="property-gallery">
       <Swiper
         modules={[Navigation, Pagination]}
         navigation={{ prevEl: "#gallery-prev", nextEl: "#gallery-next" }}
         pagination={{ clickable: true }}
-        className="h-72 w-full overflow-hidden rounded-2xl bg-gray-100 shadow-md sm:h-96"
       >
         {property.hasVideo && (
           <SwiperSlide>
             <video
               key={property.id}
-              className="h-full w-full object-cover"
+              className="property-gallery__media"
               poster={posterUrl}
               autoPlay
               muted
               loop
               playsInline
               controls
+              controlsList="nodownload noremoteplayback"
+              disablePictureInPicture
+              onContextMenu={(event) => event.preventDefault()}
             >
               <source src={videoSrc} type="video/mp4" />
             </video>
@@ -54,21 +57,11 @@ export default function PropertyGallery({ property }) {
         ))}
       </Swiper>
 
-      <button
-        id="gallery-prev"
-        type="button"
-        aria-label="Önceki görsel"
-        className="absolute left-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-brand-navy shadow-md transition hover:bg-white"
-      >
-        <ChevronLeft className="h-5 w-5" />
+      <button id="gallery-prev" type="button" aria-label="Önceki görsel" className="property-gallery__nav-btn property-gallery__nav-btn--prev">
+        <ChevronLeft className="icon-5" />
       </button>
-      <button
-        id="gallery-next"
-        type="button"
-        aria-label="Sonraki görsel"
-        className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-brand-navy shadow-md transition hover:bg-white"
-      >
-        <ChevronRight className="h-5 w-5" />
+      <button id="gallery-next" type="button" aria-label="Sonraki görsel" className="property-gallery__nav-btn property-gallery__nav-btn--next">
+        <ChevronRight className="icon-5" />
       </button>
     </div>
   );
@@ -76,5 +69,5 @@ export default function PropertyGallery({ property }) {
 
 function GalleryImage({ src, alt }) {
   const url = useResolvedMediaUrl(src);
-  return <img src={url ?? ""} alt={alt} className="h-full w-full object-cover" />;
+  return <img src={url ?? ""} alt={alt} className="property-gallery__media" />;
 }

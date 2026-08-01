@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarDays, CalendarCheck, Clock, CheckCircle2, Plus, MoreVertical } from "lucide-react";
+import { CalendarDays, CalendarCheck, Clock, CheckCircle2, Plus, MoreVertical, Trash2 } from "lucide-react";
 import { WhatsAppIcon } from "../../components/common/BrandIcons";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -21,7 +21,8 @@ import StatCard from "../components/StatCard";
 import AppointmentDetailPanel from "../components/AppointmentDetailPanel";
 import AppointmentFormDialog from "../components/AppointmentFormDialog";
 import AppointmentCalendar from "../components/AppointmentCalendar";
-import { getAppointments, subscribeToAppointments, updateAppointment } from "../data/appointmentStore";
+import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
+import { getAppointments, subscribeToAppointments, updateAppointment, deleteAppointment } from "../data/appointmentStore";
 import { getCustomers, subscribeToCustomers } from "../data/customerStore";
 import { APPOINTMENT_STATUSES, APPOINTMENT_STATUS_STYLES } from "../data/constants";
 import { buildWhatsAppLink } from "../../config/siteConfig";
@@ -43,6 +44,7 @@ export default function Appointments() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState(null);
   const [createDefaultDate, setCreateDefaultDate] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   useEffect(() => {
     const unsubA = subscribeToAppointments(() => setAppointments(getAppointments()));
@@ -70,7 +72,16 @@ export default function Appointments() {
     completed: appointments.filter((a) => a.status === "Tamamlandı").length,
   };
 
-  const filteredAppointments = statusFilter === ALL ? appointments : appointments.filter((a) => a.status === statusFilter);
+  // Liste view: upcoming appointments first (soonest first), geçmiş
+  // (past-due) appointments pushed to the bottom instead of interleaving
+  // chronologically — within each group still sorted by date, just radiating
+  // outward from "now" in both directions instead of one flat ascending list.
+  const now = Date.now();
+  const upcomingFirst = [
+    ...appointments.filter((a) => a.dateTime >= now).sort((a, b) => a.dateTime - b.dateTime),
+    ...appointments.filter((a) => a.dateTime < now).sort((a, b) => b.dateTime - a.dateTime),
+  ];
+  const filteredAppointments = statusFilter === ALL ? upcomingFirst : upcomingFirst.filter((a) => a.status === statusFilter);
   const selectedAppointment = appointments.find((a) => a.id === selectedId) ?? null;
 
   function openCreate() {
@@ -88,9 +99,25 @@ export default function Appointments() {
     setCreateDefaultDate(null);
     setDialogOpen(true);
   }
-  function quickStatus(appointment, status) {
-    updateAppointment(appointment.id, { status });
-    toast.success(`Randevu "${status}" olarak işaretlendi.`);
+  async function quickStatus(appointment, status) {
+    try {
+      await updateAppointment(appointment.id, { status });
+      toast.success(`Randevu "${status}" olarak işaretlendi.`);
+    } catch (error) {
+      toast.error(error.message || "Randevu güncellenemedi.");
+    }
+  }
+
+  async function confirmDelete() {
+    const target = pendingDelete;
+    setPendingDelete(null);
+    try {
+      await deleteAppointment(target.id);
+      toast.success("Randevu silindi.");
+      if (selectedId === target.id) setSelectedId(null);
+    } catch (error) {
+      toast.error(error.message || "Randevu silinemedi.");
+    }
   }
 
   return (
@@ -129,7 +156,7 @@ export default function Appointments() {
                 <thead>
                   <tr className="border-b border-border bg-muted/30 text-left text-xs font-medium text-muted-foreground">
                     <th className="px-4 py-3">Müşteri</th>
-                    <th className="px-4 py-3">İlan</th>
+                    <th className="px-4 py-3">Konu / İlan</th>
                     <th className="px-4 py-3">Tarih & Saat</th>
                     <th className="px-4 py-3">Durum</th>
                     <th className="px-4 py-3">Not</th>
@@ -160,8 +187,10 @@ export default function Appointments() {
                           <p className="text-xs text-muted-foreground">{customer?.phone}</p>
                         </td>
                         <td className="max-w-48 px-4 py-3">
-                          <p className="truncate font-medium">{a.listing?.title ?? "İlan"}</p>
-                          <p className="text-xs text-muted-foreground">İlan No: {a.listing?.listingNo}</p>
+                          <p className="truncate font-medium">{a.listing?.title ?? a.serviceType ?? "—"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {a.listing ? `İlan No: ${a.listing.listingNo}` : a.serviceType ? "Hizmet randevusu" : "—"}
+                          </p>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <p>{new Date(a.dateTime).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })}</p>
@@ -201,6 +230,10 @@ export default function Appointments() {
                                 <DropdownMenuItem variant="destructive" onSelect={() => quickStatus(a, "İptal Edildi")}>
                                   İptal Et
                                 </DropdownMenuItem>
+                                <DropdownMenuItem variant="destructive" onSelect={() => setPendingDelete(a)}>
+                                  <Trash2 className="h-4 w-4" />
+                                  Sil
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>
@@ -228,11 +261,10 @@ export default function Appointments() {
         <TabsContent value="takvim" className="space-y-4">
           <Select value={calendarMode} onValueChange={setCalendarMode}>
             <SelectTrigger className="w-40">
-              <SelectValue>{{ gunluk: "Günlük", haftalik: "Haftalık", aylik: "Aylık" }[calendarMode]}</SelectValue>
+              <SelectValue>{{ gunluk: "Günlük", aylik: "Aylık" }[calendarMode]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="gunluk">Günlük</SelectItem>
-              <SelectItem value="haftalik">Haftalık</SelectItem>
               <SelectItem value="aylik">Aylık</SelectItem>
             </SelectContent>
           </Select>
@@ -266,6 +298,18 @@ export default function Appointments() {
         appointment={editingAppointment}
         initialDateTime={createDefaultDate}
         onSaved={() => setAppointments(getAppointments())}
+      />
+
+      <ConfirmDeleteDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Randevuyu sil"
+        description={
+          pendingDelete
+            ? `"${customersById[pendingDelete.customerId]?.name ?? "Bu"}" randevusunu kalıcı olarak silmek istediğinize emin misiniz?`
+            : ""
+        }
+        onConfirm={confirmDelete}
       />
     </div>
   );
