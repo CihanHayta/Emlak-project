@@ -10,10 +10,11 @@ import cookieParser from "cookie-parser";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
 import { requestIdMiddleware } from "./middleware/requestId.middleware.js";
-import { globalRateLimit } from "./middleware/rateLimit.middleware.js";
+import { globalRateLimit, webhookRateLimit } from "./middleware/rateLimit.middleware.js";
 import { notFoundMiddleware } from "./middleware/notFound.middleware.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 import { apiRouter } from "./routes/index.js";
+import { instagramWebhookRouter } from "./webhook/instagram.webhook.js";
 import { MOCK_UPLOADS_ROOT } from "./firebase/mock/storage.mock.js";
 
 export const app = express();
@@ -34,10 +35,11 @@ app.use(
 );
 app.use(cookieParser());
 
-// Faz 6'da webhook route'ları TAM OLARAK BURADA, express.json()'dan ÖNCE
-// bağlanacak (kendi express.raw() gövde ayrıştırıcılarıyla) — Meta imza
-// doğrulaması ham body üzerinde çalışır.
-// app.use("/webhooks", webhookRouter);
+// Webhook route'ları BİLEREK burada, express.json()'dan ÖNCE bağlanır
+// (kendi express.raw() gövde ayrıştırıcılarıyla, bkz. instagram.webhook.js)
+// — Meta imza doğrulaması ham body üzerinde çalışır, JSON'a parse edilmiş
+// body üzerinde değil.
+app.use("/webhooks/instagram", webhookRateLimit, instagramWebhookRouter);
 
 // FIREBASE_MODE=mock iken yüklenen dosyalar buradan servis edilir (bkz.
 // firebase/mock/storage.mock.js). Rate limit'ten ÖNCE bağlanır — bir video

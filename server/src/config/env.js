@@ -12,11 +12,11 @@ const REQUIRED_WHEN_FIREBASE_LIVE = [
   "FIREBASE_STORAGE_BUCKET",
 ];
 
+// WhatsApp değişkenleri BİLEREK bu listede değil — kod tarafında henüz
+// hiçbir WhatsApp entegrasyonu (webhook/servis) yok, olmayan bir özellik
+// için zorunlu env değişkeni istemenin anlamı yok. WhatsApp Business API
+// bağlanınca (bkz. docs/ARCHITECTURE.md) WHATSAPP_* buraya geri eklenir.
 const REQUIRED_WHEN_INTEGRATIONS_LIVE = [
-  "WHATSAPP_PHONE_NUMBER_ID",
-  "WHATSAPP_ACCESS_TOKEN",
-  "WHATSAPP_VERIFY_TOKEN",
-  "WHATSAPP_APP_SECRET",
   "INSTAGRAM_APP_SECRET",
   "INSTAGRAM_VERIFY_TOKEN",
   "INSTAGRAM_ACCESS_TOKEN",

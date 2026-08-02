@@ -25,6 +25,19 @@ export async function findTenantBySlug(slug) {
   return { id: doc.id, ...doc.data() };
 }
 
+/**
+ * Tüm (silinmemiş) tenant'ları döner. Bu proje tek-kiracılı olarak
+ * kurulduğundan (bkz. docs/ARCHITECTURE.md) normalde tam olarak 1 sonuç
+ * döner — Instagram webhook'u gibi tenant context'i olmadan gelen
+ * olaylarda "tek tenant'ı bul" için kullanılır (bkz. tenant.service.js#getSingleTenant).
+ */
+export async function listAllTenants() {
+  const snapshot = await (await collection()).get();
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }))
+    .filter((tenant) => !tenant.deletedAt);
+}
+
 export async function createTenant(data) {
   const col = await collection();
   const ref = col.doc();
