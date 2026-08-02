@@ -12,8 +12,7 @@
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
     "test:watch": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --watch",
     "lint": "cross-env ESLINT_USE_FLAT_CONFIG=false eslint .",
-    "format": "prettier --write .",
-    "seed": "node scripts/seed.js"
+    "format": "prettier --write ."
   },
   "dependencies": {
     "compression": "^1.7.5",

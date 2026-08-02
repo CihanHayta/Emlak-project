@@ -1,9 +1,12 @@
 // server/scripts/bootstrap-owner.js
 //
-// Bir kerelik kurulum betiği: ilk gerçek kullanıcıyı (owner) ve onun
-// bağlı olduğu ilk tenant'ı (emlak ofisi) oluşturur. Sonraki ofisler için
-// bu betiğe gerek yok — onlar `POST /auth/register-tenant` üzerinden
-// (ileride açılacak) kendi kendine kayıt olacak.
+// Bu proje tek-kiracılı olarak, satış başına AYRI bir Firebase projesine
+// kurulur (bkz. docs/PROJE-REHBERI.md, "Yeni Müşteri Kurulumu"). Kendi
+// kendine kayıt akışı YOK — her yeni müşteri/ofis için, o müşterinin kendi
+// Firebase projesine karşı bu betik BİR KERE çalıştırılır ve o ofisin tek
+// admin (owner) hesabını oluşturur. Danışman/Personel hesapları ise daha
+// sonra bu owner'ın kendisi, admin panelindeki Ayarlar sayfasından açar
+// (bkz. src/services/user.service.js) — bu betiğe ihtiyaç duymadan.
 //
 // Kullanım: node scripts/bootstrap-owner.js <email> <şifre> ["Şirket Adı"]
 import "../src/config/env.js";
