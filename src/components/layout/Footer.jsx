@@ -3,7 +3,8 @@ import { Home as HomeIcon, Phone, Mail, MapPin, ShieldCheck } from "lucide-react
 import { FacebookIcon, InstagramIcon, YoutubeIcon, LinkedinIcon } from "../common/BrandIcons";
 import { NAV_LINKS } from "../../config/navigation";
 import { SITE } from "../../config/siteConfig";
-import { PROPERTIES } from "../../data/properties";
+import { getAllProperties } from "../../data/properties";
+import { usePropertiesVersion } from "../../hooks/usePropertiesVersion";
 import "./Footer.css";
 
 // Footer-specific service list. Deliberately separate from data/services.js
@@ -23,12 +24,12 @@ const SOCIAL_LINKS = [
   { key: "linkedin", Icon: LinkedinIcon, label: "LinkedIn" },
 ];
 
-// A handful of listing photos reused as a small "follow us" preview grid —
-// purely decorative, swap for real Instagram feed photos later if wanted.
-const FOLLOW_PREVIEW_IMAGES = PROPERTIES.slice(0, 4);
-
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  usePropertiesVersion(); // re-render once the async listings fetch resolves
+  // A handful of listing photos reused as a small "follow us" preview grid —
+  // purely decorative, swap for real Instagram feed photos later if wanted.
+  const followPreviewImages = getAllProperties().slice(0, 4);
 
   return (
     <footer className="footer">
@@ -107,7 +108,7 @@ export default function Footer() {
         <div>
           <h4 className="footer__heading">Bizi Takip Edin</h4>
           <div className="footer__follow-grid">
-            {FOLLOW_PREVIEW_IMAGES.map((property) => (
+            {followPreviewImages.map((property) => (
               <a
                 key={property.id}
                 href={SITE.social.instagram}

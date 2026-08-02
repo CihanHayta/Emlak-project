@@ -9,8 +9,8 @@
  * to the real state (RequireAuth.jsx) should use `subscribeToAuthState`
  * instead of polling these getters.
  */
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
-import { firebaseAuth } from "../../lib/firebase";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { firebaseAuth } from "../../firebase/auth";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api/v1";
 
@@ -76,13 +76,13 @@ export function subscribeToAuthState(callback) {
   return () => listeners.delete(callback);
 }
 
-/** POST /auth/session + /auth/me, sonucu currentSession'a yazar. login() ve registerTenant() ortak son adımı. */
-async function establishSession(idToken) {
+/** POST /auth/session + /auth/me, sonucu currentSession'a yazar. */
+async function establishSession(idToken, rememberMe) {
   const response = await fetch(`${API_URL}/auth/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ idToken }),
+    body: JSON.stringify({ idToken, rememberMe }),
   });
 
   if (!response.ok) {
@@ -104,40 +104,21 @@ async function establishSession(idToken) {
   return currentSession;
 }
 
-/** Başarısızlıkta fırlatır (mesajı Login.jsx'in göstereceği hata) — eski sürümün "null dönerse hata" sözleşmesinden farklı, çünkü artık neden başarısız olduğunu (yanlış şifre mi, ofise bağlı değil mi) ayırt etmemiz gerekiyor. */
-export async function login(email, password) {
+/**
+ * Başarısızlıkta fırlatır (mesajı Login.jsx'in göstereceği hata) — eski
+ * sürümün "null dönerse hata" sözleşmesinden farklı, çünkü artık neden
+ * başarısız olduğunu (yanlış şifre mi, ofise bağlı değil mi) ayırt etmemiz
+ * gerekiyor.
+ *
+ * `rememberMe`: false ise backend session cookie'yi tarayıcı-oturumluk
+ * (maxAge'siz) kurar — tarayıcı tamamen kapanınca oturum biter. true ise
+ * izin verilen tavan (14 gün) boyunca kalıcı kalır (bkz. Login.jsx'teki
+ * "Beni Hatırla" kutusu).
+ */
+export async function login(email, password, rememberMe = false) {
   const credential = await signInWithEmailAndPassword(firebaseAuth, email, password);
   const idToken = await credential.user.getIdToken();
-  return establishSession(idToken);
-}
-
-/**
- * Yeni bir emlak ofisi kaydı: önce Firebase'de gerçek bir hesap açar, sonra
- * backend'e (`POST /auth/register-tenant`) o hesabı owner yapan bir tenant
- * kurdurur. Custom claims sunucuda SONRADAN set edildiği için elimizdeki ilk
- * idToken'da henüz yok — `getIdToken(true)` ile zorla yenilemeden oturum
- * kurmaya çalışırsak "ofise bağlı değil" hatası alırız, bu yüzden session'ı
- * o yenilenmiş token'la kuruyoruz.
- */
-export async function registerTenant({ email, password, companyName, phone }) {
-  const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-  const idToken = await credential.user.getIdToken();
-
-  const response = await fetch(`${API_URL}/auth/register-tenant`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ idToken, companyName, phone }),
-  });
-
-  if (!response.ok) {
-    await credential.user.delete().catch(() => {});
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error?.message ?? "Kayıt başarısız oldu.");
-  }
-
-  const freshIdToken = await credential.user.getIdToken(true);
-  return establishSession(freshIdToken);
+  return establishSession(idToken, rememberMe);
 }
 
 export async function logout() {

@@ -38,6 +38,16 @@ function ensureLoaded() {
   return loadPromise;
 }
 
+/**
+ * Force a re-fetch from the backend (not just a cache read) — used by
+ * useIncomingLeadAlerts.js to actually notice a lead submitted by a visitor
+ * while the admin panel is open, since the cache otherwise only updates on
+ * this browser's own mutations.
+ */
+export async function refreshLeads() {
+  return refresh();
+}
+
 /** All incoming leads, newest first. */
 export function getLeads() {
   ensureLoaded();

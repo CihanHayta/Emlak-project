@@ -5,6 +5,7 @@ import ListingSortBar from "../listings/ListingSortBar";
 import PropertyGrid from "../listings/PropertyGrid";
 import { EMPTY_FILTERS, DEFAULT_SORT, filterProperties, sortProperties } from "../listings/filterProperties";
 import { getSaleProperties, getRentProperties } from "../../data/properties";
+import { usePropertiesVersion } from "../../hooks/usePropertiesVersion";
 import "./AllListingsSection.css";
 
 const PAGE_SIZE = 12;
@@ -27,12 +28,16 @@ export default function AllListingsSection() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [sortBy, setSortBy] = useState(DEFAULT_SORT);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const propertiesVersion = usePropertiesVersion();
 
   const baseProperties = useMemo(() => {
     if (category === "satilik") return getSaleProperties();
     if (category === "kiralik") return getRentProperties();
     return [...getSaleProperties(), ...getRentProperties()];
-  }, [category]);
+    // propertiesVersion is an intentional cache-busting dependency — see
+    // Satilik.jsx's identical comment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, propertiesVersion]);
 
   const properties = useMemo(
     () => sortProperties(filterProperties(baseProperties, filters), sortBy),

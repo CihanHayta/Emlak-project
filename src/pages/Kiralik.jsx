@@ -6,6 +6,7 @@ import ListingSortBar from "../components/listings/ListingSortBar";
 import PropertyGrid from "../components/listings/PropertyGrid";
 import { EMPTY_FILTERS, DEFAULT_SORT, filterProperties, sortProperties } from "../components/listings/filterProperties";
 import { getRentProperties } from "../data/properties";
+import { usePropertiesVersion } from "../hooks/usePropertiesVersion";
 import "./Kiralik.css";
 
 /**
@@ -18,9 +19,14 @@ export default function Kiralik() {
   const location = useLocation();
   const [filters, setFilters] = useState(location.state?.filters ?? EMPTY_FILTERS);
   const [sortBy, setSortBy] = useState(DEFAULT_SORT);
+  const propertiesVersion = usePropertiesVersion();
   const properties = useMemo(
     () => sortProperties(filterProperties(getRentProperties(), filters), sortBy),
-    [filters, sortBy],
+    // See Satilik.jsx's identical comment: propertiesVersion is an
+    // intentional cache-busting dependency, not one exhaustive-deps can see
+    // referenced in the callback body.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filters, sortBy, propertiesVersion],
   );
 
   return (

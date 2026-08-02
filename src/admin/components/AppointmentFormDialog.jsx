@@ -22,7 +22,9 @@ import {
 import { getCustomers } from "../data/customerStore";
 import { addAppointment, updateAppointment } from "../data/appointmentStore";
 import { getSaleProperties, getRentProperties } from "../../data/properties";
+import { usePropertiesVersion } from "../../hooks/usePropertiesVersion";
 import { APPOINTMENT_STATUSES, APPOINTMENT_SERVICE_TYPES } from "../data/constants";
+import { playAppointmentCreatedSound } from "../lib/playSound";
 
 function toDateTimeLocalValue(timestamp) {
   const d = new Date(timestamp);
@@ -59,6 +61,7 @@ export default function AppointmentFormDialog({
   onSaved,
 }) {
   const isEditing = Boolean(appointment);
+  usePropertiesVersion();
   const customers = getCustomers();
   const listings = [...getSaleProperties(), ...getRentProperties()];
 
@@ -89,6 +92,7 @@ export default function AppointmentFormDialog({
       } else {
         await addAppointment(payload);
         toast.success("Randevu oluşturuldu.");
+        playAppointmentCreatedSound();
       }
       onSaved?.();
       onOpenChange(false);

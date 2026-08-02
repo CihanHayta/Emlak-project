@@ -107,7 +107,12 @@ export const env = {
 
   session: {
     cookieName: process.env.SESSION_COOKIE_NAME || "session",
-    expiryDays: Number(process.env.SESSION_COOKIE_EXPIRY_DAYS) || 5,
+    // "Beni Hatırla" işaretliyse: Firebase session cookie'sinin izin verdiği
+    // tavan (14 gün) kullanılır. İşaretlenmezse kısa bir süre (1 gün) —
+    // tarayıcıda KALICI olup olmaması ayrı bir konu, ona auth.controller.js
+    // cookie'ye maxAge verip vermeyerek karar verir.
+    rememberExpiryDays: Number(process.env.SESSION_COOKIE_REMEMBER_DAYS) || 14,
+    defaultExpiryDays: Number(process.env.SESSION_COOKIE_DEFAULT_DAYS) || 1,
   },
 
   signedUrlExpirySeconds: Number(process.env.SIGNED_URL_EXPIRY_SECONDS) || 900,

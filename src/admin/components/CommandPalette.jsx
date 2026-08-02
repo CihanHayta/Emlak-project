@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/command";
 import { getCustomers } from "../data/customerStore";
 import { getSaleProperties, getRentProperties } from "../../data/properties";
+import { usePropertiesVersion } from "../../hooks/usePropertiesVersion";
 
 const PAGES = [
   { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
@@ -54,6 +55,7 @@ export default function CommandPalette({ open, onOpenChange }) {
     navigate(to);
   }
 
+  usePropertiesVersion();
   const customers = getCustomers();
   const listings = [...getSaleProperties(), ...getRentProperties()].filter((p) => p.hasVideo || p.category);
 

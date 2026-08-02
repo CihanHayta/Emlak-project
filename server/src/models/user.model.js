@@ -7,6 +7,11 @@ import { withCreateFields } from "./base.model.js";
  * hariç" istisnası, users'ın `uid`'i kendi doküman kimliği olarak
  * kullanmasıyla ilgili — tenantId alanı yine var ve filtrelenir).
  */
+/**
+ * `role`: "owner" sadece bootstrap-owner.js ile (bu ofisin tek admin'i)
+ * oluşturulur; "agent" (Danışman) ve "assistant" (Personel) SADECE admin
+ * tarafından, Ayarlar sayfasından oluşturulur (bkz. user.service.js).
+ */
 export function createDefaultUser({ tenantId, email, displayName = null, photoUrl = null, role }) {
   return withCreateFields({
     tenantId,
@@ -14,9 +19,9 @@ export function createDefaultUser({ tenantId, email, displayName = null, photoUr
     phone: null,
     displayName,
     photoUrl,
-    role, // owner | admin | agent | assistant | viewer
+    role, // owner | agent | assistant
     permissions: [],
-    status: "active", // active | invited | suspended
+    status: "active", // active | passive
     lastLoginAt: null,
   });
 }

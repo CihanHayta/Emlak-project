@@ -6,15 +6,14 @@ import ListingSortBar from "../components/listings/ListingSortBar";
 import PropertyGrid from "../components/listings/PropertyGrid";
 import { EMPTY_FILTERS, DEFAULT_SORT, filterProperties, sortProperties } from "../components/listings/filterProperties";
 import { getSaleProperties } from "../data/properties";
+import { usePropertiesVersion } from "../hooks/usePropertiesVersion";
 import "./Satilik.css";
 
 /**
  * "/satilik" — satılık (for-sale) listings page.
  *
- * Renders the static sample listings from data/properties.js, filtered
- * live by the Semt/Mahalle/İlan No filter bar. Once listings come from the
- * admin panel, only `getSaleProperties` needs to change (e.g. to a fetched
- * list) — the filtering/grid below stays the same.
+ * Renders real listings fetched from the backend (data/properties.js),
+ * filtered live by the Semt/Mahalle/İlan No filter bar.
  */
 export default function Satilik() {
   // The homepage's own search widget (HeroSearchBar) can send a visitor
@@ -22,9 +21,16 @@ export default function Satilik() {
   const location = useLocation();
   const [filters, setFilters] = useState(location.state?.filters ?? EMPTY_FILTERS);
   const [sortBy, setSortBy] = useState(DEFAULT_SORT);
+  const propertiesVersion = usePropertiesVersion();
   const properties = useMemo(
     () => sortProperties(filterProperties(getSaleProperties(), filters), sortBy),
-    [filters, sortBy],
+    // getSaleProperties() reads a module-level cache, not a prop/state
+    // value — propertiesVersion is the only signal that it just changed
+    // (async fetch resolved, or a listing was added/edited/deleted), so it
+    // must stay a dependency even though the callback body doesn't
+    // reference it directly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filters, sortBy, propertiesVersion],
   );
 
   return (

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StatCard from "../components/StatCard";
 import SalesPipeline from "../components/SalesPipeline";
 import { getSaleProperties, getRentProperties } from "../../data/properties";
+import { usePropertiesVersion } from "../../hooks/usePropertiesVersion";
 import { getCustomers, subscribeToCustomers } from "../data/customerStore";
 import { getAppointments, subscribeToAppointments } from "../data/appointmentStore";
 import { getLeads, subscribeToLeads } from "../../lib/leadStore";
@@ -29,6 +30,7 @@ export default function Dashboard() {
     };
   }, []);
 
+  usePropertiesVersion();
   const saleCount = getSaleProperties().length;
   const rentCount = getRentProperties().length;
   const totalListings = saleCount + rentCount;

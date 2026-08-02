@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { getSession } from "../lib/auth";
 
 const NAV_ITEMS = [
   { label: "Dashboard", to: "/admin", icon: LayoutDashboard, end: true },
@@ -23,7 +24,10 @@ const NAV_ITEMS = [
   { label: "Müşteriler", to: "/admin/musteriler", icon: Users },
   { label: "Mesajlar", to: "/admin/mesajlar", icon: MessageSquare },
   { label: "Bildirimler", to: "/admin/bildirimler", icon: Bell },
-  { label: "Ayarlar", to: "/admin/ayarlar", icon: Settings },
+  // Sadece admin (owner) görür — Danışman/Personel için Ayarlar sayfası
+  // (kullanıcı yönetimi) hiç anlamlı değil, bkz. Settings.jsx'in kendi
+  // rol koruması.
+  { label: "Ayarlar", to: "/admin/ayarlar", icon: Settings, ownerOnly: true },
 ];
 
 /**
@@ -33,6 +37,8 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
+  const isOwner = getSession()?.role === "owner";
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.ownerOnly || isOwner);
 
   return (
     <aside
@@ -53,7 +59,7 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {NAV_ITEMS.map(({ label, to, icon: Icon, end }) => (
+        {visibleNavItems.map(({ label, to, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}

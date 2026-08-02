@@ -13,6 +13,7 @@ import {
   Send,
 } from "lucide-react";
 import { getPropertyById } from "../data/properties";
+import { usePropertiesVersion } from "../hooks/usePropertiesVersion";
 import { useInquiryForm } from "../hooks/useInquiryForm";
 import { WhatsAppIcon } from "../components/common/BrandIcons";
 import { buildWhatsAppLink } from "../config/siteConfig";
@@ -30,13 +31,10 @@ import "./PropertyDetail.css";
  * sidebar (SimilarListings) so visitors can keep browsing without leaving
  * the page.
  *
- * The listing's `videoUrl` is a placeholder clip for now — see the comment
- * next to PLACEHOLDER_VIDEO_URL in data/properties.js. Once the admin panel
- * can upload real walkthrough videos, only that data needs to change; this
- * page already plays whatever `videoUrl` it's given.
  */
 export default function PropertyDetail() {
   const { id } = useParams();
+  usePropertiesVersion(); // without this, the listing fetch resolving after first paint would never re-render past "İlan Bulunamadı"
   const property = getPropertyById(id);
 
   // Land on the detail page scrolled to the top, not wherever the listing

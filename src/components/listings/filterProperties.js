@@ -1,3 +1,5 @@
+import { toMillis } from "../../lib/firestoreTimestamp";
+
 /** The "no filter applied" state for the Şehir/Semt/Mahalle/Tip/İlan No filter bar. */
 export const EMPTY_FILTERS = { province: "İstanbul", district: "", neighborhood: "", type: "", listingNo: "" };
 
@@ -43,24 +45,22 @@ function parsePriceNumber(priceText) {
 }
 
 /**
- * `createdAt` only exists once a listing has passed through the admin
- * store (see data/properties.js's getAllProperties) — a visitor who never
- * opened the admin panel in this browser won't have it on any listing.
- * Treating a missing value as 0 (oldest possible) keeps sorting from
- * breaking: untouched sample listings just sink to "oldest" instead of
- * throwing NaN comparisons around.
+ * `createdAt` comes straight from Firestore now, which serializes
+ * Timestamps as `{_seconds,_nanoseconds}` over JSON — not a number `Date`
+ * arithmetic can subtract directly. `toMillis()` normalizes that (and
+ * plain numbers/ISO strings, for anything created before this) to epoch ms.
  */
 export function sortProperties(properties, sortBy) {
   const sorted = [...properties];
   switch (sortBy) {
     case "oldest":
-      return sorted.sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+      return sorted.sort((a, b) => toMillis(a.createdAt) - toMillis(b.createdAt));
     case "price-asc":
       return sorted.sort((a, b) => parsePriceNumber(a.price) - parsePriceNumber(b.price));
     case "price-desc":
       return sorted.sort((a, b) => parsePriceNumber(b.price) - parsePriceNumber(a.price));
     case "newest":
     default:
-      return sorted.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+      return sorted.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
   }
 }

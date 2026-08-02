@@ -1,25 +1,19 @@
 // server/src/controllers/auth.controller.js
-import { createSession, getMe, revokeSessions, registerTenant } from "../services/auth.service.js";
+import { createSession, getMe, revokeSessions } from "../services/auth.service.js";
 import { sendSuccess } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { env } from "../config/env.js";
 
-export async function registerTenantController(req, res) {
-  const { idToken, companyName, phone } = req.body;
-  if (!idToken) throw ApiError.validation("idToken zorunlu.");
-  if (!companyName || !companyName.trim()) throw ApiError.validation("Şirket adı zorunlu.");
-
-  const result = await registerTenant({ idToken, companyName: companyName.trim(), phone: phone?.trim() || null });
-  sendSuccess(res, { data: result, status: 201 });
-}
-
 export async function createSessionController(req, res) {
-  const { idToken } = req.body;
+  const { idToken, rememberMe } = req.body;
   if (!idToken) throw ApiError.validation("idToken zorunlu.");
 
-  const { cookie, maxAgeMs } = await createSession(idToken);
+  const { cookie, maxAgeMs, persistent } = await createSession(idToken, { rememberMe: Boolean(rememberMe) });
   res.cookie(env.session.cookieName, cookie, {
-    maxAge: maxAgeMs,
+    // maxAge verilmezse tarayıcı bunu bir "session cookie" sayar ve
+    // tarayıcı tamamen kapanınca siler — "Beni Hatırla" işaretlenmediğinde
+    // istenen davranış tam olarak bu.
+    ...(persistent ? { maxAge: maxAgeMs } : {}),
     httpOnly: true,
     secure: env.isProduction,
     sameSite: "lax",

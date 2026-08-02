@@ -11,7 +11,7 @@
  * merge here, same as before. `customerId` references customerStore.js
  * (already backend-backed).
  */
-import { getPropertyById } from "../../data/properties";
+import { getPropertyById, subscribeToProperties } from "../../data/properties";
 import { apiClient } from "../../lib/apiClient";
 
 let cache = [];
@@ -21,6 +21,13 @@ const listeners = new Set();
 function notify() {
   listeners.forEach((callback) => callback());
 }
+
+// Listings now load asynchronously too (real backend fetch). If properties
+// resolve AFTER an appointment list has already rendered, every appointment
+// consumer needs to re-render to pick up the now-available `.listing`
+// enrichment below — forwarding property-store notifications as our own
+// does that without every consumer needing its own separate subscription.
+subscribeToProperties(notify);
 
 function withListing(appointment) {
   return { ...appointment, listing: getPropertyById(appointment.listingId) ?? null };

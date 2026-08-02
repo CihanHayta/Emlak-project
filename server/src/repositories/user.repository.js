@@ -14,6 +14,19 @@ class UserRepository extends BaseRepository {
   async findByUid(context, uid) {
     return this.findById(context, uid);
   }
+
+  /**
+   * Kullanıcı hesapları soft-delete DEĞİL, gerçek (hard) delete kullanır —
+   * diğer koleksiyonlardan (customers/leads/appointments) farklı olarak.
+   * Sebep: Firebase Auth hesabı da her zaman aynı anda tamamen silinir (bkz.
+   * user.service.js#deleteTeamMember); Firestore'da "silinmiş" görünüp
+   * Auth'ta yaşamaya devam eden ya da tam tersi bir kayıt bırakmamak için
+   * ikisi de kalıcı silinir, biri diğerinden "geride" kalmaz.
+   */
+  async hardDelete(context, id) {
+    const ref = await this.scopedDocRef(context, id);
+    await ref.delete();
+  }
 }
 
 export const userRepository = new UserRepository();

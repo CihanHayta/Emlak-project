@@ -44,10 +44,15 @@ export default function Listings() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  function confirmDelete() {
-    deleteListing(pendingDelete.id);
-    toast.success(`"${pendingDelete.title}" silindi.`);
-    setPendingDelete(null);
+  async function confirmDelete() {
+    try {
+      await deleteListing(pendingDelete.id);
+      toast.success(`"${pendingDelete.title}" silindi.`);
+    } catch (error) {
+      toast.error(error.message || "İlan silinemedi.");
+    } finally {
+      setPendingDelete(null);
+    }
   }
 
   return (

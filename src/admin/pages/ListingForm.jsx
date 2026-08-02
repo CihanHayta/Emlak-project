@@ -135,7 +135,9 @@ export default function ListingForm() {
   const addressLine = [form.street, form.neighborhood, form.district, form.province].filter(Boolean).join(", ");
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressLine)}`;
 
-  function handleSubmit(event) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
     event.preventDefault();
     const payload = {
       category: form.category,
@@ -152,24 +154,30 @@ export default function ListingForm() {
       images: form.photoRefs,
       hasVideo: form.videoRefs.length > 0,
       videoUrl: form.videoRefs[0],
-      videoRefs: form.videoRefs,
       showLocation: form.showLocation,
       ...(isArsa
         ? { area: Number(form.area) || 0, zoningStatus: form.zoningStatus, rooms: undefined, floor: undefined }
         : { area: Number(form.area) || 0, rooms: form.rooms, floor: form.floor, zoningStatus: undefined }),
     };
 
-    if (isEditing) {
-      updateListing(existingListing.id, payload);
-      toast.success("İlan güncellendi.");
-      navigate("/admin/ilanlar");
-    } else {
-      const newListing = addListing(payload);
-      toast.success("İlan yayınlandı.");
-      // Only for brand-new listings: immediately show which existing
-      // customers might want it, with a one-click WhatsApp message each.
-      const matches = findMatchingCustomers(newListing, getCustomers());
-      setMatchDialog({ listing: newListing, matches });
+    setIsSubmitting(true);
+    try {
+      if (isEditing) {
+        await updateListing(existingListing.id, payload);
+        toast.success("İlan güncellendi.");
+        navigate("/admin/ilanlar");
+      } else {
+        const newListing = await addListing(payload);
+        toast.success("İlan yayınlandı.");
+        // Only for brand-new listings: immediately show which existing
+        // customers might want it, with a one-click WhatsApp message each.
+        const matches = findMatchingCustomers(newListing, getCustomers());
+        setMatchDialog({ listing: newListing, matches });
+      }
+    } catch (error) {
+      toast.error(error.message || "İlan kaydedilemedi.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -433,8 +441,8 @@ export default function ListingForm() {
         <Button type="button" variant="outline" onClick={() => navigate("/admin/ilanlar")}>
           Vazgeç
         </Button>
-        <Button type="submit" className="bg-brand-gold text-white hover:bg-brand-gold-dark">
-          {isEditing ? "Kaydet" : "İlanı Yayınla"}
+        <Button type="submit" disabled={isSubmitting} className="bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60">
+          {isSubmitting ? "Kaydediliyor…" : isEditing ? "Kaydet" : "İlanı Yayınla"}
         </Button>
       </div>
 

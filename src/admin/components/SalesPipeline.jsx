@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { FileText } from "lucide-react";
 import { updateCustomer, addTimelineEntry } from "../data/customerStore";
 import { CUSTOMER_STATUSES, CUSTOMER_STATUS_STYLES } from "../data/constants";
+import { playPipelineMoveSound } from "../lib/playSound";
 import { cn } from "@/lib/utils";
 
 /**
@@ -36,6 +37,7 @@ export default function SalesPipeline({ customers, leads = [], onChanged }) {
         await updateCustomer(customerId, { status });
         await addTimelineEntry(customerId, `Durum güncellendi: ${status}`);
         toast.success(`"${customer.name}" → ${status}`);
+        playPipelineMoveSound();
         onChanged?.();
       } catch (error) {
         toast.error(error.message || "Durum güncellenemedi.");

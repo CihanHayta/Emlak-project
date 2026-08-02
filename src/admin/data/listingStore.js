@@ -1,91 +1,70 @@
 /**
- * Admin-side listings store.
- *
- * Seeded once from the public site's static data/properties.js (so the
- * "İlanlar" admin page has something to browse/edit immediately), then
- * persisted independently in localStorage — same read/write + change-event
- * pattern as customerStore.js / appointmentStore.js.
- *
- * IMPORTANT boundary: edits/creates here only affect the admin panel. The
- * public marketing site keeps reading data/properties.js directly, so a
- * listing created here won't appear on /satilik or /kiralik yet. Wiring
- * that up for real means either (a) merging this store into
- * data/properties.js's getters, or (b) — the real fix — replacing
- * data/properties.js with actual API calls once a backend exists. Kept
- * separate for now so the public site's data model stays simple and
- * doesn't grow a localStorage dependency.
+ * Admin-side listings store — backed by the real backend (server/,
+ * Firestore + Firebase Storage for photos/videos), same cache+subscribe
+ * pattern as customerStore.js/appointmentStore.js. Every exported function
+ * keeps its original name/shape so consumers only needed the async-write
+ * changes (await on add/update/delete) — reads stay a synchronous cache
+ * lookup.
  */
-import { PROPERTIES } from "../../data/properties";
+import { apiClient } from "../../lib/apiClient";
+import { toMillis } from "../../lib/firestoreTimestamp";
 
-const STORAGE_KEY = "sahin-admin-listings";
-const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+let cache = [];
+let loadPromise = null;
+const listeners = new Set();
 
-// The public site's PROPERTIES don't carry a `createdAt` (they're static
-// sample data), but the "bu ilan N aydır satılmadı" reminder needs one — so
-// seeding gives each a spread-out synthetic age instead of "just now" for
-// all 253 of them. A couple of ids are pinned to a specific age so the
-// demo Satıcı customer (see customerStore.js) has a listing old enough to
-// actually trigger the reminder.
-const AGE_OVERRIDE_MONTHS = { "satilik-1": 3, "kiralik-2": 2 };
-
-function seedListings() {
-  return PROPERTIES.map((property, index) => ({
-    ...property,
-    createdAt: Date.now() - (AGE_OVERRIDE_MONTHS[property.id] ?? (index * 13) % 8) * MONTH_MS,
-  }));
+function notify() {
+  listeners.forEach((callback) => callback());
 }
 
-function readAll() {
+async function refresh() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // fall through to seed
+    cache = await apiClient.get("/properties");
+  } catch (error) {
+    console.error("İlanlar yüklenemedi:", error);
+    cache = [];
   }
-  const seeded = seedListings();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
-  return seeded;
+  notify();
 }
 
-function writeAll(listings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(listings));
-  window.dispatchEvent(new CustomEvent("listingstore:change"));
+function ensureLoaded() {
+  if (!loadPromise) loadPromise = refresh();
+  return loadPromise;
 }
 
-/** All listings (satılık + kiralık), newest-created first. */
+/** All listings, newest-created first. */
 export function getListings() {
-  return [...readAll()].reverse();
+  ensureLoaded();
+  return [...cache].sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
 }
 
 export function getListingById(id) {
-  return readAll().find((l) => l.id === id) ?? null;
+  ensureLoaded();
+  return cache.find((l) => l.id === id) ?? null;
 }
 
-export function addListing(data) {
-  const listing = {
-    id: crypto.randomUUID(),
-    listingNo: String(Math.floor(100000 + Math.random() * 900000)),
-    images: data.image ? [data.image] : [],
-    createdAt: Date.now(),
-    ...data,
-  };
-  writeAll([...readAll(), listing]);
-  return listing;
+export async function addListing(data) {
+  const created = await apiClient.post("/properties", data);
+  cache = [...cache, created];
+  notify();
+  return created;
 }
 
-export function updateListing(id, updates) {
-  writeAll(readAll().map((l) => (l.id === id ? { ...l, ...updates } : l)));
+export async function updateListing(id, updates) {
+  const updated = await apiClient.patch(`/properties/${id}`, updates);
+  cache = cache.map((l) => (l.id === id ? updated : l));
+  notify();
+  return updated;
 }
 
-export function deleteListing(id) {
-  writeAll(readAll().filter((l) => l.id !== id));
+export async function deleteListing(id) {
+  await apiClient.delete(`/properties/${id}`);
+  cache = cache.filter((l) => l.id !== id);
+  notify();
 }
 
 export function subscribeToListings(callback) {
-  window.addEventListener("listingstore:change", callback);
-  window.addEventListener("storage", callback);
-  return () => {
-    window.removeEventListener("listingstore:change", callback);
-    window.removeEventListener("storage", callback);
-  };
+  listeners.add(callback);
+  ensureLoaded();
+  return () => listeners.delete(callback);
 }

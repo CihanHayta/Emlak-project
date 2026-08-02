@@ -4,6 +4,7 @@ import VideoShowcase from "../components/home/VideoShowcase";
 import ServiceHighlights from "../components/home/ServiceHighlights";
 import AllListingsSection from "../components/home/AllListingsSection";
 import { getFeaturedVideos } from "../data/properties";
+import { usePropertiesVersion } from "../hooks/usePropertiesVersion";
 
 /**
  * Homepage ("/"): sliding hero banner -> the two "ev" (house/apartment)
@@ -12,11 +13,10 @@ import { getFeaturedVideos } from "../data/properties";
  * Kiralık). Grouped by property type (evler together, arsalar together)
  * rather than by satılık/kiralık, per the agency owner's preference.
  *
- * All four video rows pull from the static sample data in data/properties.js.
- * Once the admin panel exists, swap `getFeaturedVideos` for a real fetch and
- * the rest of this page (and VideoShowcase/PropertyCard) needs no changes.
+ * All four video rows pull from the real backend via data/properties.js.
  */
 export default function Home() {
+  usePropertiesVersion(); // re-render once the async listings fetch resolves
   const saleVideos = getFeaturedVideos("satilik");
   const rentVideos = getFeaturedVideos("kiralik");
   const saleLandVideos = getFeaturedVideos("satilik", "Arsa");

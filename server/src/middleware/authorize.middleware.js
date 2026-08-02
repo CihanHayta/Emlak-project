@@ -15,12 +15,21 @@ const BASE_PERMISSIONS = {
     "leads:read", "leads:write",
     "uploads:write",
   ],
+  // Personel: randevu oluşturma/silme, müşteri oluşturma + satış hattı
+  // (pipeline) üzerinde çalışma (customer update), mesajlaşma — Danışman
+  // (agent) ile aynı asgari yetkiler. Sadece Ayarlar (kullanıcı yönetimi)
+  // admin'e özel kalır — bkz. userRouter'ın authorize("users:*") kapısı.
   assistant: [
     "properties:read",
-    "customers:read",
+    "customers:read", "customers:write",
     "appointments:read", "appointments:write",
-    "conversations:read",
-    "leads:read",
+    "conversations:read", "conversations:write",
+    // leads:write gerekli — Başvurular ekranından randevu oluşturmak ya da
+    // bir başvuruyu müşteriye çevirmek, o lead'in durumunu da günceller
+    // (bkz. Basvurular.jsx#handleAppointmentSaved/handleConvertLead);
+    // sadece leads:read olsaydı randevu OLUŞUR ama ardından gelen durum
+    // güncellemesi 403 alır (yaşanan hata tam olarak buydu).
+    "leads:read", "leads:write",
     "uploads:write",
   ],
   viewer: ["properties:read", "customers:read", "appointments:read", "leads:read"],

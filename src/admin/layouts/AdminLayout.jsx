@@ -7,6 +7,7 @@ import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import CommandPalette from "../components/CommandPalette";
 import { useUpcomingAppointmentReminders } from "../lib/useUpcomingAppointmentReminders";
+import { useIncomingLeadAlerts } from "../lib/useIncomingLeadAlerts";
 
 // Longest-prefix match from pathname -> page title/subtitle, so the Topbar
 // always shows something sensible even for nested routes (e.g. an ilan's
@@ -41,6 +42,7 @@ export default function AdminLayout() {
   const { title, subtitle } = resolveTitle(location.pathname);
 
   useUpcomingAppointmentReminders();
+  useIncomingLeadAlerts();
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>

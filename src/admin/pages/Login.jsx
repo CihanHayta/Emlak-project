@@ -5,18 +5,32 @@ import { Home as HomeIcon, Lock, Mail, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login } from "../lib/auth";
+import { Checkbox } from "@/components/ui/checkbox";
+import { login, logout } from "../lib/auth";
+
+// Giriş ekranındaki rol sekmesi <-> backend'in gerçek rol string'i. Seçim
+// sadece bir UX doğrulaması — gerçek yetkilendirme her zaman backend'in
+// custom claims'inden gelir (bkz. authorize.middleware.js); burada sadece
+// "yanlış sekmeden girdiniz" gibi net bir hata verebilmek için kullanılır.
+const ROLE_TABS = [
+  { value: "owner", label: "Admin" },
+  { value: "agent", label: "Danışman" },
+  { value: "assistant", label: "Personel" },
+];
 
 /**
  * "/admin/login" — the only unguarded admin route (see RequireAuth.jsx).
  * Real Firebase Authentication (email/password) + the backend's session
- * cookie — see lib/auth.js.
+ * cookie — see lib/auth.js. Tek firma için kurulan bir SaaS: kayıt olma
+ * yok, hesaplar sadece admin tarafından Ayarlar'dan açılır.
  */
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [selectedRole, setSelectedRole] = useState("owner");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,7 +39,13 @@ export default function Login() {
     setError("");
     setIsSubmitting(true);
     try {
-      const session = await login(email, password);
+      const session = await login(email, password, rememberMe);
+      if (session.role !== selectedRole) {
+        await logout();
+        const expected = ROLE_TABS.find((r) => r.value === selectedRole)?.label ?? selectedRole;
+        setError(`Bu hesap "${expected}" rolüne sahip değil. Doğru sekmeyi seçip tekrar deneyin.`);
+        return;
+      }
       toast.success(`Hoş geldiniz, ${session.name}!`);
       const redirectTo = location.state?.from ?? "/admin";
       navigate(redirectTo, { replace: true });
@@ -48,12 +68,29 @@ export default function Login() {
       </div>
 
       <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-white/[0.07] p-8 shadow-2xl backdrop-blur-xl">
-        <div className="mb-8 flex flex-col items-center text-center">
+        <div className="mb-6 flex flex-col items-center text-center">
           <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-brand-gold text-brand-gold">
             <HomeIcon className="h-6 w-6" />
           </span>
           <h1 className="text-lg font-extrabold tracking-wide text-white">ŞAHİN EMLAK</h1>
           <p className="mt-1 text-sm text-gray-400">Yönetim Paneline Giriş</p>
+        </div>
+
+        <div className="mb-6 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+          {ROLE_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setSelectedRole(tab.value)}
+              className={
+                selectedRole === tab.value
+                  ? "rounded-lg bg-brand-gold px-2 py-1.5 text-xs font-semibold text-white transition"
+                  : "rounded-lg px-2 py-1.5 text-xs font-medium text-gray-400 transition hover:text-gray-200"
+              }
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -95,6 +132,15 @@ export default function Login() {
             </div>
           </div>
 
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-300">
+            <Checkbox
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked === true)}
+              className="border-white/25 data-checked:border-brand-gold data-checked:bg-brand-gold"
+            />
+            Beni hatırla
+          </label>
+
           {error && <p className="text-sm text-red-400">{error}</p>}
 
           <Button
@@ -107,14 +153,8 @@ export default function Login() {
         </form>
 
         <Link
-          to="/admin/register"
-          className="mt-6 block text-center text-xs text-gray-400 transition hover:text-brand-gold"
-        >
-          Yeni emlak ofisi misiniz? Hesap oluşturun
-        </Link>
-        <Link
           to="/"
-          className="mt-2 block text-center text-xs text-gray-500 transition hover:text-gray-300"
+          className="mt-6 block text-center text-xs text-gray-500 transition hover:text-gray-300"
         >
           ← Siteye dön
         </Link>
