@@ -5,6 +5,14 @@
 // API `entry[].messaging[]` değil `entry[].changes[].value.messages[]`
 // kullanır, ve mesaj gönderenin adı/telefonu payload'ın içinde geldiği için
 // (Instagram'daki gibi ayrı bir "profil çek" API çağrısına gerek yok).
+//
+// BİLİNEN SORUN (2026-08-03 teşhis edildi, çözülmedi): Meta'nın ücretsiz
+// "test numarası" (Business Verification öncesi sandbox) ile gönderilen
+// webhook'ların imzası, INSTAGRAM_APP_SECRET ile aynı olan WHATSAPP_APP_SECRET
+// kullanılarak doğrulanamıyor — Instagram'da AYNI secret sorunsuz çalışıyor,
+// yani kod/secret doğru, sorun muhtemelen test-numarası sandbox'ına özgü bir
+// Meta davranışı. Gerçek bir numara Business Verification sonrası bağlanınca
+// tekrar test edilmeli.
 import { Router } from "express";
 import express from "express";
 import { verifyWebhookChallenge, verifyWebhookSignature } from "../services/whatsapp.service.js";

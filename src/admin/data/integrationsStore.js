@@ -89,6 +89,12 @@ export async function connectWhatsapp({ code, wabaId, phoneNumberId }) {
   notifyWhatsapp();
 }
 
+/** Elle bağlama formu (Business Verification tamamlanana kadar kullanılan asıl yol) — bkz. Settings.jsx#WhatsAppManualConnectDialog. */
+export async function connectWhatsappManual({ accessToken, wabaId, phoneNumberId, displayPhoneNumber }) {
+  whatsappCache = await apiClient.post("/whatsapp/connect-manual", { accessToken, wabaId, phoneNumberId, displayPhoneNumber });
+  notifyWhatsapp();
+}
+
 export async function disconnectWhatsapp() {
   await apiClient.post("/whatsapp/disconnect");
   whatsappCache = { connected: false };

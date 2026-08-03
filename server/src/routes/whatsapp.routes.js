@@ -9,5 +9,6 @@ export const whatsappRouter = Router();
 whatsappRouter.use(authMiddleware, tenantMiddleware, authorize("tenant:manage"));
 
 whatsappRouter.post("/connect", whatsappController.connectController);
+whatsappRouter.post("/connect-manual", whatsappController.connectManualController);
 whatsappRouter.post("/disconnect", whatsappController.disconnectController);
 whatsappRouter.get("/status", whatsappController.statusController);

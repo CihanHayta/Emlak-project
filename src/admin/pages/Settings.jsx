@@ -41,6 +41,7 @@ import {
   getWhatsappStatus,
   subscribeToWhatsappStatus,
   connectWhatsapp,
+  connectWhatsappManual,
   disconnectWhatsapp,
 } from "../data/integrationsStore";
 import { startWhatsappEmbeddedSignup, isEmbeddedSignupConfigured } from "../lib/whatsappEmbeddedSignup";
@@ -295,6 +296,7 @@ function WhatsAppIntegrationCard() {
   const [status, setStatus] = useState(getWhatsappStatus());
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
 
   useEffect(() => subscribeToWhatsappStatus(() => setStatus(getWhatsappStatus())), []);
 
@@ -344,22 +346,108 @@ function WhatsAppIntegrationCard() {
             {disconnecting ? "Kaldırılıyor…" : "Bağlantıyı Kaldır"}
           </Button>
         ) : (
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleConnect}
-            disabled={connecting || !isEmbeddedSignupConfigured}
-            title={!isEmbeddedSignupConfigured ? "WhatsApp entegrasyonu henüz yapılandırılmadı" : undefined}
-            className="bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60"
-          >
-            {connecting ? "Bağlanıyor…" : "WhatsApp Hattını Bağla"}
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setManualOpen(true)}>
+              Elle Bağla
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleConnect}
+              disabled={connecting || !isEmbeddedSignupConfigured}
+              title={!isEmbeddedSignupConfigured ? "WhatsApp entegrasyonu henüz yapılandırılmadı" : undefined}
+              className="bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60"
+            >
+              {connecting ? "Bağlanıyor…" : "WhatsApp Hattını Bağla"}
+            </Button>
+          </div>
         )}
       </div>
       <p className="text-xs text-muted-foreground">
         Bağlandığında bu WhatsApp hattına gelen mesajlar Mesajlar sayfasında görünür, oradan cevap verebilirsiniz.
+        {!status.connected && " Business Verification tamamlanana kadar \"Elle Bağla\"yı kullanın."}
       </p>
+      <WhatsAppManualConnectDialog open={manualOpen} onOpenChange={setManualOpen} />
     </div>
+  );
+}
+
+/**
+ * "Elle Bağla" — her müşteri kendi Meta App'inde WhatsApp ürününü kurup
+ * (Try it out / Production setup adımları) Access Token, WABA id ve Phone
+ * Number id'sini bu forma yapıştırır. Business Verification tamamlanıp
+ * Embedded Signup gerçekten kullanılabilir olana kadarki asıl bağlama yolu.
+ */
+function WhatsAppManualConnectDialog({ open, onOpenChange }) {
+  const [accessToken, setAccessToken] = useState("");
+  const [wabaId, setWabaId] = useState("");
+  const [phoneNumberId, setPhoneNumberId] = useState("");
+  const [displayPhoneNumber, setDisplayPhoneNumber] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function reset() {
+    setAccessToken("");
+    setWabaId("");
+    setPhoneNumberId("");
+    setDisplayPhoneNumber("");
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await connectWhatsappManual({
+        accessToken: accessToken.trim(),
+        wabaId: wabaId.trim(),
+        phoneNumberId: phoneNumberId.trim(),
+        displayPhoneNumber: displayPhoneNumber.trim() || undefined,
+      });
+      toast.success("WhatsApp hattı bağlandı.");
+      reset();
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error.message || "WhatsApp bağlanamadı.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>WhatsApp&apos;ı Elle Bağla</DialogTitle>
+          <DialogDescription>
+            Meta App Dashboard &gt; WhatsApp &gt; &quot;Try it out&quot; / &quot;Production setup&quot; sayfasındaki değerleri yapıştırın.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="wa-token">Access Token</Label>
+            <Input id="wa-token" required value={accessToken} onChange={(e) => setAccessToken(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="wa-waba">WhatsApp Business Account ID</Label>
+            <Input id="wa-waba" required value={wabaId} onChange={(e) => setWabaId(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="wa-phone-id">Phone Number ID</Label>
+            <Input id="wa-phone-id" required value={phoneNumberId} onChange={(e) => setPhoneNumberId(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="wa-phone-display">
+              Görünen Telefon Numarası <span className="font-normal text-muted-foreground">(opsiyonel)</span>
+            </Label>
+            <Input id="wa-phone-display" value={displayPhoneNumber} onChange={(e) => setDisplayPhoneNumber(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={isSubmitting} className="w-full bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60">
+              {isSubmitting ? "Bağlanıyor…" : "Bağla"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
