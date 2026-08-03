@@ -69,7 +69,7 @@ export default function Topbar({ title, subtitle, onOpenSearch }) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2 transition hover:bg-muted">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-navy text-sm font-semibold text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                 {session?.name?.charAt(0) ?? "A"}
               </span>
               <span className="hidden text-sm font-medium sm:inline">{session?.name ?? "Admin"}</span>

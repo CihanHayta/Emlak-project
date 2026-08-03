@@ -79,12 +79,12 @@ export default function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex h-screen shrink-0 flex-col border-r border-white/10 bg-brand-navy transition-all duration-200",
+        "flex h-screen shrink-0 flex-col border-r border-white/6 bg-zinc-950 transition-all duration-200",
         collapsed ? "w-20" : "w-64",
       )}
     >
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2.5 border-b border-white/10 px-5">
+      <div className="flex h-16 items-center gap-2.5 border-b border-white/6 px-5">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-2 border-brand-gold text-brand-gold">
           <HomeIcon className="h-5 w-5" />
         </span>
@@ -105,9 +105,10 @@ export default function Sidebar() {
               className={({ isActive }) =>
                 cn(
                   "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+                  "before:absolute before:inset-y-1.5 before:-left-3 before:w-0.5 before:rounded-full before:bg-brand-gold before:transition-opacity",
                   isActive
-                    ? "bg-white/10 text-white"
-                    : "text-gray-400 hover:bg-white/5 hover:text-gray-200",
+                    ? "bg-white/6 text-white before:opacity-100"
+                    : "text-zinc-400 before:opacity-0 hover:bg-white/4 hover:text-zinc-200",
                 )
               }
               title={collapsed ? label : undefined}
@@ -130,12 +131,12 @@ export default function Sidebar() {
       </nav>
 
       {/* Quick action + collapse toggle */}
-      <div className="space-y-2 border-t border-white/10 p-3">
+      <div className="space-y-2 border-t border-white/6 p-3">
         <NewListingButton collapsed={collapsed} onClick={() => navigate("/admin/ilanlar/yeni")} />
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-gray-500 transition hover:bg-white/5 hover:text-gray-300"
+          className="flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-zinc-500 transition hover:bg-white/4 hover:text-zinc-300"
         >
           <ChevronLeft className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
           {!collapsed && "Daralt"}
