@@ -457,10 +457,19 @@ export default function Mesajlar() {
                             key={l.id}
                             type="button"
                             onClick={() => handleInsertListing(l)}
-                            className="w-full rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-muted"
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-muted"
                           >
-                            <p className="truncate font-medium text-foreground">{l.title}</p>
-                            <p className="text-muted-foreground">{l.price}</p>
+                            {l.image ? (
+                              <img src={l.image} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+                            ) : (
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted">
+                                <HomeIcon className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium text-foreground">{l.title}</p>
+                              <p className="text-muted-foreground">{l.price}</p>
+                            </div>
                           </button>
                         ))
                       )}
