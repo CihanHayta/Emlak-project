@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Search, Send, CalendarPlus, MessageCircleOff, UserPlus, Phone, Mail, MapPin } from "lucide-react";
@@ -144,6 +144,19 @@ export default function Mesajlar() {
     if (selectedId) loadMessages(selectedId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.lastMessageAt]);
+
+  // Yeni mesaj eklendiğinde (gönderilen/gelen) veya bir sohbet ilk açıldığında
+  // otomatik en alta kaydırır. Sadece mesaj SAYISI arttığında tetiklenir —
+  // 20 saniyelik yenilemede içerik aynı kalıp sadece dizi referansı
+  // değişince kullanıcının yukarı kaydırdığı konumu geri almasın diye.
+  const messagesEndRef = useRef(null);
+  const prevMessageCountRef = useRef(0);
+  useEffect(() => {
+    if (messages.length > prevMessageCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages]);
 
   const customers = getCustomers();
   const linkedCustomer = selected?.customerId ? getCustomerById(selected.customerId) : null;
@@ -343,6 +356,7 @@ export default function Mesajlar() {
                   </div>
                 ))
               )}
+              <div ref={messagesEndRef} />
             </div>
 
             <form onSubmit={handleSend} className="border-t border-border p-3">

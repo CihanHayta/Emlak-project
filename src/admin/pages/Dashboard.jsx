@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Building2, Users, CalendarDays, MessageSquare, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import StatCard from "../components/StatCard";
 import SalesPipeline from "../components/SalesPipeline";
 import { getSaleProperties, getRentProperties } from "../../data/properties";
@@ -118,28 +119,39 @@ export default function Dashboard() {
             {recentConversations.length === 0 && (
               <p className="py-6 text-center text-sm text-muted-foreground">Henüz mesaj yok.</p>
             )}
-            {recentConversations.map((c) => (
-              <Link
-                key={c.id}
-                to={`/admin/mesajlar?id=${c.id}`}
-                className="block rounded-lg border border-border p-2.5 transition hover:bg-muted/60"
-              >
-                <div className="flex items-center gap-2">
-                  {c.unreadCount > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-brand-gold" aria-label="Okunmadı" />}
-                  <ChannelIcon channel={c.channel} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <p className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {c.participantName || c.participantUsername || "Bilinmeyen kişi"}
-                  </p>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {new Date(c.lastMessageAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}
-                  </span>
-                </div>
-                <p className="mt-1 truncate pl-4 text-xs text-muted-foreground">
-                  {c.lastMessageDirection === "outbound" ? "Siz: " : ""}
-                  {c.lastMessagePreview || "—"}
-                </p>
-              </Link>
-            ))}
+            {recentConversations.map((c) => {
+              const name = c.participantName || c.participantUsername || "Bilinmeyen kişi";
+              return (
+                <Link
+                  key={c.id}
+                  to={`/admin/mesajlar?id=${c.id}`}
+                  className="flex items-center gap-2.5 rounded-lg border border-border p-2.5 transition hover:bg-muted/60"
+                >
+                  <div className="relative shrink-0">
+                    <Avatar>
+                      <AvatarImage src={c.participantAvatarUrl ?? undefined} />
+                      <AvatarFallback>{name.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-background ring-1 ring-border">
+                      <ChannelIcon channel={c.channel} className="h-2 w-2 text-muted-foreground" />
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      {c.unreadCount > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-brand-gold" aria-label="Okunmadı" />}
+                      <p className="min-w-0 flex-1 truncate text-sm font-medium">{name}</p>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {new Date(c.lastMessageAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}
+                      </span>
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {c.lastMessageDirection === "outbound" ? "Siz: " : ""}
+                      {c.lastMessagePreview || "—"}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
           </CardContent>
         </Card>
 
