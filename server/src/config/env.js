@@ -12,20 +12,20 @@ const REQUIRED_WHEN_FIREBASE_LIVE = [
   "FIREBASE_STORAGE_BUCKET",
 ];
 
-// WhatsApp değişkenleri BİLEREK bu listede değil — kod tarafında henüz
-// hiçbir WhatsApp entegrasyonu (webhook/servis) yok, olmayan bir özellik
-// için zorunlu env değişkeni istemenin anlamı yok. WhatsApp Business API
-// bağlanınca (bkz. docs/ARCHITECTURE.md) WHATSAPP_* buraya geri eklenir.
-//
-// INSTAGRAM_ACCESS_TOKEN ARTIK YOK (bilerek) — tek/global bir token değil,
-// her tenant kendi hesabını OAuth ile bağlıyor, token'ı tenants/{id}.instagram
-// altında şifreli saklanıyor (bkz. services/instagramOAuth.service.js).
-// INSTAGRAM_APP_SECRET hem webhook imza doğrulaması hem OAuth client secret'ı
-// olarak kullanılıyor — tek Meta App, çok tenant.
+// INSTAGRAM_ACCESS_TOKEN/WHATSAPP_ACCESS_TOKEN/WHATSAPP_PHONE_NUMBER_ID
+// ARTIK YOK (bilerek) — tek/global bir token değil, her tenant kendi
+// hesabını/hattını bağlıyor, token tenants/{id}.instagram|whatsapp altında
+// şifreli saklanıyor (bkz. services/instagramOAuth.service.js,
+// services/whatsappOAuth.service.js). *_APP_SECRET hem webhook imza
+// doğrulaması hem OAuth client secret'ı olarak kullanılıyor — tek Meta App,
+// çok tenant.
 const REQUIRED_WHEN_INTEGRATIONS_LIVE = [
   "INSTAGRAM_APP_ID",
   "INSTAGRAM_APP_SECRET",
   "INSTAGRAM_VERIFY_TOKEN",
+  "WHATSAPP_APP_ID",
+  "WHATSAPP_APP_SECRET",
+  "WHATSAPP_VERIFY_TOKEN",
   "TOKEN_ENCRYPTION_KEY",
   "PUBLIC_BACKEND_URL",
   "FRONTEND_URL",
@@ -113,10 +113,9 @@ export const env = {
   },
 
   whatsapp: {
-    phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || null,
-    accessToken: process.env.WHATSAPP_ACCESS_TOKEN || null,
-    verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || null,
+    appId: process.env.WHATSAPP_APP_ID || null,
     appSecret: process.env.WHATSAPP_APP_SECRET || null,
+    verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || null,
   },
   instagram: {
     appId: process.env.INSTAGRAM_APP_ID || null,

@@ -52,3 +52,45 @@ export async function disconnectInstagram() {
   cache = { connected: false };
   notify();
 }
+
+// ---- WhatsApp (ayrı durum nesnesi, Instagram'la aynı desen) ----
+
+let whatsappCache = { connected: false };
+let whatsappLoadPromise = null;
+const whatsappListeners = new Set();
+
+function notifyWhatsapp() {
+  whatsappListeners.forEach((callback) => callback());
+}
+
+async function refreshWhatsapp() {
+  try {
+    whatsappCache = await apiClient.get("/whatsapp/status");
+  } catch (error) {
+    console.error("WhatsApp bağlantı durumu alınamadı:", error);
+    whatsappCache = { connected: false };
+  }
+  notifyWhatsapp();
+}
+
+export function getWhatsappStatus() {
+  if (!whatsappLoadPromise) whatsappLoadPromise = refreshWhatsapp();
+  return whatsappCache;
+}
+
+export function subscribeToWhatsappStatus(callback) {
+  whatsappListeners.add(callback);
+  return () => whatsappListeners.delete(callback);
+}
+
+/** Embedded Signup popup'ı tamamlanınca (bkz. admin/lib/whatsappEmbeddedSignup.js) çağrılır. */
+export async function connectWhatsapp({ code, wabaId, phoneNumberId }) {
+  whatsappCache = await apiClient.post("/whatsapp/connect", { code, wabaId, phoneNumberId });
+  notifyWhatsapp();
+}
+
+export async function disconnectWhatsapp() {
+  await apiClient.post("/whatsapp/disconnect");
+  whatsappCache = { connected: false };
+  notifyWhatsapp();
+}

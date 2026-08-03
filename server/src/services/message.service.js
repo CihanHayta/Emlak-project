@@ -6,6 +6,7 @@ import { withUpdateFields } from "../models/base.model.js";
 import { getConversation } from "./conversation.service.js";
 import { getTenantById } from "./tenant.service.js";
 import { sendInstagramMessage } from "./instagram.service.js";
+import { sendWhatsappMessage } from "./whatsapp.service.js";
 import { decryptToken } from "../utils/crypto.util.js";
 import { ApiError } from "../utils/ApiError.js";
 
@@ -42,13 +43,7 @@ export async function createInboundMessage(context, conversationId, { text, atta
   return message;
 }
 
-/**
- * Kanal-bazlı gönderim dağıtımı — bugün sadece "instagram" gerçekten
- * bağlı. WhatsApp Business API entegrasyonu eklenince buraya sadece bir
- * `case "whatsapp":` eklenecek, ne conversation/message modeli ne de
- * frontend'in Mesajlar sayfası değişmesi gerekecek (ikisi de zaten
- * kanal-agnostik tasarlandı).
- */
+/** Kanal-bazlı gönderim dağıtımı — conversation/message modeli ve Mesajlar sayfası kanal-agnostik, buraya yeni bir `case` eklemek yeterli. */
 async function dispatchOutbound(tenantId, channel, externalUserId, text) {
   switch (channel) {
     case "instagram": {
@@ -56,8 +51,11 @@ async function dispatchOutbound(tenantId, channel, externalUserId, text) {
       if (!tenant.instagram) throw ApiError.upstream("Bu ofis için Instagram hesabı bağlı değil.");
       return sendInstagramMessage(externalUserId, text, decryptToken(tenant.instagram.accessToken));
     }
-    case "whatsapp":
-      throw ApiError.upstream("WhatsApp entegrasyonu henüz bağlanmadı.");
+    case "whatsapp": {
+      const tenant = await getTenantById(tenantId);
+      if (!tenant.whatsapp) throw ApiError.upstream("Bu ofis için WhatsApp hattı bağlı değil.");
+      return sendWhatsappMessage(tenant.whatsapp.phoneNumberId, externalUserId, text, decryptToken(tenant.whatsapp.accessToken));
+    }
     default:
       throw ApiError.validation(`Bilinmeyen kanal: ${channel}`);
   }

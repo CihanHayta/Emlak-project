@@ -7,6 +7,9 @@ import {
   updateTenantInstagram,
   findTenantByInstagramAccountId,
   findTenantsWithExpiringInstagramToken,
+  updateTenantWhatsapp,
+  findTenantByWhatsappWabaId,
+  findTenantsWithExpiringWhatsappToken,
 } from "../repositories/tenant.repository.js";
 import { createDefaultTenant } from "../models/tenant.model.js";
 import { slugify } from "../utils/slugify.js";
@@ -32,6 +35,24 @@ export async function disconnectTenantInstagram(tenantId) {
 /** Token yenileme işi (bkz. jobs/instagramTokenRefresh.job.js) için. */
 export async function getTenantsWithExpiringInstagramToken(beforeTimestamp) {
   return findTenantsWithExpiringInstagramToken(beforeTimestamp);
+}
+
+/** WhatsApp webhook'u, kimliksiz gelen olayın hangi tenant'a ait olduğunu `entry.id` (WABA id'si) üzerinden bulmak için kullanır. */
+export async function getTenantByWhatsappWabaId(wabaId) {
+  return findTenantByWhatsappWabaId(wabaId);
+}
+
+export async function connectTenantWhatsapp(tenantId, data) {
+  await updateTenantWhatsapp(tenantId, data);
+}
+
+export async function disconnectTenantWhatsapp(tenantId) {
+  await updateTenantWhatsapp(tenantId, null);
+}
+
+/** Token yenileme işi (bkz. jobs/whatsappTokenRefresh.job.js) için. */
+export async function getTenantsWithExpiringWhatsappToken(beforeTimestamp) {
+  return findTenantsWithExpiringWhatsappToken(beforeTimestamp);
 }
 
 /**

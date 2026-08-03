@@ -3,6 +3,7 @@ import { env } from "./config/env.js"; // en başta import edilir — eksik env 
 import { logger } from "./config/logger.js";
 import { app } from "./app.js";
 import { startInstagramTokenRefreshJob } from "./jobs/instagramTokenRefresh.job.js";
+import { startWhatsappTokenRefreshJob } from "./jobs/whatsappTokenRefresh.job.js";
 
 const server = app.listen(env.port, () => {
   logger.info(`Sunucu ayakta: http://localhost:${env.port} (FIREBASE_MODE=${env.firebaseMode}, INTEGRATIONS_MODE=${env.integrationsMode})`);
@@ -11,6 +12,7 @@ const server = app.listen(env.port, () => {
 // mock modda gerçek Instagram token'ı olmadığından işi başlatmanın anlamı yok.
 if (env.integrationsMode === "live") {
   startInstagramTokenRefreshJob();
+  startWhatsappTokenRefreshJob();
 }
 
 function shutdown(signal) {

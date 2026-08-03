@@ -15,6 +15,7 @@ import { notFoundMiddleware } from "./middleware/notFound.middleware.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 import { apiRouter } from "./routes/index.js";
 import { instagramWebhookRouter } from "./webhook/instagram.webhook.js";
+import { whatsappWebhookRouter } from "./webhook/whatsapp.webhook.js";
 import { MOCK_UPLOADS_ROOT } from "./firebase/mock/storage.mock.js";
 
 export const app = express();
@@ -40,6 +41,7 @@ app.use(cookieParser());
 // — Meta imza doğrulaması ham body üzerinde çalışır, JSON'a parse edilmiş
 // body üzerinde değil.
 app.use("/webhooks/instagram", webhookRateLimit, instagramWebhookRouter);
+app.use("/webhooks/whatsapp", webhookRateLimit, whatsappWebhookRouter);
 
 // FIREBASE_MODE=mock iken yüklenen dosyalar buradan servis edilir (bkz.
 // firebase/mock/storage.mock.js). Rate limit'ten ÖNCE bağlanır — bir video

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Plus, Trash2, Pencil, Link2Off } from "lucide-react";
-import { InstagramIcon } from "../../components/common/BrandIcons";
+import { InstagramIcon, WhatsAppIcon } from "../../components/common/BrandIcons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +38,12 @@ import {
   subscribeToInstagramStatus,
   goToInstagramConnect,
   disconnectInstagram,
+  getWhatsappStatus,
+  subscribeToWhatsappStatus,
+  connectWhatsapp,
+  disconnectWhatsapp,
 } from "../data/integrationsStore";
+import { startWhatsappEmbeddedSignup, isEmbeddedSignupConfigured } from "../lib/whatsappEmbeddedSignup";
 
 const ROLE_BADGE = {
   owner: "bg-brand-navy text-white",
@@ -212,6 +217,7 @@ export default function Settings() {
 
       <TabsContent value="entegrasyonlar" className="space-y-4">
         <InstagramIntegrationCard />
+        <WhatsAppIntegrationCard />
       </TabsContent>
 
       <AddUserDialog open={addOpen} onOpenChange={setAddOpen} />
@@ -279,6 +285,79 @@ function InstagramIntegrationCard() {
       </div>
       <p className="text-xs text-muted-foreground">
         Bağlandığında bu Instagram hesabına gelen mesajlar Mesajlar sayfasında görünür, oradan cevap verebilirsiniz.
+      </p>
+    </div>
+  );
+}
+
+/** Ayarlar > Entegrasyonlar — WhatsApp bağlantısını kurma/kaldırma. Instagram'dan farklı olarak tam sayfa yönlendirme değil, bir Embedded Signup popup'ı açar. */
+function WhatsAppIntegrationCard() {
+  const [status, setStatus] = useState(getWhatsappStatus());
+  const [connecting, setConnecting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  useEffect(() => subscribeToWhatsappStatus(() => setStatus(getWhatsappStatus())), []);
+
+  async function handleConnect() {
+    setConnecting(true);
+    try {
+      const result = await startWhatsappEmbeddedSignup();
+      await connectWhatsapp(result);
+      toast.success("WhatsApp hattı bağlandı.");
+    } catch (error) {
+      toast.error(error.message || "WhatsApp bağlanamadı.");
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function handleDisconnect() {
+    setDisconnecting(true);
+    try {
+      await disconnectWhatsapp();
+      toast.success("WhatsApp bağlantısı kaldırıldı.");
+    } catch (error) {
+      toast.error(error.message || "Bağlantı kaldırılamadı.");
+    } finally {
+      setDisconnecting(false);
+    }
+  }
+
+  return (
+    <div className="max-w-xl space-y-3 rounded-2xl border border-border p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+            <WhatsAppIcon className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">WhatsApp</p>
+            <p className="text-xs text-muted-foreground">
+              {status.connected ? `${status.displayPhoneNumber} bağlı` : "Bağlı değil"}
+            </p>
+          </div>
+        </div>
+
+        {status.connected ? (
+          <Button type="button" variant="outline" size="sm" onClick={handleDisconnect} disabled={disconnecting}>
+            <Link2Off className="h-4 w-4" />
+            {disconnecting ? "Kaldırılıyor…" : "Bağlantıyı Kaldır"}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleConnect}
+            disabled={connecting || !isEmbeddedSignupConfigured}
+            title={!isEmbeddedSignupConfigured ? "WhatsApp entegrasyonu henüz yapılandırılmadı" : undefined}
+            className="bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60"
+          >
+            {connecting ? "Bağlanıyor…" : "WhatsApp Hattını Bağla"}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Bağlandığında bu WhatsApp hattına gelen mesajlar Mesajlar sayfasında görünür, oradan cevap verebilirsiniz.
       </p>
     </div>
   );

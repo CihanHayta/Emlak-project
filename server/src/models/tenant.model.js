@@ -23,5 +23,8 @@ export function createDefaultTenant({ name, slug, ownerUserId, phone = null, tax
     // Henüz bağlanmamışsa null; accessToken her zaman şifreli tutulur
     // (bkz. utils/crypto.util.js).
     instagram: null,
+    // WhatsApp Embedded Signup bağlantısı — bkz. services/whatsappOAuth.service.js.
+    // Aynı şifreleme kuralı geçerli.
+    whatsapp: null,
   });
 }

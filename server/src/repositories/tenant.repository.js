@@ -69,6 +69,26 @@ export async function findTenantsWithExpiringInstagramToken(beforeTimestamp) {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
+/** WhatsApp Embedded Signup akışı tamamlanınca/bağlantı kaldırılınca çağrılır — `data` null ise bağlantıyı temizler. */
+export async function updateTenantWhatsapp(id, data) {
+  const col = await collection();
+  await col.doc(id).update({ whatsapp: data });
+}
+
+/** Webhook'ta `entry.id` (WhatsApp Business Account id'si) elimizde oluyor — hesap id'sinden tenant'a dönmek için. */
+export async function findTenantByWhatsappWabaId(wabaId) {
+  const snapshot = await (await collection()).where("whatsapp.wabaId", "==", wabaId).limit(1).get();
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() };
+}
+
+/** Token yenileme işi için (bkz. jobs/whatsappTokenRefresh.job.js) — bkz. findTenantsWithExpiringInstagramToken'ın açıklaması, aynı desen. */
+export async function findTenantsWithExpiringWhatsappToken(beforeTimestamp) {
+  const snapshot = await (await collection()).where("whatsapp.tokenExpiresAt", "<=", beforeTimestamp).get();
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
 /**
  * `tenants/{id}.usage.{field}`'ı `delta` kadar artırır (negatifse azaltır),
  * transaction içinde oku-hesapla-yaz yaparak — mock ve gerçek Firestore
