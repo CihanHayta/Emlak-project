@@ -136,14 +136,16 @@ export default function Mesajlar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
-  // Açık sohbete yeni mesaj gelince (sol listedeki 20 saniyelik arka plan
-  // taraması conversation özetini/lastMessageAt'ini güncelleyince — bkz.
-  // useIncomingMessageAlerts.js) mesaj akışını da tazeler. Bu olmadan yeni
-  // mesaj, sohbeti kapatıp tekrar açana kadar görünmüyordu.
+  // Açık sohbet için ayrıca hızlı bir yenileme — sol listedeki 20 saniyelik
+  // genel tarama (useIncomingMessageAlerts.js) sadece son mesaj önizlemesini
+  // günceller, gelen bir mesajın gerçekten görünmesi o taramaya bağlı kalırsa
+  // 20 saniyeye kadar sürebilir. Sadece o an AÇIK olan sohbet için, tüm
+  // sohbet listesini değil, tek bir sohbeti sorguladığı için maliyeti düşük.
   useEffect(() => {
-    if (selectedId) loadMessages(selectedId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.lastMessageAt]);
+    if (!selectedId) return;
+    const interval = setInterval(() => loadMessages(selectedId), 4000);
+    return () => clearInterval(interval);
+  }, [selectedId]);
 
   // Yeni mesaj eklendiğinde (gönderilen/gelen) veya bir sohbet ilk açıldığında
   // otomatik en alta kaydırır. Sadece mesaj SAYISI arttığında tetiklenir —
