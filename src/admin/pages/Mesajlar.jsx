@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -27,7 +28,7 @@ import {
   markConversationRead,
   linkConversationToCustomer,
 } from "../data/conversationStore";
-import { getCustomers, getCustomerById } from "../data/customerStore";
+import { getCustomers, getCustomerById, updateCustomer } from "../data/customerStore";
 import AppointmentFormDialog from "../components/AppointmentFormDialog";
 import CustomerSheet from "../components/CustomerSheet";
 
@@ -79,6 +80,8 @@ export default function Mesajlar() {
   const [appointmentTarget, setAppointmentTarget] = useState(null);
   const [customerSheetOpen, setCustomerSheetOpen] = useState(false);
   const [customerSheetTarget, setCustomerSheetTarget] = useState(null); // null = "yeni müşteri kaydet" modu
+  const [noteDraft, setNoteDraft] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   useEffect(() => subscribeToConversations(() => setConversations(getConversations())), []);
 
@@ -124,6 +127,24 @@ export default function Mesajlar() {
   const customers = getCustomers();
   const linkedCustomer = selected?.customerId ? getCustomerById(selected.customerId) : null;
   const windowClosed = Boolean(selected?.windowExpiresAt && Date.now() > selected.windowExpiresAt);
+
+  useEffect(() => {
+    setNoteDraft(linkedCustomer?.notes ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedCustomer?.id]);
+
+  async function handleSaveNote() {
+    if (!linkedCustomer) return;
+    setSavingNote(true);
+    try {
+      await updateCustomer(linkedCustomer.id, { notes: noteDraft });
+      toast.success("Not kaydedildi.");
+    } catch (error) {
+      toast.error(error.message || "Not kaydedilemedi.");
+    } finally {
+      setSavingNote(false);
+    }
+  }
 
   async function handleSend(event) {
     event.preventDefault();
@@ -369,32 +390,64 @@ export default function Mesajlar() {
           </div>
 
           {linkedCustomer ? (
-            <div className="space-y-2 rounded-lg border border-border p-3 text-sm">
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold text-foreground">{linkedCustomer.name}</p>
-                <Badge variant="outline" className="shrink-0">{linkedCustomer.status}</Badge>
+            <div className="space-y-3 rounded-lg border border-border p-3 text-sm">
+              <div className="flex items-start gap-3">
+                <Avatar size="lg" className="shrink-0">
+                  <AvatarImage src={linkedCustomer.photo ?? undefined} />
+                  <AvatarFallback>{linkedCustomer.name.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="truncate font-semibold text-foreground">{linkedCustomer.name}</p>
+                    <Badge variant="outline" className="shrink-0">{linkedCustomer.status}</Badge>
+                  </div>
+                  {linkedCustomer.phone && (
+                    <p className="flex items-center gap-1.5 text-muted-foreground">
+                      <Phone className="h-3.5 w-3.5 shrink-0" />
+                      {linkedCustomer.phone}
+                    </p>
+                  )}
+                  {linkedCustomer.email && (
+                    <p className="flex items-center gap-1.5 truncate text-muted-foreground">
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      {linkedCustomer.email}
+                    </p>
+                  )}
+                  {(linkedCustomer.desiredProvince || linkedCustomer.desiredDistrict) && (
+                    <p className="flex items-center gap-1.5 text-muted-foreground">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      {[linkedCustomer.desiredDistrict, linkedCustomer.desiredProvince].filter(Boolean).join(", ")}
+                    </p>
+                  )}
+                </div>
               </div>
-              {linkedCustomer.phone && (
-                <p className="flex items-center gap-1.5 text-muted-foreground">
-                  <Phone className="h-3.5 w-3.5 shrink-0" />
-                  {linkedCustomer.phone}
-                </p>
-              )}
-              {linkedCustomer.email && (
-                <p className="flex items-center gap-1.5 truncate text-muted-foreground">
-                  <Mail className="h-3.5 w-3.5 shrink-0" />
-                  {linkedCustomer.email}
-                </p>
-              )}
-              {(linkedCustomer.desiredProvince || linkedCustomer.desiredDistrict) && (
-                <p className="flex items-center gap-1.5 text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                  {[linkedCustomer.desiredDistrict, linkedCustomer.desiredProvince].filter(Boolean).join(", ")}
-                </p>
-              )}
               <Button type="button" variant="outline" size="sm" className="w-full" onClick={openEditLinkedCustomer}>
                 Detayları Görüntüle / Düzenle
               </Button>
+
+              <div className="space-y-1.5 border-t border-border pt-3">
+                <Label htmlFor="mesajlar-not" className="text-xs font-semibold text-muted-foreground">
+                  Not
+                </Label>
+                <Textarea
+                  id="mesajlar-not"
+                  rows={3}
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                  placeholder="Bu müşteriyle ilgili bir not ekleyin..."
+                  className="resize-none text-sm"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  disabled={savingNote || noteDraft === (linkedCustomer.notes ?? "")}
+                  onClick={handleSaveNote}
+                >
+                  Notu Kaydet
+                </Button>
+              </div>
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
@@ -430,6 +483,7 @@ export default function Mesajlar() {
                     ? `@${selected.participantUsername}`
                     : "",
                 source: selected.channel === "instagram" ? "Instagram" : "WhatsApp",
+                photo: selected.participantAvatarUrl ?? null,
               }
             : undefined
         }
