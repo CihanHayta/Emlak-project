@@ -78,9 +78,16 @@ async function processEntry(entry) {
       const senderId = message.from;
       if (!senderId) continue;
 
+      // WhatsApp'ta profil bilgisi zaten payload'ın içinde geliyor (Instagram'daki
+      // gibi ayrı bir API çağrısı yok) — callback'in kendisi zaten senkron/ucuz,
+      // yine de conversation.service.js'in "sadece yeni sohbette çağır" sözleşmesine uyuyor.
       const profile = contact ? { name: contact.profile?.name ?? null, username: null, profile_pic: null } : null;
       // eslint-disable-next-line no-await-in-loop -- entry başına genelde tek mesaj gelir, sıralı işlemek yeterli.
-      const conversation = await findOrCreateConversation(context, { channel: "whatsapp", externalUserId: senderId, profile });
+      const conversation = await findOrCreateConversation(context, {
+        channel: "whatsapp",
+        externalUserId: senderId,
+        fetchProfile: profile ? () => profile : undefined,
+      });
 
       // Şimdilik sadece metin desteklenir — resim/ses/belge gibi medya
       // türlerinde WhatsApp URL'i doğrudan vermiyor, ayrı bir `GET

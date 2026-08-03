@@ -14,11 +14,20 @@ export async function getConversation(context, id) {
   return conversation;
 }
 
-/** Webhook'tan çağrılır: aynı kullanıcıyla zaten bir sohbet varsa onu döner, yoksa yenisini açar. */
-export async function findOrCreateConversation(context, { channel, externalUserId, profile }) {
+/**
+ * Webhook'tan çağrılır: aynı kullanıcıyla zaten bir sohbet varsa onu döner,
+ * yoksa yenisini açar. `fetchProfile` bir callback — SADECE gerçekten yeni
+ * bir sohbet açılırken çağrılır (mevcut olanı bulunca hiç çağrılmaz). Bu
+ * bilerek böyle: profil bilgisini önceden (çağıran tarafta) çekmek, devam
+ * eden her sohbetteki HER mesajda gereksiz bir Meta API turu ekliyordu —
+ * webhook'un Firestore'a yazması o kadar gecikiyordu (canlıda teşhis edildi,
+ * "gelen mesaj yavaş" şikayetinin asıl sebebiydi).
+ */
+export async function findOrCreateConversation(context, { channel, externalUserId, fetchProfile }) {
   const existing = await conversationRepository.findByExternalUser(context, channel, externalUserId);
   if (existing) return existing;
 
+  const profile = fetchProfile ? await fetchProfile() : null;
   return conversationRepository.create(
     context,
     createDefaultConversation({

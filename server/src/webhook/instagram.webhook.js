@@ -93,9 +93,13 @@ async function processEntry(entry) {
     if (!senderId) continue;
 
     // eslint-disable-next-line no-await-in-loop -- ayrıntı: entry başına genelde tek bir olay gelir, sıralı işlemek yeterli.
-    const profile = await fetchInstagramProfile(senderId, accessToken);
-    // eslint-disable-next-line no-await-in-loop
-    const conversation = await findOrCreateConversation(context, { channel: "instagram", externalUserId: senderId, profile });
+    const conversation = await findOrCreateConversation(context, {
+      channel: "instagram",
+      externalUserId: senderId,
+      // SADECE yeni bir sohbet açılırken çağrılır (bkz. conversation.service.js) —
+      // devam eden sohbetlerde gereksiz bir Meta API turu eklemez.
+      fetchProfile: () => fetchInstagramProfile(senderId, accessToken),
+    });
 
     // eslint-disable-next-line no-await-in-loop
     await createInboundMessage(context, conversation.id, {
