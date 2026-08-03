@@ -68,3 +68,11 @@ export function playNewLeadSound() {
 export function playPipelineMoveSound() {
   playChime([{ frequency: 523, delayMs: 0, durationMs: 90 }]);
 }
+
+/** Instagram/WhatsApp'tan yeni bir gelen mesaj — kısa, "pop" tarzı iki nota. */
+export function playNewMessageSound() {
+  playChime([
+    { frequency: 880, delayMs: 0, durationMs: 90 },
+    { frequency: 1318, delayMs: 70, durationMs: 130 },
+  ]);
+}

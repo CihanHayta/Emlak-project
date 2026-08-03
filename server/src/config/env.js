@@ -16,10 +16,19 @@ const REQUIRED_WHEN_FIREBASE_LIVE = [
 // hiçbir WhatsApp entegrasyonu (webhook/servis) yok, olmayan bir özellik
 // için zorunlu env değişkeni istemenin anlamı yok. WhatsApp Business API
 // bağlanınca (bkz. docs/ARCHITECTURE.md) WHATSAPP_* buraya geri eklenir.
+//
+// INSTAGRAM_ACCESS_TOKEN ARTIK YOK (bilerek) — tek/global bir token değil,
+// her tenant kendi hesabını OAuth ile bağlıyor, token'ı tenants/{id}.instagram
+// altında şifreli saklanıyor (bkz. services/instagramOAuth.service.js).
+// INSTAGRAM_APP_SECRET hem webhook imza doğrulaması hem OAuth client secret'ı
+// olarak kullanılıyor — tek Meta App, çok tenant.
 const REQUIRED_WHEN_INTEGRATIONS_LIVE = [
+  "INSTAGRAM_APP_ID",
   "INSTAGRAM_APP_SECRET",
   "INSTAGRAM_VERIFY_TOKEN",
-  "INSTAGRAM_ACCESS_TOKEN",
+  "TOKEN_ENCRYPTION_KEY",
+  "PUBLIC_BACKEND_URL",
+  "FRONTEND_URL",
 ];
 
 function missingFrom(keys) {
@@ -67,6 +76,19 @@ if (!Number.isInteger(port) || port <= 0) {
   process.exit(1);
 }
 
+// TOKEN_ENCRYPTION_KEY: 64 hex karakter (32 byte) — AES-256-GCM anahtarı.
+// `openssl rand -hex 32` ile üretilir. Yanlış uzunlukta bir anahtarla
+// şifreleme/çözme sessizce yanlış sonuç vermek yerine boot'ta durur.
+function parseTokenEncryptionKey() {
+  const raw = process.env.TOKEN_ENCRYPTION_KEY;
+  if (!raw) return null;
+  if (!/^[0-9a-fA-F]{64}$/.test(raw)) {
+    console.error("\n[env] TOKEN_ENCRYPTION_KEY 64 hex karakter (32 byte) olmalı — `openssl rand -hex 32` ile üretin.\n");
+    process.exit(1);
+  }
+  return Buffer.from(raw, "hex");
+}
+
 /**
  * Tek doğru kaynak: kodun geri kalanı process.env'e değil buraya baksın.
  * Böylece tipi/varsayılanı bir kere burada tanımlarız, her yerde tekrar etmeyiz.
@@ -97,10 +119,13 @@ export const env = {
     appSecret: process.env.WHATSAPP_APP_SECRET || null,
   },
   instagram: {
+    appId: process.env.INSTAGRAM_APP_ID || null,
     appSecret: process.env.INSTAGRAM_APP_SECRET || null,
     verifyToken: process.env.INSTAGRAM_VERIFY_TOKEN || null,
-    accessToken: process.env.INSTAGRAM_ACCESS_TOKEN || null,
   },
+  tokenEncryptionKey: parseTokenEncryptionKey(),
+  publicBackendUrl: (process.env.PUBLIC_BACKEND_URL || "").replace(/\/$/, ""),
+  frontendUrl: (process.env.FRONTEND_URL || "").replace(/\/$/, ""),
   metaGraphApiVersion: process.env.META_GRAPH_API_VERSION || "v21.0",
 
   logLevel: process.env.LOG_LEVEL || "info",

@@ -1,10 +1,10 @@
 // server/src/services/instagram.service.js
 //
-// Meta Graph API ile Instagram DM entegrasyonu. Tek tenant/tek Instagram
-// hesabı varsayımıyla (bkz. docs/ARCHITECTURE.md) basit tutuldu — Page
-// Access Token tek bir env değişkeninde (`INSTAGRAM_ACCESS_TOKEN`),
-// kişi/tenant bazlı bir OAuth "hesabını bağla" akışı YOK (bilerek —
-// tek kiracılı kurulumda gereksiz karmaşıklık).
+// Meta Graph API ile Instagram DM entegrasyonu. Her tenant kendi Instagram
+// hesabını OAuth ile bağlar (bkz. instagramOAuth.service.js) — bu yüzden
+// gönderim/profil çekme fonksiyonları `accessToken`'ı PARAMETRE olarak
+// alır, global bir env token'ına bakmaz. Çağıran katman (message.service.js,
+// webhook) tenant'ın kayıtlı (şifrelenmiş) token'ını çözüp buraya geçirir.
 import crypto from "node:crypto";
 import { env } from "../config/env.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -47,13 +47,14 @@ export function verifyWebhookSignature(rawBody, signatureHeader) {
  * Bir Instagram kullanıcısına (IGSID) metin mesajı gönderir. Meta'nın
  * "24 saatlik mesajlaşma penceresi" kuralı burada DEĞİL, çağıran katmanda
  * (message.service.js#sendOutboundMessage) kontrol edilir — bu fonksiyon
- * sadece Graph API çağrısının kendisinden sorumlu.
+ * sadece Graph API çağrısının kendisinden sorumlu. `accessToken`: tenant'ın
+ * kendi bağladığı Instagram hesabının token'ı (bkz. instagramOAuth.service.js).
  */
-export async function sendInstagramMessage(recipientId, text) {
-  if (!env.instagram.accessToken) {
-    throw ApiError.upstream("Instagram bağlantısı henüz yapılandırılmamış (INSTAGRAM_ACCESS_TOKEN eksik).");
+export async function sendInstagramMessage(recipientId, text, accessToken) {
+  if (!accessToken) {
+    throw ApiError.upstream("Bu ofis için Instagram hesabı bağlı değil.");
   }
-  const url = `${GRAPH_BASE}/me/messages?access_token=${encodeURIComponent(env.instagram.accessToken)}`;
+  const url = `${GRAPH_BASE}/me/messages?access_token=${encodeURIComponent(accessToken)}`;
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -71,10 +72,10 @@ export async function sendInstagramMessage(recipientId, text) {
 }
 
 /** Gönderenin profil bilgisini (ad, kullanıcı adı, avatar) çeker — sohbet listesinde göstermek için. Başarısız olursa null döner, akışı durdurmaz. */
-export async function fetchInstagramProfile(userId) {
-  if (!env.instagram.accessToken) return null;
+export async function fetchInstagramProfile(userId, accessToken) {
+  if (!accessToken) return null;
   try {
-    const url = `${GRAPH_BASE}/${userId}?fields=name,username,profile_pic&access_token=${encodeURIComponent(env.instagram.accessToken)}`;
+    const url = `${GRAPH_BASE}/${userId}?fields=name,username,profile_pic&access_token=${encodeURIComponent(accessToken)}`;
     const response = await fetch(url);
     if (!response.ok) return null;
     return await response.json();

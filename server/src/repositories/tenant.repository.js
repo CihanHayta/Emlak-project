@@ -25,19 +25,6 @@ export async function findTenantBySlug(slug) {
   return { id: doc.id, ...doc.data() };
 }
 
-/**
- * Tüm (silinmemiş) tenant'ları döner. Bu proje tek-kiracılı olarak
- * kurulduğundan (bkz. docs/ARCHITECTURE.md) normalde tam olarak 1 sonuç
- * döner — Instagram webhook'u gibi tenant context'i olmadan gelen
- * olaylarda "tek tenant'ı bul" için kullanılır (bkz. tenant.service.js#getSingleTenant).
- */
-export async function listAllTenants() {
-  const snapshot = await (await collection()).get();
-  return snapshot.docs
-    .map((doc) => ({ id: doc.id, ...doc.data() }))
-    .filter((tenant) => !tenant.deletedAt);
-}
-
 export async function createTenant(data) {
   const col = await collection();
   const ref = col.doc();
@@ -48,6 +35,38 @@ export async function createTenant(data) {
 export async function updateTenant(id, updates) {
   const col = await collection();
   await col.doc(id).update(updates);
+}
+
+/** OAuth akışı tamamlanınca/bağlantı kaldırılınca çağrılır — `data` null ise bağlantıyı temizler. */
+export async function updateTenantInstagram(id, data) {
+  const col = await collection();
+  await col.doc(id).update({ instagram: data });
+}
+
+/**
+ * Webhook'ta `entry.id` (mesajı alan Instagram Business hesabı) elimizde
+ * oluyor ama kimliksiz gelen bir istekten hangi tenant'a ait olduğunu
+ * bilmiyoruz — hesap id'sinden tenant'a dönmek için kullanılır.
+ * `instagram.accountId` üstünde composite index GEREKMEZ (Firestore tek
+ * alanlı where'lerde otomatik index kullanır).
+ */
+export async function findTenantByInstagramAccountId(igAccountId) {
+  const snapshot = await (await collection()).where("instagram.accountId", "==", igAccountId).limit(1).get();
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() };
+}
+
+/**
+ * Token yenileme işi için (bkz. jobs/instagramTokenRefresh.job.js) — süresi
+ * `beforeTimestamp`'ten önce dolacak, Instagram'ı bağlı tenant'ları bulur.
+ * `instagram` alanı `null` olan (bağlı olmayan) tenant'larda `instagram.tokenExpiresAt`
+ * de yok sayılır — Firestore eşitsizlik operatörlerinde alanı olmayan
+ * dokümanları otomatik eler, mock Firestore da aynı davranışı taklit ediyor.
+ */
+export async function findTenantsWithExpiringInstagramToken(beforeTimestamp) {
+  const snapshot = await (await collection()).where("instagram.tokenExpiresAt", "<=", beforeTimestamp).get();
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
 /**

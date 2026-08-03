@@ -8,7 +8,7 @@
  * every request — without it every one of these calls would come back 401
  * even right after logging in.
  */
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api/v1";
+export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api/v1";
 
 async function request(path, { method = "GET", body } = {}) {
   const response = await fetch(`${API_URL}${path}`, {

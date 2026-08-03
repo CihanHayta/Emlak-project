@@ -19,5 +19,9 @@ export function createDefaultTenant({ name, slug, ownerUserId, phone = null, tax
     trialEndsAt: null,
     phone,
     taxNumber,
+    // Instagram OAuth bağlantısı — bkz. services/instagramOAuth.service.js.
+    // Henüz bağlanmamışsa null; accessToken her zaman şifreli tutulur
+    // (bkz. utils/crypto.util.js).
+    instagram: null,
   });
 }

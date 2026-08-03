@@ -4,7 +4,9 @@ import { conversationRepository } from "../repositories/conversation.repository.
 import { createDefaultMessage } from "../models/message.model.js";
 import { withUpdateFields } from "../models/base.model.js";
 import { getConversation } from "./conversation.service.js";
+import { getTenantById } from "./tenant.service.js";
 import { sendInstagramMessage } from "./instagram.service.js";
+import { decryptToken } from "../utils/crypto.util.js";
 import { ApiError } from "../utils/ApiError.js";
 
 export async function listMessages(context, conversationId) {
@@ -47,10 +49,13 @@ export async function createInboundMessage(context, conversationId, { text, atta
  * frontend'in Mesajlar sayfası değişmesi gerekecek (ikisi de zaten
  * kanal-agnostik tasarlandı).
  */
-async function dispatchOutbound(channel, externalUserId, text) {
+async function dispatchOutbound(tenantId, channel, externalUserId, text) {
   switch (channel) {
-    case "instagram":
-      return sendInstagramMessage(externalUserId, text);
+    case "instagram": {
+      const tenant = await getTenantById(tenantId);
+      if (!tenant.instagram) throw ApiError.upstream("Bu ofis için Instagram hesabı bağlı değil.");
+      return sendInstagramMessage(externalUserId, text, decryptToken(tenant.instagram.accessToken));
+    }
     case "whatsapp":
       throw ApiError.upstream("WhatsApp entegrasyonu henüz bağlanmadı.");
     default:
@@ -68,7 +73,7 @@ export async function sendOutboundMessage(context, conversationId, text) {
     );
   }
 
-  await dispatchOutbound(conversation.channel, conversation.externalUserId, text);
+  await dispatchOutbound(context.tenantId, conversation.channel, conversation.externalUserId, text);
 
   const message = await messageRepository.create(
     context,

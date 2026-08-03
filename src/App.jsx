@@ -18,9 +18,9 @@ import ListingForm from "./admin/pages/ListingForm";
 import Appointments from "./admin/pages/Appointments";
 import Customers from "./admin/pages/Customers";
 import Basvurular from "./admin/pages/Basvurular";
+import Mesajlar from "./admin/pages/Mesajlar";
 import Notifications from "./admin/pages/Notifications";
 import Settings from "./admin/pages/Settings";
-import PlaceholderPage from "./admin/pages/PlaceholderPage";
 
 /**
  * App-level route table: the public marketing site (under <Layout/>) and
@@ -53,7 +53,7 @@ export default function App() {
             <Route path="basvurular" element={<Basvurular />} />
             <Route path="randevular" element={<Appointments />} />
             <Route path="musteriler" element={<Customers />} />
-            <Route path="mesajlar" element={<PlaceholderPage title="Mesajlar" />} />
+            <Route path="mesajlar" element={<Mesajlar />} />
             <Route path="bildirimler" element={<Notifications />} />
             <Route path="ayarlar" element={<Settings />} />
           </Route>

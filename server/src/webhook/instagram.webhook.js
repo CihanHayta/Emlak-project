@@ -9,9 +9,10 @@
 import { Router } from "express";
 import express from "express";
 import { verifyWebhookChallenge, verifyWebhookSignature, fetchInstagramProfile } from "../services/instagram.service.js";
-import { getSingleTenant } from "../services/tenant.service.js";
+import { getTenantByInstagramAccountId } from "../services/tenant.service.js";
 import { findOrCreateConversation } from "../services/conversation.service.js";
 import { createInboundMessage } from "../services/message.service.js";
+import { decryptToken } from "../utils/crypto.util.js";
 import { logger } from "../config/logger.js";
 
 export const instagramWebhookRouter = Router();
@@ -48,29 +49,43 @@ instagramWebhookRouter.post("/", express.raw({ type: "application/json" }), asyn
   }
 
   try {
-    const tenant = await getSingleTenant();
-    const context = { tenantId: tenant.id, userId: null, role: "system" };
-
     for (const entry of payload.entry ?? []) {
-      // eslint-disable-next-line no-await-in-loop -- her olay bir öncekinin sohbet/mesaj kaydına bağımlı olabilir, sıralı işleniyor.
-      await processEntry(context, entry);
+      // eslint-disable-next-line no-await-in-loop -- entry'ler sırayla işleniyor, her biri kendi tenant'ını bulup yazıyor.
+      await processEntry(entry);
     }
   } catch (error) {
     logger.error("Instagram webhook işleme hatası: " + error.message);
   }
 });
 
-async function processEntry(context, entry) {
+/**
+ * `entry.id`: bu DM'i alan Instagram Business hesabının id'si — artık tek
+ * tenant varsayımı yok, hangi tenant'a ait olduğunu BUNDAN buluyoruz (bkz.
+ * tenant.repository.js#findTenantByInstagramAccountId). Eşleşen tenant
+ * yoksa (hesap bağlantısı kaldırılmış/hiç bağlanmamış), o entry loglanıp
+ * atlanır — diğer entry'leri etkilemez.
+ */
+async function processEntry(entry) {
+  const tenant = await getTenantByInstagramAccountId(entry.id);
+  if (!tenant) {
+    logger.warn(`Instagram webhook: hesap id=${entry.id} için bağlı bir tenant bulunamadı, olay atlandı.`);
+    return;
+  }
+  const accessToken = decryptToken(tenant.instagram.accessToken);
+  const context = { tenantId: tenant.id, userId: null, role: "system" };
+
   for (const event of entry.messaging ?? []) {
     // `is_echo`: kendi gönderdiğimiz mesajın Meta tarafından bize geri
-    // yansıtılmış hali — tekrar kaydetmemek için atlanır.
+    // yansıtılmış hali — tekrar kaydetmemek için atlanır. `event.message`
+    // olmayan olaylar (ör. message_edit, reaction) de bilerek atlanıyor —
+    // sadece yeni gelen mesajlar işleniyor.
     if (!event.message || event.message.is_echo) continue;
 
     const senderId = event.sender?.id;
     if (!senderId) continue;
 
     // eslint-disable-next-line no-await-in-loop -- ayrıntı: entry başına genelde tek bir olay gelir, sıralı işlemek yeterli.
-    const profile = await fetchInstagramProfile(senderId);
+    const profile = await fetchInstagramProfile(senderId, accessToken);
     // eslint-disable-next-line no-await-in-loop
     const conversation = await findOrCreateConversation(context, { channel: "instagram", externalUserId: senderId, profile });
 
@@ -84,5 +99,6 @@ async function processEntry(context, entry) {
       externalMessageId: event.message.mid ?? null,
       senderId,
     });
+    logger.info(`Instagram webhook: yeni mesaj kaydedildi (tenant=${tenant.id}, conversation=${conversation.id}).`);
   }
 }

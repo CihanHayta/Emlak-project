@@ -11,6 +11,7 @@ import { userRouter } from "./user.routes.js";
 import { propertyRouter } from "./property.routes.js";
 import { publicPropertyRouter } from "./publicProperty.routes.js";
 import { conversationRouter } from "./conversation.routes.js";
+import { instagramRouter } from "./instagram.routes.js";
 
 // Not: webhook route'ları (Faz 6) BİLEREK burada değil, app.js'te
 // express.json()'dan ÖNCE bağlanır — çünkü Meta imza doğrulaması ham
@@ -28,3 +29,4 @@ apiRouter.use("/users", userRouter);
 apiRouter.use("/properties", propertyRouter);
 apiRouter.use("/public/properties", publicPropertyRouter);
 apiRouter.use("/conversations", conversationRouter);
+apiRouter.use("/instagram", instagramRouter);

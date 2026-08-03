@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Trash2, Pencil } from "lucide-react";
+import { Plus, Trash2, Pencil, Link2Off } from "lucide-react";
+import { InstagramIcon } from "../../components/common/BrandIcons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +33,12 @@ import {
   USER_ROLES,
   ALL_PERMISSIONS,
 } from "../data/settingsStore";
+import {
+  getInstagramStatus,
+  subscribeToInstagramStatus,
+  goToInstagramConnect,
+  disconnectInstagram,
+} from "../data/integrationsStore";
 
 const ROLE_BADGE = {
   owner: "bg-brand-navy text-white",
@@ -51,9 +58,25 @@ export default function Settings() {
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => subscribeToUsers(() => setUsers(getUsers())), []);
   useEffect(() => subscribeToSettings(() => setPermissions(getRolePermissions())), []);
+
+  // OAuth callback backend'den `?instagram=connected|error` ile geri
+  // döndüğünde bir kere toast göster, sonra query param'ı temizle (F5'te
+  // tekrar tekrar toast çıkmasın diye).
+  useEffect(() => {
+    const result = searchParams.get("instagram");
+    if (!result) return;
+    if (result === "connected") toast.success("Instagram hesabı bağlandı.");
+    if (result === "error") toast.error("Instagram hesabı bağlanamadı, lütfen tekrar deneyin.");
+    setSearchParams((params) => {
+      params.delete("instagram");
+      return params;
+    }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleDelete() {
     try {
@@ -85,6 +108,7 @@ export default function Settings() {
       <TabsList>
         <TabsTrigger value="kullanicilar">Kullanıcılar</TabsTrigger>
         <TabsTrigger value="yetkiler">Yetkiler</TabsTrigger>
+        <TabsTrigger value="entegrasyonlar">Entegrasyonlar</TabsTrigger>
       </TabsList>
 
       <TabsContent value="kullanicilar" className="space-y-4">
@@ -186,6 +210,10 @@ export default function Settings() {
         </div>
       </TabsContent>
 
+      <TabsContent value="entegrasyonlar" className="space-y-4">
+        <InstagramIntegrationCard />
+      </TabsContent>
+
       <AddUserDialog open={addOpen} onOpenChange={setAddOpen} />
       <EditUserDialog user={editTarget} open={Boolean(editTarget)} onOpenChange={(open) => !open && setEditTarget(null)} />
       <ConfirmDeleteDialog
@@ -196,6 +224,63 @@ export default function Settings() {
         onConfirm={handleDelete}
       />
     </Tabs>
+  );
+}
+
+/** Ayarlar > Entegrasyonlar — Instagram DM bağlantısını kurma/kaldırma. */
+function InstagramIntegrationCard() {
+  const [status, setStatus] = useState(getInstagramStatus());
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  useEffect(() => subscribeToInstagramStatus(() => setStatus(getInstagramStatus())), []);
+
+  async function handleDisconnect() {
+    setDisconnecting(true);
+    try {
+      await disconnectInstagram();
+      toast.success("Instagram bağlantısı kaldırıldı.");
+    } catch (error) {
+      toast.error(error.message || "Bağlantı kaldırılamadı.");
+    } finally {
+      setDisconnecting(false);
+    }
+  }
+
+  return (
+    <div className="max-w-xl space-y-3 rounded-2xl border border-border p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+            <InstagramIcon className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Instagram</p>
+            <p className="text-xs text-muted-foreground">
+              {status.connected ? `@${status.username} bağlı` : "Bağlı değil"}
+            </p>
+          </div>
+        </div>
+
+        {status.connected ? (
+          <Button type="button" variant="outline" size="sm" onClick={handleDisconnect} disabled={disconnecting}>
+            <Link2Off className="h-4 w-4" />
+            {disconnecting ? "Kaldırılıyor…" : "Bağlantıyı Kaldır"}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            size="sm"
+            onClick={goToInstagramConnect}
+            className="bg-brand-gold text-white hover:bg-brand-gold-dark"
+          >
+            Instagram Hesabını Bağla
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Bağlandığında bu Instagram hesabına gelen mesajlar Mesajlar sayfasında görünür, oradan cevap verebilirsiniz.
+      </p>
+    </div>
   );
 }
 

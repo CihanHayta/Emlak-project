@@ -1,5 +1,13 @@
 // server/src/services/tenant.service.js
-import { findTenantById, findTenantBySlug, createTenant, incrementTenantUsage, listAllTenants } from "../repositories/tenant.repository.js";
+import {
+  findTenantById,
+  findTenantBySlug,
+  createTenant,
+  incrementTenantUsage,
+  updateTenantInstagram,
+  findTenantByInstagramAccountId,
+  findTenantsWithExpiringInstagramToken,
+} from "../repositories/tenant.repository.js";
 import { createDefaultTenant } from "../models/tenant.model.js";
 import { slugify } from "../utils/slugify.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -8,19 +16,22 @@ export async function getTenantById(id) {
   return findTenantById(id);
 }
 
-/**
- * Instagram/WhatsApp webhook'ları gibi kimliksiz gelen olaylarda "hangi
- * tenant'a ait" bilgisi Meta'dan gelmez — bu proje tek-kiracılı olarak
- * kurulduğundan (bkz. docs/ARCHITECTURE.md), o TEK tenant'ı bulmak için
- * kullanılır. Birden fazla ya da sıfır tenant varsa (beklenmeyen bir
- * durum) açıkça hata fırlatır, sessizce yanlış bir tenant'a yazmaz.
- */
-export async function getSingleTenant() {
-  const tenants = await listAllTenants();
-  if (tenants.length !== 1) {
-    throw new Error(`Tek-kiracılı kurulum bekleniyor ama ${tenants.length} tenant bulundu.`);
-  }
-  return tenants[0];
+/** Instagram webhook'u, kimliksiz gelen olayın hangi tenant'a ait olduğunu `entry.id` (IG hesap id'si) üzerinden bulmak için kullanır. */
+export async function getTenantByInstagramAccountId(igAccountId) {
+  return findTenantByInstagramAccountId(igAccountId);
+}
+
+export async function connectTenantInstagram(tenantId, data) {
+  await updateTenantInstagram(tenantId, data);
+}
+
+export async function disconnectTenantInstagram(tenantId) {
+  await updateTenantInstagram(tenantId, null);
+}
+
+/** Token yenileme işi (bkz. jobs/instagramTokenRefresh.job.js) için. */
+export async function getTenantsWithExpiringInstagramToken(beforeTimestamp) {
+  return findTenantsWithExpiringInstagramToken(beforeTimestamp);
 }
 
 /**
