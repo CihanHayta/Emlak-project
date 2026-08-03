@@ -76,10 +76,18 @@ async function processEntry(entry) {
 
   for (const event of entry.messaging ?? []) {
     // `is_echo`: kendi gönderdiğimiz mesajın Meta tarafından bize geri
-    // yansıtılmış hali — tekrar kaydetmemek için atlanır. `event.message`
-    // olmayan olaylar (ör. message_edit, reaction) de bilerek atlanıyor —
-    // sadece yeni gelen mesajlar işleniyor.
-    if (!event.message || event.message.is_echo) continue;
+    // yansıtılmış hali — tekrar kaydetmemek için sessizce atlanır (rutin, loglamaya değmez).
+    if (event.message?.is_echo) continue;
+
+    // `event.message` olmayan olaylar (ör. message_edit, reaction, postback)
+    // bilerek atlanıyor — sadece yeni gelen mesajlar işleniyor. Mesaj
+    // içeriği/PII loglanmadan, SADECE olayın hangi alanları taşıdığı
+    // loglanıyor — "neden atlandı" sorusu bir sonraki sefer tahminle değil
+    // doğrudan loglardan cevaplanabilsin diye (bkz. bugünkü teşhis süreci).
+    if (!event.message) {
+      logger.info(`Instagram webhook: mesaj dışı bir olay atlandı (tenant=${tenant.id}, olay alanları: ${Object.keys(event).join(",")}).`);
+      continue;
+    }
 
     const senderId = event.sender?.id;
     if (!senderId) continue;
