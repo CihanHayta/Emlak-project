@@ -136,6 +136,15 @@ export default function Mesajlar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
+  // Açık sohbete yeni mesaj gelince (sol listedeki 20 saniyelik arka plan
+  // taraması conversation özetini/lastMessageAt'ini güncelleyince — bkz.
+  // useIncomingMessageAlerts.js) mesaj akışını da tazeler. Bu olmadan yeni
+  // mesaj, sohbeti kapatıp tekrar açana kadar görünmüyordu.
+  useEffect(() => {
+    if (selectedId) loadMessages(selectedId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.lastMessageAt]);
+
   const customers = getCustomers();
   const linkedCustomer = selected?.customerId ? getCustomerById(selected.customerId) : null;
   const windowClosed = Boolean(selected?.windowExpiresAt && Date.now() > selected.windowExpiresAt);

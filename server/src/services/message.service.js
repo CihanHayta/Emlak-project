@@ -10,9 +10,20 @@ import { sendWhatsappMessage } from "./whatsapp.service.js";
 import { decryptToken } from "../utils/crypto.util.js";
 import { ApiError } from "../utils/ApiError.js";
 
+// Firestore Admin SDK'nın Timestamp sınıfı `new Date(timestamp)` ile DOĞRU
+// parse edilmez (NaN döner, canlı veriyle doğrulandı) — `.toMillis()`
+// kullanılmalı. FIREBASE_MODE=mock'ta düz bir Date objesi geldiği için
+// `instanceof Date` da ayrıca kontrol ediliyor.
+function toMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (value instanceof Date) return value.getTime();
+  return new Date(value).getTime();
+}
+
 export async function listMessages(context, conversationId) {
   const messages = await messageRepository.findByConversation(context, conversationId);
-  return messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  return messages.sort((a, b) => toMillis(a.createdAt) - toMillis(b.createdAt));
 }
 
 /**
