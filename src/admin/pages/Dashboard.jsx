@@ -9,24 +9,35 @@ import { usePropertiesVersion } from "../../hooks/usePropertiesVersion";
 import { getCustomers, subscribeToCustomers } from "../data/customerStore";
 import { getAppointments, subscribeToAppointments } from "../data/appointmentStore";
 import { getLeads, subscribeToLeads } from "../../lib/leadStore";
+import { getConversations, subscribeToConversations } from "../data/conversationStore";
+import { InstagramIcon, WhatsAppIcon } from "../../components/common/BrandIcons";
 import { toMillis } from "../../lib/firestoreTimestamp";
 import { APPOINTMENT_STATUS_STYLES } from "../data/constants";
 import { cn } from "@/lib/utils";
+
+function ChannelIcon({ channel, className }) {
+  if (channel === "instagram") return <InstagramIcon className={className} />;
+  if (channel === "whatsapp") return <WhatsAppIcon className={className} />;
+  return null;
+}
 
 /** "/admin" — landing page after login: at-a-glance stats + recent activity. */
 export default function Dashboard() {
   const [customers, setCustomers] = useState(getCustomers());
   const [appointments, setAppointments] = useState(getAppointments());
   const [leads, setLeads] = useState(getLeads());
+  const [conversations, setConversations] = useState(getConversations());
 
   useEffect(() => {
     const unsubCustomers = subscribeToCustomers(() => setCustomers(getCustomers()));
     const unsubAppointments = subscribeToAppointments(() => setAppointments(getAppointments()));
     const unsubLeads = subscribeToLeads(() => setLeads(getLeads()));
+    const unsubConversations = subscribeToConversations(() => setConversations(getConversations()));
     return () => {
       unsubCustomers();
       unsubAppointments();
       unsubLeads();
+      unsubConversations();
     };
   }, []);
 
@@ -38,6 +49,7 @@ export default function Dashboard() {
     (a) => a.dateTime > Date.now() && a.status !== "İptal Edildi",
   );
   const nextAppointments = upcomingAppointments.slice(0, 5);
+  const recentConversations = conversations.slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -54,7 +66,7 @@ export default function Dashboard() {
         <StatCard icon={MessageSquare} tone="green" value={leads.length} label="Gelen Form" sublabel="Henüz işlenmedi" />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Upcoming appointments */}
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -91,6 +103,43 @@ export default function Dashboard() {
                 </div>
               );
             })}
+          </CardContent>
+        </Card>
+
+        {/* Yeni mesajlar (Instagram/WhatsApp) */}
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle>Yeni Mesajlar</CardTitle>
+            <Link to="/admin/mesajlar" className="flex items-center gap-1 text-sm text-brand-gold-dark hover:underline">
+              Tümünü Gör <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </CardHeader>
+          <CardContent className="max-h-72 space-y-2.5 overflow-y-auto sm:max-h-80">
+            {recentConversations.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">Henüz mesaj yok.</p>
+            )}
+            {recentConversations.map((c) => (
+              <Link
+                key={c.id}
+                to={`/admin/mesajlar?id=${c.id}`}
+                className="block rounded-lg border border-border p-2.5 transition hover:bg-muted/60"
+              >
+                <div className="flex items-center gap-2">
+                  {c.unreadCount > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-brand-gold" aria-label="Okunmadı" />}
+                  <ChannelIcon channel={c.channel} className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <p className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {c.participantName || c.participantUsername || "Bilinmeyen kişi"}
+                  </p>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {new Date(c.lastMessageAt).toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })}
+                  </span>
+                </div>
+                <p className="mt-1 truncate pl-4 text-xs text-muted-foreground">
+                  {c.lastMessageDirection === "outbound" ? "Siz: " : ""}
+                  {c.lastMessagePreview || "—"}
+                </p>
+              </Link>
+            ))}
           </CardContent>
         </Card>
 

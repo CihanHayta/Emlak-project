@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Search, Send, CalendarPlus, MessageCircleOff, UserPlus, Phone, Mail, MapPin } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -70,6 +71,7 @@ function formatTime(ms) {
  * devre dışı kalır (bkz. message.service.js#sendOutboundMessage).
  */
 export default function Mesajlar() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState(getConversations());
   const [search, setSearch] = useState("");
   const [channelFilter, setChannelFilter] = useState("all");
@@ -97,8 +99,18 @@ export default function Mesajlar() {
 
   // Seçili sohbet filtrelenince (kanal sekmesi değişince vb.) listede
   // kaybolmasın diye ilk görünen sohbete geçer; ilk yüklemede de otomatik
-  // bir sohbet açar.
+  // bir sohbet açar. Dashboard'daki "Yeni Mesajlar" kutusundan
+  // ?id=<conversationId> ile gelindiyse (Customers.jsx'in ⌘K derin
+  // bağlantı deseniyle aynı mantık) o öncelikli — aynı render'da hem
+  // deep-link hem "ilkine geç" mantığı yarışıp deep-link'i ezmesin diye
+  // tek effect'te birleştirildi.
   useEffect(() => {
+    const deepLinkId = searchParams.get("id");
+    if (deepLinkId) {
+      setSelectedId(deepLinkId);
+      setSearchParams({}, { replace: true });
+      return;
+    }
     if (selectedId && filtered.some((c) => c.id === selectedId)) return;
     setSelectedId(filtered[0]?.id ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
