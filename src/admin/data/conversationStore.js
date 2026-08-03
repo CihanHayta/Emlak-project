@@ -95,12 +95,18 @@ export async function loadMessages(conversationId) {
   notifyMessages(conversationId);
 }
 
-/** Sends an outbound reply, appends it locally, and refreshes the conversation list (last-message preview/ordering changed). */
+/**
+ * Sends an outbound reply, appends it locally, and refreshes the
+ * conversation list (last-message preview/ordering changed). The list
+ * refresh is deliberately NOT awaited — it doesn't affect what the caller
+ * needs (the sent message), and awaiting it just adds a second network
+ * round-trip's worth of latency to something that's supposed to feel instant.
+ */
 export async function sendMessage(conversationId, text) {
   const message = await apiClient.post(`/conversations/${conversationId}/messages`, { text });
   messagesCache.set(conversationId, [...(messagesCache.get(conversationId) ?? []), message]);
   notifyMessages(conversationId);
-  await refresh();
+  refresh();
   return message;
 }
 

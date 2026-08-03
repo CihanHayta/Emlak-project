@@ -78,7 +78,11 @@ export default function Mesajlar() {
   const [selectedId, setSelectedId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [replyText, setReplyText] = useState("");
-  const [sending, setSending] = useState(false);
+  // Gönderilmiş ama backend'in henüz onaylamadığı mesajlar — "Gönder"e
+  // basınca metin kutusunu ve balonu ANINDA güncelleyip API isteğini arka
+  // planda beklemek için (bkz. handleSend). Gerçek mesaj gelince (store'un
+  // messages'ı üzerinden) ilgili geçici balon kaldırılır.
+  const [pendingMessages, setPendingMessages] = useState([]);
   const [appointmentTarget, setAppointmentTarget] = useState(null);
   const [customerSheetOpen, setCustomerSheetOpen] = useState(false);
   const [customerSheetTarget, setCustomerSheetTarget] = useState(null); // null = "yeni müşteri kaydet" modu
@@ -120,6 +124,7 @@ export default function Mesajlar() {
 
   useEffect(() => {
     setReplyText("");
+    setPendingMessages([]);
     if (!selectedId) {
       setMessages([]);
       return;
@@ -138,27 +143,31 @@ export default function Mesajlar() {
 
   // Açık sohbet için ayrıca hızlı bir yenileme — sol listedeki 20 saniyelik
   // genel tarama (useIncomingMessageAlerts.js) sadece son mesaj önizlemesini
-  // günceller, gelen bir mesajın gerçekten görünmesi o taramaya bağlı kalırsa
-  // 20 saniyeye kadar sürebilir. Sadece o an AÇIK olan sohbet için, tüm
-  // sohbet listesini değil, tek bir sohbeti sorguladığı için maliyeti düşük.
+  // günceller. Sadece o an AÇIK olan sohbet için, tüm sohbet listesini değil
+  // tek bir sohbeti sorguladığı için maliyeti düşük — 1 saniyede bir gelen
+  // mesajın görünmesi için yeterince sık.
   useEffect(() => {
     if (!selectedId) return;
-    const interval = setInterval(() => loadMessages(selectedId), 4000);
+    const interval = setInterval(() => loadMessages(selectedId), 1000);
     return () => clearInterval(interval);
   }, [selectedId]);
 
+  // Gerçek mesajlarla (backend'den) henüz onaylanmamış, az önce gönderilen
+  // geçici balonları birleştirir — bkz. handleSend.
+  const displayMessages = [...messages, ...pendingMessages];
+
   // Yeni mesaj eklendiğinde (gönderilen/gelen) veya bir sohbet ilk açıldığında
   // otomatik en alta kaydırır. Sadece mesaj SAYISI arttığında tetiklenir —
-  // 20 saniyelik yenilemede içerik aynı kalıp sadece dizi referansı
-  // değişince kullanıcının yukarı kaydırdığı konumu geri almasın diye.
+  // periyodik yenilemede içerik aynı kalıp sadece dizi referansı değişince
+  // kullanıcının yukarı kaydırdığı konumu geri almasın diye.
   const messagesEndRef = useRef(null);
   const prevMessageCountRef = useRef(0);
   useEffect(() => {
-    if (messages.length > prevMessageCountRef.current) {
+    if (displayMessages.length > prevMessageCountRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
     }
-    prevMessageCountRef.current = messages.length;
-  }, [messages]);
+    prevMessageCountRef.current = displayMessages.length;
+  }, [displayMessages.length]);
 
   const customers = getCustomers();
   const linkedCustomer = selected?.customerId ? getCustomerById(selected.customerId) : null;
@@ -184,15 +193,21 @@ export default function Mesajlar() {
 
   async function handleSend(event) {
     event.preventDefault();
-    if (!replyText.trim() || !selected || sending) return;
-    setSending(true);
+    const text = replyText.trim();
+    if (!text || !selected) return;
+
+    // Önce ekrana yaz, sonra gönder — Graph API + Firestore turu bitene
+    // kadar beklemek yerine metin kutusu anında boşalır, balon anında görünür.
+    const tempId = `pending-${Date.now()}`;
+    setPendingMessages((prev) => [...prev, { id: tempId, direction: "outbound", text, createdAt: new Date(), pending: true }]);
+    setReplyText("");
+
     try {
-      await sendMessage(selected.id, replyText.trim());
-      setReplyText("");
+      await sendMessage(selected.id, text);
     } catch (error) {
       toast.error(error.message || "Mesaj gönderilemedi.");
     } finally {
-      setSending(false);
+      setPendingMessages((prev) => prev.filter((m) => m.id !== tempId));
     }
   }
 
@@ -339,11 +354,14 @@ export default function Mesajlar() {
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
-              {messages.length === 0 ? (
+              {displayMessages.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">Bu sohbette henüz mesaj yok.</p>
               ) : (
-                messages.map((m) => (
-                  <div key={m.id} className={cn("flex", m.direction === "outbound" ? "justify-end" : "justify-start")}>
+                displayMessages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={cn("flex", m.direction === "outbound" ? "justify-end" : "justify-start", m.pending && "opacity-60")}
+                  >
                     <div
                       className={cn(
                         "max-w-[70%] rounded-2xl px-3.5 py-2 text-sm",
@@ -352,7 +370,7 @@ export default function Mesajlar() {
                     >
                       <p className="whitespace-pre-wrap break-words">{m.text}</p>
                       <p className={cn("mt-1 text-[10px]", m.direction === "outbound" ? "text-white/70" : "text-muted-foreground")}>
-                        {formatTime(toMillis(m.createdAt))}
+                        {m.pending ? "Gönderiliyor..." : formatTime(toMillis(m.createdAt))}
                       </p>
                     </div>
                   </div>
@@ -373,7 +391,7 @@ export default function Mesajlar() {
                   onChange={(e) => setReplyText(e.target.value)}
                   placeholder="Mesaj yaz..."
                   rows={1}
-                  disabled={windowClosed || sending}
+                  disabled={windowClosed}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -385,7 +403,7 @@ export default function Mesajlar() {
                 <Button
                   type="submit"
                   size="icon"
-                  disabled={windowClosed || sending || !replyText.trim()}
+                  disabled={windowClosed || !replyText.trim()}
                   className="bg-brand-gold text-white hover:bg-brand-gold-dark"
                 >
                   <Send className="h-4 w-4" />
