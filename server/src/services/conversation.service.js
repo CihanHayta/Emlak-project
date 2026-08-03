@@ -47,3 +47,13 @@ export async function linkConversationToCustomer(context, id, customerId) {
 export async function markConversationRead(context, id) {
   return conversationRepository.update(context, id, withUpdateFields({ unreadCount: 0 }, { actorUserId: context.userId }));
 }
+
+/**
+ * Yumuşak silme — diğer koleksiyonlarla (customers, leads, ...) aynı geri
+ * getirilebilir desen. Mesajlar ayrıca silinmiyor (zararsız, hiçbir yerde
+ * gösterilmiyor); aynı kişi tekrar yazarsa `findByExternalUser` bu kaydı
+ * (deletedAt dolu olduğu için) bulamaz ve sıfırdan yeni bir sohbet açılır.
+ */
+export async function deleteConversation(context, id) {
+  await conversationRepository.softDelete(context, id);
+}

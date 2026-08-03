@@ -12,5 +12,6 @@ conversationRouter.get("/", authorize("conversations:read"), conversationControl
 conversationRouter.get("/:id", authorize("conversations:read"), conversationController.getConversationController);
 conversationRouter.patch("/:id/customer", authorize("conversations:write"), conversationController.linkConversationCustomerController);
 conversationRouter.post("/:id/read", authorize("conversations:write"), conversationController.markConversationReadController);
+conversationRouter.delete("/:id", authorize("conversations:write"), conversationController.deleteConversationController);
 conversationRouter.get("/:conversationId/messages", authorize("conversations:read"), conversationController.listMessagesController);
 conversationRouter.post("/:conversationId/messages", authorize("conversations:write"), conversationController.sendMessageController);

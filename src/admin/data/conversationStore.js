@@ -66,6 +66,14 @@ export async function markConversationRead(id) {
   return updated;
 }
 
+/** Yumuşak siler (backend'de deletedAt set edilir) — liste ve önbellekten kaldırır. */
+export async function deleteConversation(id) {
+  await apiClient.delete(`/conversations/${id}`);
+  cache = cache.filter((c) => c.id !== id);
+  messagesCache.delete(id);
+  notify();
+}
+
 export function subscribeToConversations(callback) {
   listeners.add(callback);
   return () => listeners.delete(callback);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { Search, Send, CalendarPlus, MessageCircleOff, UserPlus, Phone, Mail, MapPin } from "lucide-react";
+import { Search, Send, CalendarPlus, MessageCircleOff, UserPlus, Phone, Mail, MapPin, Trash2, Home as HomeIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,10 +28,14 @@ import {
   sendMessage,
   markConversationRead,
   linkConversationToCustomer,
+  deleteConversation,
 } from "../data/conversationStore";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getCustomers, getCustomerById, updateCustomer } from "../data/customerStore";
+import { getListings } from "../data/listingStore";
 import AppointmentFormDialog from "../components/AppointmentFormDialog";
 import CustomerSheet from "../components/CustomerSheet";
+import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
 
 const NONE = "__none__";
 const CHANNEL_TABS = [
@@ -86,6 +90,9 @@ export default function Mesajlar() {
   const [appointmentTarget, setAppointmentTarget] = useState(null);
   const [customerSheetOpen, setCustomerSheetOpen] = useState(false);
   const [customerSheetTarget, setCustomerSheetTarget] = useState(null); // null = "yeni müşteri kaydet" modu
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [listingPickerOpen, setListingPickerOpen] = useState(false);
+  const [listingSearch, setListingSearch] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const [savingNote, setSavingNote] = useState(false);
 
@@ -243,6 +250,35 @@ export default function Mesajlar() {
     }
   }
 
+  async function handleDeleteConversation() {
+    if (!selected) return;
+    try {
+      await deleteConversation(selected.id);
+      toast.success("Sohbet silindi.");
+      setSelectedId(null);
+    } catch (error) {
+      toast.error(error.message || "Sohbet silinemedi.");
+    } finally {
+      setDeleteConfirmOpen(false);
+    }
+  }
+
+  // Seçilen ilanın bilgilerini metin olarak yanıt kutusuna ekler — agent
+  // göndermeden önce üstüne kendi notunu da yazabilir. Instagram/WhatsApp
+  // gönderim API'leri özel "ilan kartı" biçimini desteklemediği için (sadece
+  // metin/medya), link içeren düzenli bir metin en pratik/güvenilir yol.
+  function handleInsertListing(listing) {
+    const link = `${window.location.origin}/ilan/${listing.id}`;
+    const summary = `🏠 ${listing.title}\n📍 ${listing.district}, ${listing.province}\n💰 ${listing.price}\n${link}`;
+    setReplyText((prev) => (prev ? `${prev}\n\n${summary}` : summary));
+    setListingSearch("");
+    setListingPickerOpen(false);
+  }
+
+  const filteredListings = getListings().filter((l) =>
+    l.title.toLowerCase().includes(listingSearch.trim().toLowerCase()),
+  );
+
   return (
     <div className="flex h-[calc(100vh-7rem)] gap-4">
       {/* Sol: sohbet listesi */}
@@ -340,17 +376,29 @@ export default function Mesajlar() {
                   </p>
                 </div>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => linkedCustomer && setAppointmentTarget(linkedCustomer)}
-                disabled={!linkedCustomer}
-                title={!linkedCustomer ? "Randevu oluşturmak için önce bir müşteriye bağlayın" : undefined}
-              >
-                <CalendarPlus className="h-4 w-4" />
-                Randevu Oluştur
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => linkedCustomer && setAppointmentTarget(linkedCustomer)}
+                  disabled={!linkedCustomer}
+                  title={!linkedCustomer ? "Randevu oluşturmak için önce bir müşteriye bağlayın" : undefined}
+                >
+                  <CalendarPlus className="h-4 w-4" />
+                  Randevu Oluştur
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  aria-label="Sohbeti Sil"
+                  title="Sohbeti Sil"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
@@ -385,6 +433,41 @@ export default function Mesajlar() {
                   24 saatlik mesajlaşma penceresi kapandı — kullanıcı tekrar yazana kadar cevap gönderilemez (Meta kuralı).
                 </p>
               )}
+              <div className="mb-2 flex items-center gap-2">
+                <Popover open={listingPickerOpen} onOpenChange={setListingPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" size="sm" variant="outline" disabled={windowClosed}>
+                      <HomeIcon className="h-3.5 w-3.5" />
+                      İlan Ekle
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-80">
+                    <Input
+                      value={listingSearch}
+                      onChange={(e) => setListingSearch(e.target.value)}
+                      placeholder="İlan ara..."
+                      autoFocus
+                    />
+                    <div className="max-h-60 space-y-1 overflow-y-auto">
+                      {filteredListings.length === 0 ? (
+                        <p className="py-4 text-center text-xs text-muted-foreground">İlan bulunamadı.</p>
+                      ) : (
+                        filteredListings.map((l) => (
+                          <button
+                            key={l.id}
+                            type="button"
+                            onClick={() => handleInsertListing(l)}
+                            className="w-full rounded-md px-2 py-1.5 text-left text-xs transition hover:bg-muted"
+                          >
+                            <p className="truncate font-medium text-foreground">{l.title}</p>
+                            <p className="text-muted-foreground">{l.price}</p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
               <div className="flex items-end gap-2">
                 <Textarea
                   value={replyText}
@@ -544,6 +627,16 @@ export default function Mesajlar() {
         }
         onSaved={handleCustomerSheetSaved}
       />
+
+      {selected && (
+        <ConfirmDeleteDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+          title="Sohbeti sil"
+          description={`"${participantLabel(selected)}" ile olan sohbeti kalıcı olarak listeden kaldırmak istediğinize emin misiniz? Bu kişi tekrar yazarsa yeni bir sohbet olarak açılır.`}
+          onConfirm={handleDeleteConversation}
+        />
+      )}
     </div>
   );
 }

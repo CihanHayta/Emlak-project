@@ -26,6 +26,11 @@ export async function markConversationReadController(req, res) {
   sendSuccess(res, { data: conversation });
 }
 
+export async function deleteConversationController(req, res) {
+  await conversationService.deleteConversation(req.context, req.params.id);
+  sendSuccess(res, { data: { ok: true } });
+}
+
 export async function listMessagesController(req, res) {
   const messages = await messageService.listMessages(req.context, req.params.conversationId);
   sendSuccess(res, { data: messages });
