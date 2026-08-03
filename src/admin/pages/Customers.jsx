@@ -15,6 +15,7 @@ import CustomerSheet from "../components/CustomerSheet";
 import AppointmentFormDialog from "../components/AppointmentFormDialog";
 import { getCustomers, subscribeToCustomers } from "../data/customerStore";
 import { CUSTOMER_STATUSES, LEAD_SOURCES } from "../data/constants";
+import { markSeen } from "../lib/lastSeen";
 
 const ALL = "__all__";
 
@@ -41,6 +42,8 @@ export default function Customers() {
   const [appointmentTarget, setAppointmentTarget] = useState(null);
 
   useEffect(() => subscribeToCustomers(() => setCustomers(getCustomers())), []);
+  // Sidebar'daki "Yeni" rozeti bu sayfa ziyaret edilince sıfırlanır (bkz. lib/lastSeen.js).
+  useEffect(() => markSeen("musteriler"), []);
 
   // Deep-link support from the ⌘K command palette: ?yeni=1 opens the create
   // sheet, ?id=<customerId> opens that customer directly.

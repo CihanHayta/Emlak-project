@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils";
 import { getSession } from "../lib/auth";
 import { getLeads, subscribeToLeads } from "../../lib/leadStore";
 import { getCustomers, subscribeToCustomers } from "../data/customerStore";
+import { getConversations, subscribeToConversations } from "../data/conversationStore";
+import { getLastSeen, subscribeToLastSeen } from "../lib/lastSeen";
+import { toMillis } from "../../lib/firestoreTimestamp";
 
 const NAV_ITEMS = [
   { label: "Dashboard", to: "/admin", icon: LayoutDashboard, end: true },
@@ -24,7 +27,7 @@ const NAV_ITEMS = [
   { label: "Başvurular", to: "/admin/basvurular", icon: FileText, badgeKey: "newLeads" },
   { label: "Randevular", to: "/admin/randevular", icon: CalendarDays },
   { label: "Müşteriler", to: "/admin/musteriler", icon: Users, badgeKey: "newCustomers" },
-  { label: "Mesajlar", to: "/admin/mesajlar", icon: MessageSquare },
+  { label: "Mesajlar", to: "/admin/mesajlar", icon: MessageSquare, badgeKey: "unreadMessages" },
   { label: "Bildirimler", to: "/admin/bildirimler", icon: Bell },
   // Sadece admin (owner) görür — Danışman/Personel için Ayarlar sayfası
   // (kullanıcı yönetimi) hiç anlamlı değil, bkz. Settings.jsx'in kendi
@@ -40,6 +43,10 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [leads, setLeads] = useState(getLeads());
   const [customers, setCustomers] = useState(getCustomers());
+  const [conversations, setConversations] = useState(getConversations());
+  // Değeri hiç okunmuyor — sadece setLastSeenTick'i "sayfa görüldü"
+  // olayında çağırıp yeniden render tetiklemek için var (bkz. lib/lastSeen.js).
+  const [, setLastSeenTick] = useState(0);
   const navigate = useNavigate();
   const isOwner = getSession()?.role === "owner";
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.ownerOnly || isOwner);
@@ -47,16 +54,26 @@ export default function Sidebar() {
   useEffect(() => {
     const unsubLeads = subscribeToLeads(() => setLeads(getLeads()));
     const unsubCustomers = subscribeToCustomers(() => setCustomers(getCustomers()));
+    const unsubConversations = subscribeToConversations(() => setConversations(getConversations()));
+    const unsubLastSeen = subscribeToLastSeen(() => setLastSeenTick((n) => n + 1));
     return () => {
       unsubLeads();
       unsubCustomers();
+      unsubConversations();
+      unsubLastSeen();
     };
   }, []);
 
-  // "Yeni" durumundaki (henüz işlenmemiş) kayıt sayısı — menüde dikkat çeksin diye.
+  // Başvurular/Müşteriler rozetleri "Yeni" durumunu DEĞİL, ilgili sayfa en
+  // son ne zaman ziyaret edildiğini baz alır (bkz. lib/lastSeen.js) — sayfa
+  // açılınca rozet sıfırlanır, sadece ondan SONRA gelen "Yeni" kayıtlar
+  // sayılır. Mesajlar rozeti ise zaten sohbet bazlı okunmadı sayacının
+  // toplamı (conversation.unreadCount, her sohbet açılınca kendiliğinden
+  // sıfırlanıyor — bkz. Mesajlar.jsx#markConversationRead).
   const badgeCounts = {
-    newLeads: leads.filter((l) => l.status === "Yeni").length,
-    newCustomers: customers.filter((c) => c.status === "Yeni").length,
+    newLeads: leads.filter((l) => l.status === "Yeni" && toMillis(l.createdAt) > getLastSeen("basvurular")).length,
+    newCustomers: customers.filter((c) => c.status === "Yeni" && toMillis(c.createdAt) > getLastSeen("musteriler")).length,
+    unreadMessages: conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0),
   };
 
   return (

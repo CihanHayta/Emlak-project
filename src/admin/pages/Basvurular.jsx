@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import IncomingLeads from "../components/IncomingLeads";
 import CustomerSheet from "../components/CustomerSheet";
@@ -6,6 +6,7 @@ import AppointmentFormDialog from "../components/AppointmentFormDialog";
 import { updateLeadStatus } from "../../lib/leadStore";
 import { addCustomer } from "../data/customerStore";
 import { SERVICES } from "../../data/services";
+import { markSeen } from "../lib/lastSeen";
 
 /**
  * A lead's `context` says which form it came from (see lib/leadStore.js) —
@@ -42,6 +43,9 @@ function resolveServiceType(context) {
  * lead "Müşteri Oldu" so it's obvious at a glance which ones are done.
  */
 export default function Basvurular() {
+  // Sidebar'daki "Yeni" rozeti bu sayfa ziyaret edilince sıfırlanır (bkz. lib/lastSeen.js).
+  useEffect(() => markSeen("basvurular"), []);
+
   const [sheetOpen, setSheetOpen] = useState(false);
   const [prefill, setPrefill] = useState({});
   const [convertingLeadId, setConvertingLeadId] = useState(null);
