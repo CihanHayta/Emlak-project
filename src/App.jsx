@@ -6,6 +6,7 @@ import Kiralik from "./pages/Kiralik";
 import Hakkimizda from "./pages/Hakkimizda";
 import Hizmetlerimiz from "./pages/Hizmetlerimiz";
 import Iletisim from "./pages/Iletisim";
+import Gizlilik from "./pages/Gizlilik";
 import PropertyDetail from "./pages/PropertyDetail";
 import NotFound from "./pages/NotFound";
 
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="hakkimizda" element={<Hakkimizda />} />
           <Route path="hizmetlerimiz" element={<Hizmetlerimiz />} />
           <Route path="iletisim" element={<Iletisim />} />
+          <Route path="gizlilik-politikasi" element={<Gizlilik />} />
           <Route path="ilan/:id" element={<PropertyDetail />} />
         </Route>
 
