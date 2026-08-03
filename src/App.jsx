@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import Home from "./pages/Home";
@@ -10,18 +11,33 @@ import Gizlilik from "./pages/Gizlilik";
 import PropertyDetail from "./pages/PropertyDetail";
 import NotFound from "./pages/NotFound";
 
-import RequireAuth from "./admin/components/RequireAuth";
-import AdminLayout from "./admin/layouts/AdminLayout";
-import Login from "./admin/pages/Login";
-import Dashboard from "./admin/pages/Dashboard";
-import Listings from "./admin/pages/Listings";
-import ListingForm from "./admin/pages/ListingForm";
-import Appointments from "./admin/pages/Appointments";
-import Customers from "./admin/pages/Customers";
-import Basvurular from "./admin/pages/Basvurular";
-import Mesajlar from "./admin/pages/Mesajlar";
-import Notifications from "./admin/pages/Notifications";
-import Settings from "./admin/pages/Settings";
+// Admin paneli (Firebase Auth SDK + tüm CRM sayfaları/bileşenleri) BİLEREK
+// lazy-load ediliyor — genel site ziyaretçisi (ilana bakan, form dolduran
+// müşteri adayı) bu kodu hiç indirmemeli. Öncesinde tek pakette birleşince
+// bundle ~1MB'a (288KB gzip) çıkıyordu; `npm run build`'ın kendi uyarısıyla
+// tespit edildi. Admin'e hiç girmeyen bir ziyaretçi artık bunun hiçbirini
+// indirmez, sadece gerçekten /admin/* açıldığında ayrı bir parça (chunk)
+// olarak çekilir.
+const RequireAuth = lazy(() => import("./admin/components/RequireAuth"));
+const AdminLayout = lazy(() => import("./admin/layouts/AdminLayout"));
+const Login = lazy(() => import("./admin/pages/Login"));
+const Dashboard = lazy(() => import("./admin/pages/Dashboard"));
+const Listings = lazy(() => import("./admin/pages/Listings"));
+const ListingForm = lazy(() => import("./admin/pages/ListingForm"));
+const Appointments = lazy(() => import("./admin/pages/Appointments"));
+const Customers = lazy(() => import("./admin/pages/Customers"));
+const Basvurular = lazy(() => import("./admin/pages/Basvurular"));
+const Mesajlar = lazy(() => import("./admin/pages/Mesajlar"));
+const Notifications = lazy(() => import("./admin/pages/Notifications"));
+const Settings = lazy(() => import("./admin/pages/Settings"));
+
+function AdminLoadingFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-brand-navy">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-gold border-t-transparent" />
+    </div>
+  );
+}
 
 /**
  * App-level route table: the public marketing site (under <Layout/>) and
@@ -45,8 +61,22 @@ export default function App() {
         </Route>
 
         {/* Admin panel */}
-        <Route path="admin/login" element={<Login />} />
-        <Route path="admin" element={<RequireAuth />}>
+        <Route
+          path="admin/login"
+          element={
+            <Suspense fallback={<AdminLoadingFallback />}>
+              <Login />
+            </Suspense>
+          }
+        />
+        <Route
+          path="admin"
+          element={
+            <Suspense fallback={<AdminLoadingFallback />}>
+              <RequireAuth />
+            </Suspense>
+          }
+        >
           <Route element={<AdminLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="ilanlar" element={<Listings />} />

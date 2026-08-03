@@ -52,7 +52,10 @@ export default function PropertyGallery({ property }) {
         )}
         {images.map((src, index) => (
           <SwiperSlide key={src + index}>
-            <GalleryImage src={src} alt={`${property.title} - ${index + 1}`} />
+            {/* Video varsa o zaten ilk slayt, en görünür medya onun posteri —
+                galerideki hiçbir görsel LCP adayı değil, hepsi lazy olabilir.
+                Video yoksa ilk görsel gerçekten ilk görünen şey, o eager kalmalı. */}
+            <GalleryImage src={src} alt={`${property.title} - ${index + 1}`} isFirst={!property.hasVideo && index === 0} />
           </SwiperSlide>
         ))}
       </Swiper>
@@ -67,7 +70,15 @@ export default function PropertyGallery({ property }) {
   );
 }
 
-function GalleryImage({ src, alt }) {
+function GalleryImage({ src, alt, isFirst }) {
   const url = useResolvedMediaUrl(src);
-  return <img src={url ?? ""} alt={alt} className="property-gallery__media" />;
+  return (
+    <img
+      src={url ?? ""}
+      alt={alt}
+      className="property-gallery__media"
+      loading={isFirst ? "eager" : "lazy"}
+      fetchPriority={isFirst ? "high" : undefined}
+    />
+  );
 }

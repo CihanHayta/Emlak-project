@@ -50,6 +50,7 @@ export default function Hakkimizda() {
           src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&w=900&q=75"
           alt="Şahin Emlak ofisi"
           className="about-story__image"
+          loading="lazy"
         />
       </section>
 

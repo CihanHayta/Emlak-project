@@ -27,9 +27,9 @@ export default function HeroSlider() {
         navigation={{ prevEl: "#hero-prev", nextEl: "#hero-next" }}
         pagination={{ clickable: true }}
       >
-        {HERO_SLIDES.map((slide) => (
+        {HERO_SLIDES.map((slide, index) => (
           <SwiperSlide key={slide.id}>
-            <HeroSlideContent slide={slide} />
+            <HeroSlideContent slide={slide} isFirst={index === 0} />
           </SwiperSlide>
         ))}
       </Swiper>
@@ -45,11 +45,23 @@ export default function HeroSlider() {
   );
 }
 
-/** One hero slide: background photo + gradient overlay + headline + CTAs. */
-function HeroSlideContent({ slide }) {
+/**
+ * One hero slide: background photo + gradient overlay + headline + CTAs.
+ * Swiper renders every slide's <img> into the DOM upfront (not just the
+ * active one), so without this only the first slide should load eagerly —
+ * it's the actual LCP element; the rest aren't visible until autoplay/a
+ * click reaches them.
+ */
+function HeroSlideContent({ slide, isFirst }) {
   return (
     <div className="hero-slide">
-      <img src={slide.image} alt="" className="hero-slide__image" />
+      <img
+        src={slide.image}
+        alt=""
+        className="hero-slide__image"
+        loading={isFirst ? "eager" : "lazy"}
+        fetchPriority={isFirst ? "high" : undefined}
+      />
       {/* Dark gradient so the white text stays readable over any photo */}
       <div className="hero-slide__gradient" />
 
