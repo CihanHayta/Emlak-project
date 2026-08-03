@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Search, Send, CalendarPlus, MessageCircleOff } from "lucide-react";
+import { Search, Send, CalendarPlus, MessageCircleOff, UserPlus, Phone, Mail, MapPin } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import {
 } from "../data/conversationStore";
 import { getCustomers, getCustomerById } from "../data/customerStore";
 import AppointmentFormDialog from "../components/AppointmentFormDialog";
+import CustomerSheet from "../components/CustomerSheet";
 
 const NONE = "__none__";
 const CHANNEL_TABS = [
@@ -76,6 +77,8 @@ export default function Mesajlar() {
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [appointmentTarget, setAppointmentTarget] = useState(null);
+  const [customerSheetOpen, setCustomerSheetOpen] = useState(false);
+  const [customerSheetTarget, setCustomerSheetTarget] = useState(null); // null = "yeni müşteri kaydet" modu
 
   useEffect(() => subscribeToConversations(() => setConversations(getConversations())), []);
 
@@ -142,6 +145,29 @@ export default function Mesajlar() {
       toast.success(value === NONE ? "Müşteri bağlantısı kaldırıldı." : "Müşteriye bağlandı.");
     } catch (error) {
       toast.error(error.message || "Bağlanamadı.");
+    }
+  }
+
+  function openCreateCustomerFromConversation() {
+    setCustomerSheetTarget(null);
+    setCustomerSheetOpen(true);
+  }
+
+  function openEditLinkedCustomer() {
+    if (!linkedCustomer) return;
+    setCustomerSheetTarget(linkedCustomer);
+    setCustomerSheetOpen(true);
+  }
+
+  // "Yeni Kaydet" akışında oluşturulan kart otomatik olarak bu sohbete
+  // bağlanır — kullanıcı ayrıca dropdown'dan seçmek zorunda kalmasın diye.
+  async function handleCustomerSheetSaved(savedCustomer) {
+    if (!customerSheetTarget && savedCustomer && selected) {
+      try {
+        await linkConversationToCustomer(selected.id, savedCustomer.id);
+      } catch (error) {
+        toast.error(error.message || "Müşteri oluşturuldu ama sohbete bağlanamadı.");
+      }
     }
   }
 
@@ -314,9 +340,19 @@ export default function Mesajlar() {
 
       {/* Sağ: müşteri bağlantısı */}
       {selected && (
-        <div className="w-72 shrink-0 space-y-4 rounded-xl border border-border bg-card p-4">
+        <div className="w-72 shrink-0 space-y-4 overflow-y-auto rounded-xl border border-border bg-card p-4">
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-foreground">Müşteri Bağlantısı</h3>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-foreground">Müşteri Bağlantısı</h3>
+              <button
+                type="button"
+                onClick={openCreateCustomerFromConversation}
+                className="flex shrink-0 items-center gap-1 text-xs font-medium text-brand-gold-dark hover:underline"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Yeni Kaydet
+              </button>
+            </div>
             <Select value={selected.customerId ?? NONE} onValueChange={handleLinkCustomer}>
               <SelectTrigger className="w-full">
                 <SelectValue>{linkedCustomer ? linkedCustomer.name : "Bağlı değil"}</SelectValue>
@@ -332,13 +368,39 @@ export default function Mesajlar() {
             </Select>
           </div>
 
-          {linkedCustomer && (
-            <div className="space-y-1.5 rounded-lg border border-border p-3 text-sm">
-              <p className="font-semibold text-foreground">{linkedCustomer.name}</p>
-              {linkedCustomer.phone && <p className="text-muted-foreground">{linkedCustomer.phone}</p>}
-              {linkedCustomer.email && <p className="truncate text-muted-foreground">{linkedCustomer.email}</p>}
-              <Badge variant="outline">{linkedCustomer.status}</Badge>
+          {linkedCustomer ? (
+            <div className="space-y-2 rounded-lg border border-border p-3 text-sm">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-semibold text-foreground">{linkedCustomer.name}</p>
+                <Badge variant="outline" className="shrink-0">{linkedCustomer.status}</Badge>
+              </div>
+              {linkedCustomer.phone && (
+                <p className="flex items-center gap-1.5 text-muted-foreground">
+                  <Phone className="h-3.5 w-3.5 shrink-0" />
+                  {linkedCustomer.phone}
+                </p>
+              )}
+              {linkedCustomer.email && (
+                <p className="flex items-center gap-1.5 truncate text-muted-foreground">
+                  <Mail className="h-3.5 w-3.5 shrink-0" />
+                  {linkedCustomer.email}
+                </p>
+              )}
+              {(linkedCustomer.desiredProvince || linkedCustomer.desiredDistrict) && (
+                <p className="flex items-center gap-1.5 text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  {[linkedCustomer.desiredDistrict, linkedCustomer.desiredProvince].filter(Boolean).join(", ")}
+                </p>
+              )}
+              <Button type="button" variant="outline" size="sm" className="w-full" onClick={openEditLinkedCustomer}>
+                Detayları Görüntüle / Düzenle
+              </Button>
             </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Bu sohbet henüz bir müşteri kartına bağlı değil — yukarıdan mevcut bir kartı seçebilir ya da &quot;Yeni Kaydet&quot;
+              ile buradan bir kart oluşturabilirsiniz.
+            </p>
           )}
 
           <p className="text-xs text-muted-foreground">Sohbet durumu: {selected.status === "open" ? "Açık" : "Kapalı"}</p>
@@ -354,6 +416,25 @@ export default function Mesajlar() {
           initialCustomerId={appointmentTarget.id}
         />
       )}
+
+      <CustomerSheet
+        open={customerSheetOpen}
+        onOpenChange={setCustomerSheetOpen}
+        customer={customerSheetTarget}
+        prefill={
+          !customerSheetTarget && selected
+            ? {
+                name: participantLabel(selected) !== "Bilinmeyen kişi" ? participantLabel(selected) : "",
+                instagram:
+                  selected.channel === "instagram" && selected.participantUsername
+                    ? `@${selected.participantUsername}`
+                    : "",
+                source: selected.channel === "instagram" ? "Instagram" : "WhatsApp",
+              }
+            : undefined
+        }
+        onSaved={handleCustomerSheetSaved}
+      />
     </div>
   );
 }

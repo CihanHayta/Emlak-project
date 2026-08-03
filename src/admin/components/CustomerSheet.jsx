@@ -187,17 +187,18 @@ function CustomerSheetForm({ customer, prefill, onOpenChange, onSaved, onCreated
     };
 
     try {
+      let savedCustomer;
       if (isEditing) {
         const statusChanged = customer.status !== payload.status;
-        await updateCustomer(customer.id, payload);
+        savedCustomer = await updateCustomer(customer.id, payload);
         if (statusChanged) await addTimelineEntry(customer.id, `Durum güncellendi: ${payload.status}`);
         toast.success("Müşteri kartı güncellendi.");
       } else {
-        const newCustomer = await addCustomer(payload);
+        savedCustomer = await addCustomer(payload);
         toast.success("Müşteri kartı oluşturuldu.");
-        if (scheduleAppointment) onCreatedWantsAppointment?.(newCustomer);
+        if (scheduleAppointment) onCreatedWantsAppointment?.(savedCustomer);
       }
-      onSaved?.();
+      onSaved?.(savedCustomer);
       onOpenChange(false);
     } catch (error) {
       toast.error(error.message || "Müşteri kartı kaydedilemedi.");
