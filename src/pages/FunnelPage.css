@@ -30,26 +30,25 @@
   text-decoration: none;
 }
 
-/* Small, non-navigational brand mark — trust signal only, no site nav. */
+/* Small, non-navigational, centered brand mark — trust signal only, no
+   site nav/wordmark (reference sayfadaki gibi minimal). */
 .funnel-page__brand {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  padding: 1.25rem 1.5rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  color: var(--brand-navy);
+  justify-content: center;
+  padding: 1.75rem 1.5rem 0.5rem;
+  background: var(--brand-navy);
 }
 
 .funnel-page__brand-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 0.5rem;
-  border: 2px solid var(--brand-gold);
-  color: var(--brand-gold);
+  border: 2px solid #fff;
+  color: #fff;
 }
 
 .funnel-page__hero {
@@ -105,8 +104,9 @@
   margin: 0;
   font-size: 2rem;
   font-weight: 800;
-  line-height: 1.25;
+  line-height: 1.3;
   color: #fff;
+  white-space: pre-line;
 }
 @media (min-width: 768px) {
   .funnel-page__headline {
@@ -121,30 +121,26 @@
   color: transparent;
 }
 
-.funnel-page__divider {
-  width: 4rem;
-  height: 3px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--brand-gold), var(--brand-gold-light));
-}
-
 .funnel-page__subheadline {
   margin: 0;
   font-size: 1.05rem;
   color: var(--gray-200);
   max-width: 34rem;
+  white-space: pre-line;
 }
 
 .funnel-page__video-pointer {
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.4rem;
   margin-top: 0.5rem;
-  color: var(--brand-gold-light);
+  color: #fff;
   font-weight: 700;
   text-decoration: none;
   animation: funnel-page-bounce 1.6s ease-in-out infinite;
+}
+.funnel-page__video-pointer span {
+  font-size: 1.1rem;
 }
 @keyframes funnel-page-bounce {
   0%, 100% { transform: translateY(0); }
@@ -173,13 +169,18 @@
 }
 
 .funnel-page__video-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
   padding: 3.5rem 1.5rem;
-  background: var(--gray-50);
+  background: var(--brand-navy-dark);
   scroll-margin-top: 1rem;
 }
 
 .funnel-page__video-wrap {
   position: relative;
+  width: 100%;
   max-width: 48rem;
   margin: 0 auto;
   aspect-ratio: 16 / 9;
@@ -198,13 +199,45 @@
   object-fit: cover;
 }
 
+/* Video'nun altında, testimonial'lardan önce gelen kısa "harekete geçir"
+   ara başlığı — reference sayfadaki "Programa katılmak için..." bloğu. */
+.funnel-page__mid-cta {
+  padding: 3rem 1.5rem 1rem;
+  text-align: center;
+  background: #fff;
+}
+.funnel-page__mid-cta h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--brand-navy);
+}
+.funnel-page__mid-cta p {
+  margin: 0;
+  color: var(--gray-600);
+  font-size: 0.95rem;
+}
+
+.funnel-page__testimonials-section {
+  padding: 2.5rem 1.5rem 1rem;
+  background: #fff;
+}
+
+.funnel-page__section-title {
+  margin: 0 0 2rem;
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--brand-navy);
+}
+
 .funnel-page__testimonials {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1.5rem;
+  gap: 2.5rem 1.5rem;
   max-width: 56rem;
   margin: 0 auto;
-  padding: 3.5rem 1.5rem;
+  padding: 0 0 2.5rem;
 }
 @media (min-width: 768px) {
   .funnel-page__testimonials {
@@ -217,19 +250,15 @@
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
   border-radius: 1rem;
-  padding: 1.75rem 1.5rem 1.5rem;
+  padding: 2.25rem 1.5rem 1.5rem;
 }
 
-.funnel-page__quote-icon {
-  color: var(--brand-gold);
-  opacity: 0.8;
-}
-
-.funnel-page__testimonial-text {
-  margin: 0.75rem 0 1.25rem;
-  color: var(--gray-700);
-  line-height: 1.6;
-  font-size: 0.95rem;
+.funnel-page__testimonial-avatar-wrap {
+  position: absolute;
+  top: -1.25rem;
+  left: 1.25rem;
+  display: flex;
+  align-items: center;
 }
 
 .funnel-page__testimonial-avatar {
@@ -239,10 +268,31 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 999px;
+  border: 2px solid #fff;
   background: var(--brand-navy);
   color: var(--brand-gold-light);
   font-weight: 700;
   font-size: 0.8rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  z-index: 1;
+}
+
+.funnel-page__testimonial-ribbon {
+  margin-left: -0.5rem;
+  padding: 0.3rem 0.75rem 0.3rem 1.1rem;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, var(--brand-gold-dark), var(--brand-gold));
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.funnel-page__testimonial-text {
+  margin: 0.5rem 0 0;
+  color: var(--gray-700);
+  line-height: 1.6;
+  font-size: 0.95rem;
 }
 
 .funnel-page__final-cta {

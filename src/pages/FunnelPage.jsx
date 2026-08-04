@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Loader2, Home as HomeIcon, ChevronDown, ArrowRight, X, Quote } from "lucide-react";
+import { Loader2, Diamond, ArrowRight, X } from "lucide-react";
 import { apiClient } from "../lib/apiClient";
 import { SITE } from "../config/siteConfig";
 import { youtubeEmbedUrl } from "../lib/youtube";
@@ -9,17 +9,13 @@ import "./FunnelPage.css";
 const TENANT_ID = import.meta.env.VITE_TENANT_ID;
 
 const TESTIMONIALS = [
-  {
-    initials: "M.A.",
-    text: "Bütçemize uygun 3 farklı seçeneği aynı hafta gösterdiler, hiç oyalanmadık. İki hafta içinde anahtarı elimizdeydi.",
-  },
-  {
-    initials: "S.K.",
-    text: "Yatırım için daire arıyordum, bölge ve getiri konusunda gerçekten doğru yönlendirdiler. Süreç boyunca hep bilgilendirildim.",
-  },
+  { initials: "M.A.", role: "Ev Sahibi", text: "Bütçemize uygun 3 farklı seçeneği aynı hafta gösterdiler, hiç oyalanmadık. İki hafta içinde anahtarı elimizdeydi." },
+  { initials: "S.K.", role: "Yatırımcı", text: "Yatırım için daire arıyordum, bölge ve getiri konusunda gerçekten doğru yönlendirdiler. Süreç boyunca hep bilgilendirildim." },
+  { initials: "E.T.", role: "Ev Sahibi", text: "İlk ev alımımızdı, her adımda yanımızdaydılar. Evrak işlerinden krediye kadar hiç uğraşmadık." },
+  { initials: "B.Y.", role: "Kiracı", text: "İhtiyacımıza uygun kiralık daireyi çok kısa sürede bulduk, süreç son derece şeffaftı." },
 ];
 
-/** `**vurgu**` işaretli kısmı altın rengi bir <span>'e çevirir (bkz. FunnelForm.jsx'teki ipucu). */
+/** `**vurgu**` işaretli kısmı altın rengi bir gradyan <span>'e çevirir, satır sonlarını korur (bkz. FunnelForm.jsx'teki ipucu). */
 function renderHeadline(headline) {
   return headline.split(/\*\*(.+?)\*\*/g).map((part, i) =>
     i % 2 === 1 ? (
@@ -34,15 +30,16 @@ function renderHeadline(headline) {
 
 /**
  * "/kampanya/:slug" — Instagram/reklam trafiği için hazırlanan, admin
- * panelden (bkz. admin/pages/FunnelForm.jsx) sadece metin/CTA alanları
- * düzenlenebilen tek sayfalık kampanya sitesi. BİLEREK <Layout/> DIŞINDA
- * (bkz. App.jsx) — genel site navigasyonu/footer'ı yok, ziyaretçinin
- * dikkati sadece CTA/randevu formunda kalsın diye. `status !== "published"`
- * olan bir funnel için backend 404 döner (taslaklar public'e sızmaz).
+ * panelden (bkz. admin/pages/FunnelForm.jsx) sadece metin/görsel/CTA
+ * alanları düzenlenebilen tek sayfalık kampanya sitesi. BİLEREK <Layout/>
+ * DIŞINDA (bkz. App.jsx) — genel site navigasyonu/footer'ı yok,
+ * ziyaretçinin dikkati sadece CTA/randevu formunda kalsın diye.
+ * `status !== "published"` olan bir funnel için backend 404 döner
+ * (taslaklar public'e sızmaz).
  *
  * CTA butonu bir yere yönlendirmek yerine bir popup (randevu formu) açar —
  * form gönderimi `/public/leads`'e `funnelId` ile düşer, admin panelde bu
- * funnel'ın "Başvurular" listesinde görünür (bkz. FunnelForm.jsx).
+ * funnel'ın başvuru listesinde görünür (bkz. FunnelForm.jsx).
  */
 export default function FunnelPage() {
   const { slug } = useParams();
@@ -138,15 +135,14 @@ export default function FunnelPage() {
   const headline = funnel.headline || SITE.slogan;
   const subheadline =
     funnel.subheadline ||
-    "İster ilk eviniz olsun ister yatırım amaçlı arıyor olun, ihtiyacınıza en uygun portföyü birlikte bulalım.";
+    "İster ilk eviniz olsun ister yatırım amaçlı arıyor olun,\nihtiyacınıza en uygun portföyü birlikte bulalım.";
 
   return (
     <div className="funnel-page">
       <header className="funnel-page__brand">
         <span className="funnel-page__brand-icon">
-          <HomeIcon className="icon-5" />
+          <Diamond className="icon-5" />
         </span>
-        {SITE.name}
       </header>
 
       <section
@@ -158,13 +154,12 @@ export default function FunnelPage() {
         <div className="funnel-page__hero-overlay" />
         <div className="funnel-page__hero-content">
           <h1 className="funnel-page__headline">{renderHeadline(headline)}</h1>
-          <div className="funnel-page__divider" />
           <p className="funnel-page__subheadline">{subheadline}</p>
 
           {hasVideo ? (
             <a href="#funnel-video" className="funnel-page__video-pointer">
               Videoyu izle
-              <ChevronDown className="icon-4" />
+              <span aria-hidden>👇</span>
             </a>
           ) : (
             funnel.formEnabled && (
@@ -191,17 +186,35 @@ export default function FunnelPage() {
               <video src={funnel.videoUrl} controls playsInline />
             )}
           </div>
+          {funnel.formEnabled && (
+            <button type="button" className="funnel-page__cta funnel-page__video-cta" onClick={openPopup}>
+              {ctaText}
+              <ArrowRight className="icon-5" />
+            </button>
+          )}
         </section>
       )}
 
-      <section className="funnel-page__testimonials">
-        {TESTIMONIALS.map((t) => (
-          <div key={t.initials} className="funnel-page__testimonial-card">
-            <Quote className="icon-5 funnel-page__quote-icon" />
-            <p className="funnel-page__testimonial-text">{t.text}</p>
-            <div className="funnel-page__testimonial-avatar">{t.initials}</div>
-          </div>
-        ))}
+      {funnel.formEnabled && (
+        <section className="funnel-page__mid-cta">
+          <h2>Görüşme İçin Uygun Gün ve Saati Seçin!</h2>
+          <p>Tanışalım, hayalinizdeki evi birlikte bulalım.</p>
+        </section>
+      )}
+
+      <section className="funnel-page__testimonials-section">
+        <h2 className="funnel-page__section-title">Ne Diyorlar?</h2>
+        <div className="funnel-page__testimonials">
+          {TESTIMONIALS.map((t) => (
+            <div key={t.initials} className="funnel-page__testimonial-card">
+              <div className="funnel-page__testimonial-avatar-wrap">
+                <div className="funnel-page__testimonial-avatar">{t.initials}</div>
+                <span className="funnel-page__testimonial-ribbon">{t.role}</span>
+              </div>
+              <p className="funnel-page__testimonial-text">{t.text}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       {funnel.formEnabled && (

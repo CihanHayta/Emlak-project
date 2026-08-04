@@ -194,9 +194,9 @@ export default function FunnelForm() {
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="f-headline">Başlık</Label>
-              <Input id="f-headline" value={form.headline} onChange={(e) => set("headline", e.target.value)} placeholder="Örn: Boğaz Manzaralı Yazlık Fırsatları" />
+              <Textarea id="f-headline" rows={3} value={form.headline} onChange={(e) => set("headline", e.target.value)} placeholder={"Örn: Kişiye Özel\n**Boğaz Manzaralı Yazlık Fırsatları**\nSizi Bekliyor"} />
               <p className="text-[11px] text-muted-foreground">
-                Vurgulamak istediğiniz kısmı <strong>**iki yıldız**</strong> arasına yazın, sayfada altın renkli görünür.
+                Enter ile satır kırabilirsiniz. Vurgulamak istediğiniz kısmı <strong>**iki yıldız**</strong> arasına yazın, sayfada altın renkli görünür.
               </p>
             </div>
             <div className="space-y-1.5">
