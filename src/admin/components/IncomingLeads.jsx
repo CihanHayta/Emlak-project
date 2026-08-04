@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Inbox, UserPlus, Trash2, CalendarPlus } from "lucide-react";
+import { Inbox, UserPlus, Trash2, CalendarPlus, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -90,7 +90,14 @@ export default function IncomingLeads({ onConvert, onCreateAppointment }) {
             </div>
           </div>
           <p className="truncate text-xs text-muted-foreground">{lead.phone}</p>
-          <p className="mt-1 truncate text-xs text-muted-foreground">{lead.context}</p>
+          {lead.funnelId ? (
+            <div className="mt-1 flex min-w-0 items-center gap-1 text-xs font-medium text-brand-gold-dark">
+              <Megaphone className="h-3 w-3 shrink-0" />
+              <span className="truncate">Kampanya: {lead.context}</span>
+            </div>
+          ) : (
+            <p className="mt-1 truncate text-xs text-muted-foreground">{lead.context}</p>
+          )}
           {lead.message && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">“{lead.message}”</p>}
           <span className="mt-2 text-[11px] text-muted-foreground">
             {new Date(toMillis(lead.createdAt)).toLocaleString("tr-TR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}

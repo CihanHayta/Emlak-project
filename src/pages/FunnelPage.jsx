@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Loader2, Home as HomeIcon, ChevronDown, ArrowRight, X, Quote } from "lucide-react";
 import { apiClient } from "../lib/apiClient";
 import { SITE } from "../config/siteConfig";
+import { youtubeEmbedUrl } from "../lib/youtube";
 import "./FunnelPage.css";
 
 const TENANT_ID = import.meta.env.VITE_TENANT_ID;
@@ -18,10 +19,17 @@ const TESTIMONIALS = [
   },
 ];
 
-function youtubeEmbedUrl(url) {
-  if (!url) return null;
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{11})/);
-  return match ? `https://www.youtube.com/embed/${match[1]}` : null;
+/** `**vurgu**` işaretli kısmı altın rengi bir <span>'e çevirir (bkz. FunnelForm.jsx'teki ipucu). */
+function renderHeadline(headline) {
+  return headline.split(/\*\*(.+?)\*\*/g).map((part, i) =>
+    i % 2 === 1 ? (
+      <span key={i} className="funnel-page__highlight">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
 }
 
 /**
@@ -43,6 +51,15 @@ export default function FunnelPage() {
   const [form, setForm] = useState({ name: "", phone: "", message: "" });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [heroVisible, setHeroVisible] = useState(true);
+  const heroRef = useRef(null);
+
+  useEffect(() => {
+    if (!heroRef.current) return;
+    const observer = new IntersectionObserver(([entry]) => setHeroVisible(entry.isIntersecting), { threshold: 0 });
+    observer.observe(heroRef.current);
+    return () => observer.disconnect();
+  }, [funnel]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,6 +132,8 @@ export default function FunnelPage() {
   }
 
   const embedUrl = youtubeEmbedUrl(funnel.videoUrl);
+  const hasDirectVideo = Boolean(funnel.videoUrl) && !embedUrl;
+  const hasVideo = Boolean(embedUrl) || hasDirectVideo;
   const ctaText = funnel.ctaText || "Hemen Randevu Al";
   const headline = funnel.headline || SITE.slogan;
   const subheadline =
@@ -131,16 +150,18 @@ export default function FunnelPage() {
       </header>
 
       <section
+        ref={heroRef}
         className="funnel-page__hero"
         style={funnel.heroImage ? { backgroundImage: `url(${funnel.heroImage})` } : undefined}
       >
+        <div className="funnel-page__hero-grid" />
         <div className="funnel-page__hero-overlay" />
         <div className="funnel-page__hero-content">
-          <h1 className="funnel-page__headline">{headline}</h1>
+          <h1 className="funnel-page__headline">{renderHeadline(headline)}</h1>
           <div className="funnel-page__divider" />
           <p className="funnel-page__subheadline">{subheadline}</p>
 
-          {embedUrl ? (
+          {hasVideo ? (
             <a href="#funnel-video" className="funnel-page__video-pointer">
               Videoyu izle
               <ChevronDown className="icon-4" />
@@ -156,15 +177,19 @@ export default function FunnelPage() {
         </div>
       </section>
 
-      {embedUrl && (
+      {hasVideo && (
         <section id="funnel-video" className="funnel-page__video-section">
           <div className="funnel-page__video-wrap">
-            <iframe
-              src={embedUrl}
-              title={headline}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+            {embedUrl ? (
+              <iframe
+                src={embedUrl}
+                title={funnel.name}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <video src={funnel.videoUrl} controls playsInline />
+            )}
           </div>
         </section>
       )}
@@ -201,6 +226,17 @@ export default function FunnelPage() {
           Bu sayfa Meta/Instagram&apos;ın bir parçası değildir ve Meta tarafından onaylanmamıştır.
         </p>
       </footer>
+
+      {funnel.formEnabled && (
+        <button
+          type="button"
+          className={`funnel-page__sticky-cta ${heroVisible ? "" : "funnel-page__sticky-cta--visible"}`}
+          onClick={openPopup}
+        >
+          {ctaText}
+          <ArrowRight className="icon-4" />
+        </button>
+      )}
 
       {popupOpen && (
         <div className="funnel-page__modal-overlay" onClick={() => setPopupOpen(false)}>
