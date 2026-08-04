@@ -188,7 +188,8 @@
   overflow: hidden;
   box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.25);
 }
-.funnel-page__video-wrap iframe {
+.funnel-page__video-wrap iframe,
+.funnel-page__video-wrap video {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -197,29 +198,14 @@
   background: #000;
 }
 
-/* Yüklenen video YouTube gibi hep 16:9 olmayabilir — çoğu ajans videosu
-   telefonla dikey çekilir. Sabit 16:9 kutuya zorlayıp kırpmak yerine,
-   videonun kendi en-boy oranında, yüksekliği viewport'a göre sınırlı
-   şekilde gösterilir. */
-.funnel-page__video-wrap--native {
-  position: static;
-  display: flex;
-  justify-content: center;
-  max-width: 40rem;
-  aspect-ratio: unset;
-  box-shadow: none;
-  border-radius: 0;
-  overflow: visible;
-}
-.funnel-page__video-wrap--native video {
-  position: static;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 70vh;
-  border-radius: 1rem;
-  background: #000;
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.25);
+/* YouTube embed'i her zaman tam 16:9 olduğu için kutuyu doldurur (cover).
+   Yüklenen video ise 16:9'a yakın ama tam tutmayabilir (telefon kaydı) —
+   "contain" ile hiçbir zaman kırpılmaz/gerilmez, sadece gerekirse ince
+   siyah şeritlerle (letterbox) tam görünür. Kullanıcıdan yatay (16:9'a
+   yakın) video yüklemesi bekleniyor; dikey video da kırpılmadan görünür
+   ama üstte/altta büyük boşluk kalır. */
+.funnel-page__video-wrap video {
+  object-fit: contain;
 }
 
 /* Video'nun altında, testimonial'lardan önce gelen kısa "harekete geçir"
