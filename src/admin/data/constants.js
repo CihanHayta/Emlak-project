@@ -26,6 +26,7 @@ export const LEAD_SOURCES = [
   "WhatsApp",
   "Facebook",
   "Web Sitesi",
+  "Kampanya",
   ...SERVICES.map((service) => service.title),
   "Sahibinden",
   "Hepsiemlak",

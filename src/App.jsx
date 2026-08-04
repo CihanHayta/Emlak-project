@@ -96,7 +96,6 @@ export default function App() {
             <Route path="mesajlar" element={<Mesajlar />} />
             <Route path="bildirimler" element={<Notifications />} />
             <Route path="funnel" element={<Funnels />} />
-            <Route path="funnel/yeni" element={<FunnelForm />} />
             <Route path="funnel/:id" element={<FunnelForm />} />
             <Route path="ayarlar" element={<Settings />} />
           </Route>

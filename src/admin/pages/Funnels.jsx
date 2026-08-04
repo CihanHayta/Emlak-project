@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ExternalLink, Copy } from "lucide-react";
+import { Pencil, Trash2, ExternalLink, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -65,20 +65,12 @@ export default function Funnels() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Instagram/reklam trafiği için tek sayfalık kampanya siteleri oluşturun — gelen başvurular ayrı ayrı listelenir.
-        </p>
-        <Button asChild className="bg-brand-gold text-white hover:bg-brand-gold-dark">
-          <Link to="/admin/funnel/yeni">
-            <Plus className="h-4 w-4" />
-            Yeni Funnel
-          </Link>
-        </Button>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Instagram/reklam trafiği için hazırlanan kampanya sayfaları — gelen başvurular ayrı ayrı listelenir.
+      </p>
 
       {funnels.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted-foreground">Henüz bir kampanya sayfası oluşturmadınız.</p>
+        <p className="py-16 text-center text-sm text-muted-foreground">Henüz bir kampanya sayfası yok.</p>
       ) : (
         <div className="rounded-xl border border-border">
           <Table>

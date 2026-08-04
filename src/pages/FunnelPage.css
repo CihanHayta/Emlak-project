@@ -57,7 +57,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 32rem;
+  min-height: 34rem;
   padding: 3rem 1.5rem;
   background-color: var(--brand-navy);
   background-size: cover;
@@ -68,13 +68,13 @@
 .funnel-page__hero-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(14, 27, 44, 0.55) 0%, rgba(14, 27, 44, 0.85) 100%);
+  background: linear-gradient(180deg, rgba(14, 27, 44, 0.6) 0%, rgba(10, 20, 32, 0.92) 100%);
 }
 
 .funnel-page__hero-content {
   position: relative;
   z-index: 1;
-  max-width: 42rem;
+  max-width: 44rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -85,7 +85,7 @@
   margin: 0;
   font-size: 2rem;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1.25;
   color: #fff;
 }
 @media (min-width: 768px) {
@@ -94,33 +94,61 @@
   }
 }
 
+.funnel-page__divider {
+  width: 4rem;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand-gold), var(--brand-gold-light));
+}
+
 .funnel-page__subheadline {
   margin: 0;
   font-size: 1.05rem;
   color: var(--gray-200);
+  max-width: 34rem;
+}
+
+.funnel-page__video-pointer {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  color: var(--brand-gold-light);
+  font-weight: 700;
+  text-decoration: none;
+  animation: funnel-page-bounce 1.6s ease-in-out infinite;
+}
+@keyframes funnel-page-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
 }
 
 .funnel-page__cta {
   display: inline-flex;
   align-items: center;
   gap: 0.625rem;
-  padding: 0.875rem 1.75rem;
+  padding: 1rem 2rem;
+  border: none;
   border-radius: 999px;
-  background: var(--whatsapp-green);
+  background: linear-gradient(90deg, var(--brand-gold-dark), var(--brand-gold));
   color: #fff;
   font-weight: 700;
+  font-size: 1.05rem;
+  cursor: pointer;
   text-decoration: none;
-  box-shadow: 0 8px 20px -6px rgba(37, 211, 102, 0.5);
+  box-shadow: 0 10px 24px -8px rgba(232, 163, 61, 0.55);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .funnel-page__cta:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 24px -6px rgba(37, 211, 102, 0.6);
+  box-shadow: 0 14px 28px -8px rgba(232, 163, 61, 0.65);
 }
 
 .funnel-page__video-section {
-  padding: 3rem 1.5rem;
+  padding: 3.5rem 1.5rem;
   background: var(--gray-50);
+  scroll-margin-top: 1rem;
 }
 
 .funnel-page__video-wrap {
@@ -140,25 +168,167 @@
   border: 0;
 }
 
-.funnel-page__form-section {
+.funnel-page__testimonials {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  max-width: 56rem;
+  margin: 0 auto;
   padding: 3.5rem 1.5rem;
+}
+@media (min-width: 768px) {
+  .funnel-page__testimonials {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.funnel-page__testimonial-card {
+  position: relative;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 1rem;
+  padding: 1.75rem 1.5rem 1.5rem;
+}
+
+.funnel-page__quote-icon {
+  color: var(--brand-gold);
+  opacity: 0.8;
+}
+
+.funnel-page__testimonial-text {
+  margin: 0.75rem 0 1.25rem;
+  color: var(--gray-700);
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.funnel-page__testimonial-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: var(--brand-navy);
+  color: var(--brand-gold-light);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.funnel-page__final-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 3.5rem 1.5rem 4rem;
+  background: var(--brand-navy);
+  text-align: center;
+}
+
+.funnel-page__final-cta-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.funnel-page__trust-line {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gray-400);
+}
+
+.funnel-page__footer {
+  padding: 2rem 1.5rem 2.5rem;
+  text-align: center;
+  background: var(--brand-navy-dark);
+}
+
+.funnel-page__footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+.funnel-page__footer-links a {
+  color: var(--gray-300);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.funnel-page__footer-links a:hover {
+  color: var(--brand-gold-light);
+}
+
+.funnel-page__disclaimer {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--gray-500);
+  max-width: 36rem;
+  margin-inline: auto;
+}
+
+/* CTA popup (randevu formu) — public site vanilla CSS'e uygun, admin
+   Tailwind bileşenlerinden bağımsız, sıfırdan yazılmış minimal modal. */
+.funnel-page__modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(10, 20, 32, 0.65);
+  backdrop-filter: blur(2px);
+}
+
+.funnel-page__modal {
+  position: relative;
+  width: 100%;
+  max-width: 26rem;
   background: #fff;
+  border-radius: 1.25rem;
+  padding: 2rem 1.75rem 1.75rem;
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.35);
+}
+
+.funnel-page__modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  cursor: pointer;
+}
+.funnel-page__modal-close:hover {
+  background: var(--gray-200);
 }
 
 .funnel-page__form {
-  max-width: 28rem;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
 }
 
 .funnel-page__form-title {
-  margin: 0 0 0.5rem;
+  margin: 0;
   text-align: center;
-  font-size: 1.35rem;
-  font-weight: 700;
+  font-size: 1.3rem;
+  font-weight: 800;
   color: var(--brand-navy);
+}
+
+.funnel-page__form-subtitle {
+  margin: -0.5rem 0 0.25rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--gray-500);
 }
 
 .funnel-page__form input,
@@ -198,17 +368,9 @@
 }
 
 .funnel-page__success {
-  max-width: 28rem;
-  margin: 0 auto;
+  margin: 0.5rem 0 0;
   text-align: center;
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--emerald-600);
-}
-
-.funnel-page__final-cta {
-  display: flex;
-  justify-content: center;
-  padding: 3rem 1.5rem 4rem;
-  background: var(--gray-50);
 }

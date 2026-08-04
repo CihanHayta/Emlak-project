@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, Copy } from "lucide-react";
+import { ArrowLeft, ExternalLink, Copy, UserPlus, CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getFunnelById, addFunnel, updateFunnel } from "../data/funnelStore";
-import { getLeads, subscribeToLeads } from "../../lib/leadStore";
+import { getFunnelById, updateFunnel } from "../data/funnelStore";
+import { getLeads, subscribeToLeads, updateLeadStatus } from "../../lib/leadStore";
+import { addCustomer } from "../data/customerStore";
+import CustomerSheet from "../components/CustomerSheet";
+import AppointmentFormDialog from "../components/AppointmentFormDialog";
 import { LEAD_STATUS_STYLES } from "../data/constants";
 import { toMillis } from "../../lib/firestoreTimestamp";
 import { cn } from "@/lib/utils";
@@ -32,27 +35,33 @@ const EMPTY_FORM = {
 };
 
 /**
- * "/admin/funnel/yeni" ve "/admin/funnel/:id" — kampanya sayfası
- * oluşturma/düzenleme + (düzenleme modunda) o sayfadan gelen başvuruların
- * listesi. Genel (public) tarafı için bkz. src/pages/FunnelPage.jsx —
- * burada girilen her alan aynen orada render edilir.
+ * "/admin/funnel/:id" — kampanya sayfası düzenleme + o sayfadan gelen
+ * başvuruların listesi. Yeni funnel oluşturma UI'dan bilerek kaldırıldı
+ * (her kampanya sayfası artık referans bir tasarıma göre elle kodlanıyor,
+ * bkz. src/pages/FunnelPage.jsx) — bu ekran sadece var olan bir funnel'ın
+ * metin/CTA alanlarını düzenlemeye ve başvuruları triyaj etmeye yarıyor.
+ * Genel (public) tarafı için bkz. src/pages/FunnelPage.jsx.
  */
 export default function FunnelForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const isEditing = Boolean(id);
-  const existing = isEditing ? getFunnelById(id) : null;
+  const existing = getFunnelById(id);
 
   const [form, setForm] = useState(() => (existing ? { ...EMPTY_FORM, ...existing } : EMPTY_FORM));
   const [saving, setSaving] = useState(false);
   const [leads, setLeads] = useState(getLeads());
 
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [prefill, setPrefill] = useState({});
+  const [convertingLeadId, setConvertingLeadId] = useState(null);
+  const [appointmentTarget, setAppointmentTarget] = useState(null);
+
   useEffect(() => subscribeToLeads(() => setLeads(getLeads())), []);
 
-  // Düzenleme modunda, funnel henüz store'un ilk yüklemesi tamamlanmadan
-  // gelmişse (sayfaya doğrudan linkten girildiğinde) veriyi geç doldur.
+  // Funnel, store'un ilk yüklemesi tamamlanmadan (sayfaya doğrudan linkten
+  // girildiğinde) gelmişse veriyi geç doldur.
   useEffect(() => {
-    if (isEditing && existing && form.name === "") {
+    if (existing && form.name === "") {
       setForm({ ...EMPTY_FORM, ...existing });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,15 +76,8 @@ export default function FunnelForm() {
     if (!form.name.trim()) return toast.error("Ad zorunlu.");
     setSaving(true);
     try {
-      if (isEditing) {
-        await updateFunnel(id, form);
-        toast.success("Funnel güncellendi.");
-      } else {
-        const created = await addFunnel(form);
-        toast.success("Funnel oluşturuldu.");
-        navigate(`/admin/funnel/${created.id}`, { replace: true });
-        return;
-      }
+      await updateFunnel(id, form);
+      toast.success("Funnel güncellendi.");
     } catch (error) {
       toast.error(error.message || "Kaydedilemedi.");
     } finally {
@@ -92,7 +94,43 @@ export default function FunnelForm() {
     }
   }
 
-  const submissions = isEditing ? leads.filter((l) => l.funnelId === id) : [];
+  function handleConvertLead(lead) {
+    setConvertingLeadId(lead.id);
+    setPrefill({ name: lead.name, phone: lead.phone, notes: lead.message, source: "Kampanya" });
+    setSheetOpen(true);
+  }
+
+  async function handleCustomerSaved() {
+    if (convertingLeadId) {
+      try {
+        await updateLeadStatus(convertingLeadId, "Müşteri Oldu");
+      } catch (error) {
+        toast.error(error.message || "Başvuru durumu güncellenemedi.");
+      }
+      setConvertingLeadId(null);
+    }
+  }
+
+  async function handleCreateAppointment(lead) {
+    try {
+      const customer = await addCustomer({ name: lead.name, phone: lead.phone, notes: lead.message, source: "Kampanya" });
+      setAppointmentTarget({ leadId: lead.id, customer });
+    } catch (error) {
+      toast.error(error.message || "Müşteri kartı oluşturulamadı.");
+    }
+  }
+
+  async function handleAppointmentSaved() {
+    if (appointmentTarget) {
+      try {
+        await updateLeadStatus(appointmentTarget.leadId, "Randevu Verildi");
+      } catch (error) {
+        toast.error(error.message || "Başvuru durumu güncellenemedi.");
+      }
+    }
+  }
+
+  const submissions = leads.filter((l) => l.funnelId === id);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -118,7 +156,7 @@ export default function FunnelForm() {
               </div>
             </div>
 
-            {isEditing && form.slug && (
+            {form.slug && (
               <div className="flex items-center gap-2 rounded-lg bg-muted p-2.5 text-xs">
                 <span className="min-w-0 flex-1 truncate text-muted-foreground">{funnelUrl(form.slug)}</span>
                 <button type="button" onClick={handleCopyLink} title="Kopyala">
@@ -173,21 +211,17 @@ export default function FunnelForm() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Çağrı (CTA) ve Form</CardTitle>
+            <CardTitle>Çağrı (CTA) ve Randevu Formu</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="f-cta-text">Buton Metni</Label>
               <Input id="f-cta-text" value={form.ctaText} onChange={(e) => set("ctaText", e.target.value)} />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="f-cta-msg">WhatsApp&apos;ta Açılacak Hazır Mesaj</Label>
-              <Input id="f-cta-msg" value={form.ctaWhatsappMessage} onChange={(e) => set("ctaWhatsappMessage", e.target.value)} placeholder="Örn: Yazlık kampanyası hakkında bilgi almak istiyorum." />
-            </div>
             <div className="flex items-center justify-between rounded-lg border border-border p-3">
               <div>
-                <p className="text-sm font-medium text-foreground">İletişim Formu</p>
-                <p className="text-xs text-muted-foreground">Açıkken sayfada ad/telefon toplayan bir form da gösterilir.</p>
+                <p className="text-sm font-medium text-foreground">Randevu Formu</p>
+                <p className="text-xs text-muted-foreground">Açıkken CTA butonuna tıklayınca ad/telefon toplayan bir popup açılır.</p>
               </div>
               <Switch checked={form.formEnabled} onCheckedChange={(checked) => set("formEnabled", checked)} />
             </div>
@@ -195,35 +229,64 @@ export default function FunnelForm() {
         </Card>
 
         <Button type="submit" disabled={saving} className="w-full bg-brand-gold text-white hover:bg-brand-gold-dark">
-          {isEditing ? "Kaydet" : "Funnel Oluştur"}
+          Kaydet
         </Button>
       </form>
 
-      {isEditing && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Bu Sayfadan Gelen Başvurular ({submissions.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2.5">
-            {submissions.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">Henüz başvuru yok.</p>
-            ) : (
-              submissions
-                .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
-                .map((lead) => (
-                  <div key={lead.id} className="flex items-center justify-between gap-2 rounded-lg border border-border p-2.5 text-sm">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{lead.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{lead.phone}</p>
-                    </div>
-                    <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", LEAD_STATUS_STYLES[lead.status])}>
-                      {lead.status}
-                    </span>
+      <Card>
+        <CardHeader>
+          <CardTitle>Bu Sayfadan Gelen Başvurular ({submissions.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2.5">
+          {submissions.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Henüz başvuru yok.</p>
+          ) : (
+            submissions
+              .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+              .map((lead) => (
+                <div key={lead.id} className="flex flex-col gap-2 rounded-lg border border-border p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{lead.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{lead.phone}</p>
+                    {lead.message && <p className="mt-1 truncate text-xs text-muted-foreground">“{lead.message}”</p>}
                   </div>
-                ))
-            )}
-          </CardContent>
-        </Card>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", LEAD_STATUS_STYLES[lead.status ?? "Yeni"])}>
+                      {lead.status ?? "Yeni"}
+                    </span>
+                    <Button size="sm" variant="outline" onClick={() => handleCreateAppointment(lead)}>
+                      <CalendarPlus className="h-3.5 w-3.5" />
+                      Randevu
+                    </Button>
+                    <Button size="sm" className="bg-brand-gold text-white hover:bg-brand-gold-dark" onClick={() => handleConvertLead(lead)}>
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Müşteri Yap
+                    </Button>
+                  </div>
+                </div>
+              ))
+          )}
+        </CardContent>
+      </Card>
+
+      <CustomerSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        customer={null}
+        prefill={prefill}
+        onSaved={handleCustomerSaved}
+      />
+
+      {appointmentTarget && (
+        <AppointmentFormDialog
+          key={appointmentTarget.customer.id}
+          open
+          onOpenChange={(o) => !o && setAppointmentTarget(null)}
+          appointment={null}
+          initialCustomerId={appointmentTarget.customer.id}
+          initialServiceType="İlan Gösterimi"
+          onSaved={handleAppointmentSaved}
+        />
       )}
     </div>
   );

@@ -19,8 +19,7 @@ export function createDefaultFunnel({
   subheadline = "",
   videoUrl = "",
   heroImage = "",
-  ctaText = "Hemen Bilgi Al",
-  ctaWhatsappMessage = "",
+  ctaText = "Hemen Randevu Al",
   formEnabled = true,
 }) {
   return withCreateFields({
@@ -31,8 +30,7 @@ export function createDefaultFunnel({
     subheadline,
     videoUrl,
     heroImage,
-    ctaText,
-    ctaWhatsappMessage,
-    formEnabled,
+    ctaText, // sayfadaki CTA butonunun metni — tıklanınca randevu formu popup'ı açılır
+    formEnabled, // kapalıyken CTA butonu popup açmaz, sadece bilgi amaçlı görünür
   });
 }
