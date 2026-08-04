@@ -9,6 +9,7 @@ import Hizmetlerimiz from "./pages/Hizmetlerimiz";
 import Iletisim from "./pages/Iletisim";
 import Gizlilik from "./pages/Gizlilik";
 import PropertyDetail from "./pages/PropertyDetail";
+import FunnelPage from "./pages/FunnelPage";
 import NotFound from "./pages/NotFound";
 
 // Admin paneli (Firebase Auth SDK + tüm CRM sayfaları/bileşenleri) BİLEREK
@@ -30,6 +31,8 @@ const Basvurular = lazy(() => import("./admin/pages/Basvurular"));
 const Mesajlar = lazy(() => import("./admin/pages/Mesajlar"));
 const Notifications = lazy(() => import("./admin/pages/Notifications"));
 const Settings = lazy(() => import("./admin/pages/Settings"));
+const Funnels = lazy(() => import("./admin/pages/Funnels"));
+const FunnelForm = lazy(() => import("./admin/pages/FunnelForm"));
 
 function AdminLoadingFallback() {
   return (
@@ -60,6 +63,11 @@ export default function App() {
           <Route path="ilan/:id" element={<PropertyDetail />} />
         </Route>
 
+        {/* Kampanya (funnel) sayfaları — BİLEREK <Layout/> DIŞINDA, genel
+            site navigasyonu/footer'ı olmadan, reklam trafiğinin dikkati
+            dağılmasın diye. Admin tarafı için bkz. admin/pages/Funnels.jsx. */}
+        <Route path="kampanya/:slug" element={<FunnelPage />} />
+
         {/* Admin panel */}
         <Route
           path="admin/login"
@@ -87,6 +95,9 @@ export default function App() {
             <Route path="musteriler" element={<Customers />} />
             <Route path="mesajlar" element={<Mesajlar />} />
             <Route path="bildirimler" element={<Notifications />} />
+            <Route path="funnel" element={<Funnels />} />
+            <Route path="funnel/yeni" element={<FunnelForm />} />
+            <Route path="funnel/:id" element={<FunnelForm />} />
             <Route path="ayarlar" element={<Settings />} />
           </Route>
         </Route>

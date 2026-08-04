@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Bell,
   Settings,
+  Megaphone,
   Plus,
   Home as HomeIcon,
   ChevronLeft,
@@ -29,6 +30,10 @@ const NAV_ITEMS = [
   { label: "Müşteriler", to: "/admin/musteriler", icon: Users, badgeKey: "newCustomers" },
   { label: "Mesajlar", to: "/admin/mesajlar", icon: MessageSquare, badgeKey: "unreadMessages" },
   { label: "Bildirimler", to: "/admin/bildirimler", icon: Bell },
+  // Kampanya sayfası oluşturma/yayınlama — Ayarlar'la aynı gerekçeyle
+  // sadece owner'da (bkz. server/authorize.middleware.js'in "funnels:*"ı
+  // agent/assistant'a hiç vermemesi).
+  { label: "Funnel", to: "/admin/funnel", icon: Megaphone, ownerOnly: true },
   // Sadece admin (owner) görür — Danışman/Personel için Ayarlar sayfası
   // (kullanıcı yönetimi) hiç anlamlı değil, bkz. Settings.jsx'in kendi
   // rol koruması.

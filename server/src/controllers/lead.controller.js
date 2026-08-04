@@ -25,7 +25,7 @@ export async function deleteLeadController(req, res) {
 // popup'ları çağırır, bkz. routes/publicLead.routes.js) ---
 
 export async function createPublicLeadController(req, res) {
-  const { tenantId, name, phone, message, context } = req.body;
+  const { tenantId, name, phone, message, context, funnelId } = req.body;
   if (!tenantId) throw ApiError.validation("tenantId zorunlu.");
   if (!name || !phone) throw ApiError.validation("Ad ve telefon zorunlu.");
 
@@ -33,6 +33,6 @@ export async function createPublicLeadController(req, res) {
   if (!tenant) throw ApiError.notFound("Geçersiz tenant.");
 
   const publicContext = { tenantId, userId: null, role: "public" };
-  const lead = await leadService.createLead(publicContext, { name, phone, message, context });
+  const lead = await leadService.createLead(publicContext, { name, phone, message, context, funnelId });
   sendSuccess(res, { data: { id: lead.id }, status: 201 });
 }
