@@ -174,7 +174,7 @@ export default function FunnelPage() {
 
       {hasVideo && (
         <section id="funnel-video" className="funnel-page__video-section">
-          <div className="funnel-page__video-wrap">
+          <div className={embedUrl ? "funnel-page__video-wrap" : "funnel-page__video-wrap funnel-page__video-wrap--native"}>
             {embedUrl ? (
               <iframe
                 src={embedUrl}
