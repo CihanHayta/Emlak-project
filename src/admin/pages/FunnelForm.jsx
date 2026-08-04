@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowLeft, ExternalLink, Copy } from "lucide-react";
+import { ArrowLeft, ExternalLink, Copy, UserPlus, CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getFunnelById, updateFunnel } from "../data/funnelStore";
 import MediaUploadField from "../components/MediaUploadField";
 import { isYoutubeUrl } from "../../lib/youtube";
+import { getLeads, subscribeToLeads, updateLeadStatus } from "../../lib/leadStore";
+import { addCustomer } from "../data/customerStore";
+import CustomerSheet from "../components/CustomerSheet";
+import AppointmentFormDialog from "../components/AppointmentFormDialog";
+import { LEAD_STATUS_STYLES } from "../data/constants";
+import { toMillis } from "../../lib/firestoreTimestamp";
+import { cn } from "@/lib/utils";
 
 function funnelUrl(slug) {
   return `${window.location.origin}/kampanya/${slug}`;
@@ -29,13 +36,13 @@ const EMPTY_FORM = {
 };
 
 /**
- * "/admin/funnel/:id" — kampanya sayfası düzenleme. Yeni funnel oluşturma
- * UI'dan bilerek kaldırıldı (her kampanya sayfası artık referans bir
- * tasarıma göre elle kodlanıyor, bkz. src/pages/FunnelPage.jsx) — bu ekran
- * sadece var olan bir funnel'ın metin/görsel/CTA alanlarını düzenlemeye
- * yarıyor. Bu sayfadan gelen başvurular BURADA DEĞİL, doğrudan
- * "/admin/basvurular"da görünür (bkz. IncomingLeads.jsx'in Kampanya
- * rozeti) — aynı kaydı iki ayrı ekranda triyaj etmek yerine tek yer.
+ * "/admin/funnel/:id" — kampanya sayfası düzenleme + o sayfadan gelen
+ * başvuruların listesi (aynı kayıtlar, kaynağı belli olsun diye ayrıca
+ * "/admin/basvurular"da da Kampanya rozetiyle görünür — bkz.
+ * IncomingLeads.jsx — ama randevu/müşteri dönüştürme burada da yapılabilir,
+ * agent hangisini açtıysa orada işlem yapabilsin diye). Yeni funnel
+ * oluşturma UI'dan bilerek kaldırıldı (her kampanya sayfası artık referans
+ * bir tasarıma göre elle kodlanıyor, bkz. src/pages/FunnelPage.jsx).
  */
 export default function FunnelForm() {
   const { id } = useParams();
@@ -44,6 +51,14 @@ export default function FunnelForm() {
 
   const [form, setForm] = useState(() => (existing ? { ...EMPTY_FORM, ...existing } : EMPTY_FORM));
   const [saving, setSaving] = useState(false);
+  const [leads, setLeads] = useState(getLeads());
+
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [prefill, setPrefill] = useState({});
+  const [convertingLeadId, setConvertingLeadId] = useState(null);
+  const [appointmentTarget, setAppointmentTarget] = useState(null);
+
+  useEffect(() => subscribeToLeads(() => setLeads(getLeads())), []);
 
   // Funnel, store'un ilk yüklemesi tamamlanmadan (sayfaya doğrudan linkten
   // girildiğinde) gelmişse veriyi geç doldur.
@@ -80,6 +95,44 @@ export default function FunnelForm() {
       toast.error("Bağlantı kopyalanamadı.");
     }
   }
+
+  function handleConvertLead(lead) {
+    setConvertingLeadId(lead.id);
+    setPrefill({ name: lead.name, phone: lead.phone, notes: lead.message, source: "Kampanya" });
+    setSheetOpen(true);
+  }
+
+  async function handleCustomerSaved() {
+    if (convertingLeadId) {
+      try {
+        await updateLeadStatus(convertingLeadId, "Müşteri Oldu");
+      } catch (error) {
+        toast.error(error.message || "Başvuru durumu güncellenemedi.");
+      }
+      setConvertingLeadId(null);
+    }
+  }
+
+  async function handleCreateAppointment(lead) {
+    try {
+      const customer = await addCustomer({ name: lead.name, phone: lead.phone, notes: lead.message, source: "Kampanya" });
+      setAppointmentTarget({ leadId: lead.id, customer });
+    } catch (error) {
+      toast.error(error.message || "Müşteri kartı oluşturulamadı.");
+    }
+  }
+
+  async function handleAppointmentSaved() {
+    if (appointmentTarget) {
+      try {
+        await updateLeadStatus(appointmentTarget.leadId, "Randevu Verildi");
+      } catch (error) {
+        toast.error(error.message || "Başvuru durumu güncellenemedi.");
+      }
+    }
+  }
+
+  const submissions = leads.filter((l) => l.funnelId === id);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -195,6 +248,62 @@ export default function FunnelForm() {
           Kaydet
         </Button>
       </form>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Bu Sayfadan Gelen Başvurular ({submissions.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2.5">
+          {submissions.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Henüz başvuru yok.</p>
+          ) : (
+            submissions
+              .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
+              .map((lead) => (
+                <div key={lead.id} className="flex flex-col gap-2 rounded-lg border border-border p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{lead.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{lead.phone}</p>
+                    {lead.message && <p className="mt-1 truncate text-xs text-muted-foreground">“{lead.message}”</p>}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", LEAD_STATUS_STYLES[lead.status ?? "Yeni"])}>
+                      {lead.status ?? "Yeni"}
+                    </span>
+                    <Button size="sm" variant="outline" onClick={() => handleCreateAppointment(lead)}>
+                      <CalendarPlus className="h-3.5 w-3.5" />
+                      Randevu
+                    </Button>
+                    <Button size="sm" className="bg-brand-gold text-white hover:bg-brand-gold-dark" onClick={() => handleConvertLead(lead)}>
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Müşteri Yap
+                    </Button>
+                  </div>
+                </div>
+              ))
+          )}
+        </CardContent>
+      </Card>
+
+      <CustomerSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        customer={null}
+        prefill={prefill}
+        onSaved={handleCustomerSaved}
+      />
+
+      {appointmentTarget && (
+        <AppointmentFormDialog
+          key={appointmentTarget.customer.id}
+          open
+          onOpenChange={(o) => !o && setAppointmentTarget(null)}
+          appointment={null}
+          initialCustomerId={appointmentTarget.customer.id}
+          initialServiceType="İlan Gösterimi"
+          onSaved={handleAppointmentSaved}
+        />
+      )}
     </div>
   );
 }
