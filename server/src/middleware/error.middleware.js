@@ -1,6 +1,7 @@
 // server/src/middleware/error.middleware.js
 import { ERROR_CODES } from "../config/constants.js";
 import { logger } from "../config/logger.js";
+import { notifyTelegramError } from "../utils/notifyTelegram.js";
 
 /**
  * Tek merkezi hata yakalayıcı — app.js'te en son middleware olarak bağlanır.
@@ -24,6 +25,11 @@ export function errorMiddleware(err, req, res, _next) {
     method: req.method,
     stack: err.stack,
   });
+
+  // Beklenmeyen (5xx) hatalar Telegram'a düşer — 4xx'ler (validasyon, 404
+  // gibi) normal kullanıcı akışının parçası, kimseyi rahatsız etmemeli.
+  // await EDİLMEZ — bildirim gönderimi yanıt süresini geciktirmesin.
+  if (status >= 500) notifyTelegramError(err, req);
 
   res.status(status).json({
     success: false,

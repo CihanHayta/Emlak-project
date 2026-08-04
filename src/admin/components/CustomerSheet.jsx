@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Phone, Mail, Trash2, Clock, CalendarPlus, Info, X as XIcon, Plus } from "lucide-react";
 import { InstagramIcon } from "../../components/common/BrandIcons";
+import { formatPhoneInput } from "../../lib/formatPhoneInput";
 import {
   Sheet,
   SheetContent,
@@ -324,7 +325,7 @@ function CustomerSheetForm({ customer, prefill, onOpenChange, onSaved, onCreated
               id="c-phone"
               required
               value={form.phone}
-              onChange={(e) => set("phone", e.target.value)}
+              onChange={(e) => set("phone", formatPhoneInput(e.target.value))}
               placeholder="05XX XXX XX XX"
             />
           </div>

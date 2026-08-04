@@ -10,6 +10,8 @@
 // kapsıyor; bu route'a özel ek bir sınır şimdilik yok.
 import { Router } from "express";
 import { createPublicLeadController } from "../controllers/lead.controller.js";
+import { createPublicLeadValidator } from "../validators/lead.validator.js";
+import { validate } from "../middleware/validate.middleware.js";
 
 export const publicLeadRouter = Router();
-publicLeadRouter.post("/", createPublicLeadController);
+publicLeadRouter.post("/", createPublicLeadValidator, validate, createPublicLeadController);

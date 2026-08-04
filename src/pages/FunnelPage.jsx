@@ -4,6 +4,7 @@ import { Loader2, Diamond, ArrowRight, X } from "lucide-react";
 import { apiClient } from "../lib/apiClient";
 import { SITE } from "../config/siteConfig";
 import { youtubeEmbedUrl } from "../lib/youtube";
+import { formatPhoneInput } from "../lib/formatPhoneInput";
 import "./FunnelPage.css";
 
 const TENANT_ID = import.meta.env.VITE_TENANT_ID;
@@ -282,7 +283,7 @@ export default function FunnelPage() {
                   required
                   placeholder="Telefon Numaranız"
                   value={form.phone}
-                  onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) => setForm((prev) => ({ ...prev, phone: formatPhoneInput(e.target.value) }))}
                 />
                 <textarea
                   rows={3}

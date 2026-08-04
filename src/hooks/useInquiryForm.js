@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { addLead } from "../lib/leadStore";
+import { formatPhoneInput } from "../lib/formatPhoneInput";
 
 const EMPTY_FORM = { name: "", phone: "", message: "" };
 
@@ -22,7 +23,7 @@ export function useInquiryForm(context) {
 
   function handleChange(event) {
     const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: name === "phone" ? formatPhoneInput(value) : value }));
   }
 
   async function handleSubmit(event) {
