@@ -30,6 +30,8 @@ import { APPOINTMENT_STATUSES, APPOINTMENT_SERVICE_TYPES } from "../data/constan
 import { getDaySlots, getSlotDateTime, isSlotTaken, isDayFullyBooked } from "../lib/appointmentSlots";
 import { playAppointmentCreatedSound } from "../lib/playSound";
 
+const NONE = "__none__"; // shadcn Select boş string value'yu kabul etmiyor — "seçim yok" için bu sentinel kullanılır (bkz. admin/pages/Mesajlar.jsx'teki aynı desen).
+
 /** Bir zaman damgasını, o günün çalışma-saati slot ızgarasındaki (en yakın alttaki) slota yuvarlar — mevcut bir randevuyu düzenlerken başlangıç seçimini bulmak için. */
 function closestSlot(timestamp) {
   const d = new Date(timestamp);
@@ -123,113 +125,118 @@ export default function AppointmentFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Randevuyu Düzenle" : "Yeni Randevu"}</DialogTitle>
           <DialogDescription>Müşteri ve randevu zamanını seçin — ilgili bir ilan varsa ekleyebilirsiniz.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Müşteri</Label>
-            <Select value={customerId} onValueChange={setCustomerId} required>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Müşteri seçin">
-                  {customers.find((c) => c.id === customerId)?.name}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Sol: müşteri/ilan/konu/durum/not */}
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Müşteri</Label>
+                <Select value={customerId} onValueChange={setCustomerId} required>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Müşteri seçin">
+                      {customers.find((c) => c.id === customerId)?.name}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-1.5">
-            <Label>İlan <span className="font-normal text-muted-foreground">(opsiyonel)</span></Label>
-            <Select value={listingId} onValueChange={setListingId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="İlgili bir ilan varsa seçin">
-                  {listings.find((l) => l.id === listingId)?.title}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent className="max-h-72">
-                {listings.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>{l.title} — #{l.listingNo}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-1.5">
+                <Label>İlan <span className="font-normal text-muted-foreground">(opsiyonel)</span></Label>
+                <Select value={listingId || NONE} onValueChange={(v) => setListingId(v === NONE ? "" : v)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue>{listingId ? listings.find((l) => l.id === listingId)?.title : "Seçim yok"}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    <SelectItem value={NONE}>Seçim yok</SelectItem>
+                    {listings.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>{l.title} — #{l.listingNo}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-1.5">
-            <Label>Randevu Konusu</Label>
-            <Select value={serviceType} onValueChange={setServiceType}>
-              <SelectTrigger className="w-full"><SelectValue>{serviceType}</SelectValue></SelectTrigger>
-              <SelectContent>
-                {APPOINTMENT_SERVICE_TYPES.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <div className="space-y-1.5">
+                <Label>Randevu Konusu</Label>
+                <Select value={serviceType} onValueChange={setServiceType}>
+                  <SelectTrigger className="w-full"><SelectValue>{serviceType}</SelectValue></SelectTrigger>
+                  <SelectContent>
+                    {APPOINTMENT_SERVICE_TYPES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="space-y-1.5">
-            <Label>Tarih & Saat</Label>
-            <div className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row">
-              <Calendar
-                mode="single"
-                selected={selectedDay}
-                onSelect={handleDaySelect}
-                locale={tr}
-                disabled={[{ before: new Date(new Date().setHours(0, 0, 0, 0)) }, (day) => isDayFullyBooked(day, appointments, appointment?.id)]}
-                className="rounded-lg border border-border p-0"
-              />
-              <div className="flex-1">
-                <p className="mb-2 text-xs font-medium text-muted-foreground">
-                  {format(selectedDay, "d MMMM yyyy, EEEE", { locale: tr })} — müsait saatler
-                </p>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {daySlots.map((slot) => {
-                    const taken = isSlotTaken(selectedDay, slot, appointments, appointment?.id);
-                    const isSelected = selectedSlot?.hour === slot.hour && selectedSlot?.minute === slot.minute;
-                    return (
-                      <button
-                        key={`${slot.hour}:${slot.minute}`}
-                        type="button"
-                        disabled={taken}
-                        onClick={() => setSelectedSlot(slot)}
-                        className={cn(
-                          "rounded-lg border px-2 py-1.5 text-xs font-medium transition",
-                          taken && "cursor-not-allowed border-border bg-muted text-muted-foreground line-through",
-                          !taken && isSelected && "border-brand-gold bg-brand-gold text-white",
-                          !taken && !isSelected && "border-border bg-card hover:border-brand-gold",
-                        )}
-                      >
-                        {String(slot.hour).padStart(2, "0")}:{String(slot.minute).padStart(2, "0")}
-                      </button>
-                    );
-                  })}
+              <div className="space-y-1.5">
+                <Label>Durum</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger className="w-full"><SelectValue>{status}</SelectValue></SelectTrigger>
+                  <SelectContent>
+                    {APPOINTMENT_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="a-note">Not</Label>
+                <Textarea id="a-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
+              </div>
+            </div>
+
+            {/* Sağ: takvim + saat seçici */}
+            <div className="space-y-1.5">
+              <Label>Tarih & Saat</Label>
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                <Calendar
+                  mode="single"
+                  selected={selectedDay}
+                  onSelect={handleDaySelect}
+                  locale={tr}
+                  disabled={[{ before: new Date(new Date().setHours(0, 0, 0, 0)) }, (day) => isDayFullyBooked(day, appointments, appointment?.id)]}
+                  className="mx-auto rounded-lg border border-border p-0"
+                />
+                <div>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">
+                    {format(selectedDay, "d MMMM yyyy, EEEE", { locale: tr })} — müsait saatler
+                  </p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {daySlots.map((slot) => {
+                      const taken = isSlotTaken(selectedDay, slot, appointments, appointment?.id);
+                      const isSelected = selectedSlot?.hour === slot.hour && selectedSlot?.minute === slot.minute;
+                      return (
+                        <button
+                          key={`${slot.hour}:${slot.minute}`}
+                          type="button"
+                          disabled={taken}
+                          onClick={() => setSelectedSlot(slot)}
+                          className={cn(
+                            "rounded-lg border px-2 py-1.5 text-xs font-medium transition",
+                            taken && "cursor-not-allowed border-border bg-muted text-muted-foreground line-through",
+                            !taken && isSelected && "border-brand-gold bg-brand-gold text-white",
+                            !taken && !isSelected && "border-border bg-card hover:border-brand-gold",
+                          )}
+                        >
+                          {String(slot.hour).padStart(2, "0")}:{String(slot.minute).padStart(2, "0")}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Durum</Label>
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="w-full"><SelectValue>{status}</SelectValue></SelectTrigger>
-              <SelectContent>
-                {APPOINTMENT_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="a-note">Not</Label>
-            <Textarea id="a-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
 
           <DialogFooter>
