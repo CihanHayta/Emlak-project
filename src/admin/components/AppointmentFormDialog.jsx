@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { tr } from "date-fns/locale";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -19,17 +21,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { getCustomers } from "../data/customerStore";
-import { addAppointment, updateAppointment } from "../data/appointmentStore";
+import { addAppointment, updateAppointment, getAppointments } from "../data/appointmentStore";
 import { getSaleProperties, getRentProperties } from "../../data/properties";
 import { usePropertiesVersion } from "../../hooks/usePropertiesVersion";
 import { APPOINTMENT_STATUSES, APPOINTMENT_SERVICE_TYPES } from "../data/constants";
+import { getDaySlots, getSlotDateTime, isSlotTaken, isDayFullyBooked } from "../lib/appointmentSlots";
 import { playAppointmentCreatedSound } from "../lib/playSound";
 
-function toDateTimeLocalValue(timestamp) {
+/** Bir zaman damgasını, o günün çalışma-saati slot ızgarasındaki (en yakın alttaki) slota yuvarlar — mevcut bir randevuyu düzenlerken başlangıç seçimini bulmak için. */
+function closestSlot(timestamp) {
   const d = new Date(timestamp);
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const minutes = d.getHours() * 60 + d.getMinutes();
+  const slots = getDaySlots();
+  const atOrBefore = slots.filter((s) => s.hour * 60 + s.minute <= minutes);
+  return atOrBefore[atOrBefore.length - 1] ?? slots[0];
 }
 
 /**
@@ -68,19 +75,32 @@ export default function AppointmentFormDialog({
   const [customerId, setCustomerId] = useState(appointment?.customerId ?? initialCustomerId ?? "");
   const [serviceType, setServiceType] = useState(appointment?.serviceType ?? initialServiceType ?? "İlan Gösterimi");
   const [listingId, setListingId] = useState(appointment?.listingId ?? "");
-  const [dateTime, setDateTime] = useState(
-    toDateTimeLocalValue(appointment?.dateTime ?? initialDateTime?.getTime() ?? Date.now() + 60 * 60 * 1000),
-  );
+  const initialTimestamp = appointment?.dateTime ?? initialDateTime?.getTime() ?? Date.now() + 60 * 60 * 1000;
+  const [selectedDay, setSelectedDay] = useState(new Date(initialTimestamp));
+  const [selectedSlot, setSelectedSlot] = useState(closestSlot(initialTimestamp));
   const [status, setStatus] = useState(appointment?.status ?? "Beklemede");
   const [note, setNote] = useState(appointment?.note ?? "");
 
+  const appointments = getAppointments();
+  const daySlots = getDaySlots();
+
+  function handleDaySelect(day) {
+    if (!day) return;
+    setSelectedDay(day);
+    setSelectedSlot(null);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
+    if (!selectedSlot) {
+      toast.error("Lütfen bir saat seçin.");
+      return;
+    }
     const payload = {
       customerId,
       serviceType,
       listingId,
-      dateTime: new Date(dateTime).getTime(),
+      dateTime: getSlotDateTime(selectedDay, selectedSlot).getTime(),
       status,
       note,
     };
@@ -155,14 +175,44 @@ export default function AppointmentFormDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="a-datetime">Tarih & Saat</Label>
-            <Input
-              id="a-datetime"
-              type="datetime-local"
-              required
-              value={dateTime}
-              onChange={(e) => setDateTime(e.target.value)}
-            />
+            <Label>Tarih & Saat</Label>
+            <div className="flex flex-col gap-3 rounded-lg border border-border p-3 sm:flex-row">
+              <Calendar
+                mode="single"
+                selected={selectedDay}
+                onSelect={handleDaySelect}
+                locale={tr}
+                disabled={[{ before: new Date(new Date().setHours(0, 0, 0, 0)) }, (day) => isDayFullyBooked(day, appointments, appointment?.id)]}
+                className="rounded-lg border border-border p-0"
+              />
+              <div className="flex-1">
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                  {format(selectedDay, "d MMMM yyyy, EEEE", { locale: tr })} — müsait saatler
+                </p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {daySlots.map((slot) => {
+                    const taken = isSlotTaken(selectedDay, slot, appointments, appointment?.id);
+                    const isSelected = selectedSlot?.hour === slot.hour && selectedSlot?.minute === slot.minute;
+                    return (
+                      <button
+                        key={`${slot.hour}:${slot.minute}`}
+                        type="button"
+                        disabled={taken}
+                        onClick={() => setSelectedSlot(slot)}
+                        className={cn(
+                          "rounded-lg border px-2 py-1.5 text-xs font-medium transition",
+                          taken && "cursor-not-allowed border-border bg-muted text-muted-foreground line-through",
+                          !taken && isSelected && "border-brand-gold bg-brand-gold text-white",
+                          !taken && !isSelected && "border-border bg-card hover:border-brand-gold",
+                        )}
+                      >
+                        {String(slot.hour).padStart(2, "0")}:{String(slot.minute).padStart(2, "0")}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -183,7 +233,7 @@ export default function AppointmentFormDialog({
           </div>
 
           <DialogFooter>
-            <Button type="submit" className="w-full bg-brand-gold text-white hover:bg-brand-gold-dark">
+            <Button type="submit" disabled={!selectedSlot} className="w-full bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60">
               {isEditing ? "Kaydet" : "Randevu Oluştur"}
             </Button>
           </DialogFooter>

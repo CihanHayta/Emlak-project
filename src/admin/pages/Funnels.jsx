@@ -13,8 +13,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getFunnels, subscribeToFunnels, deleteFunnel } from "../data/funnelStore";
-import { getLeads, subscribeToLeads } from "../../lib/leadStore";
+import { getLeads, subscribeToLeads, updateLeadStatus } from "../../lib/leadStore";
 import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
+import IncomingLeads from "../components/IncomingLeads";
+import CustomerSheet from "../components/CustomerSheet";
+import AppointmentFormDialog from "../components/AppointmentFormDialog";
+import { addCustomer } from "../data/customerStore";
 
 function funnelUrl(slug) {
   return `${window.location.origin}/kampanya/${slug}`;
@@ -30,6 +34,14 @@ export default function Funnels() {
   const [leads, setLeads] = useState(getLeads());
   const [pendingDelete, setPendingDelete] = useState(null);
 
+  // Kampanya kartları alanı — Basvurular.jsx'teki aynı desen (bkz. o dosyanın
+  // yorumları): "Müşteri Yap" akışı için CustomerSheet, "Randevu Oluştur"
+  // akışı için önce hafif bir müşteri kaydı + AppointmentFormDialog.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [prefill, setPrefill] = useState({});
+  const [convertingLeadId, setConvertingLeadId] = useState(null);
+  const [appointmentTarget, setAppointmentTarget] = useState(null);
+
   useEffect(() => {
     const unsubFunnels = subscribeToFunnels(() => setFunnels(getFunnels()));
     const unsubLeads = subscribeToLeads(() => setLeads(getLeads()));
@@ -41,6 +53,44 @@ export default function Funnels() {
 
   function submissionCount(funnelId) {
     return leads.filter((l) => l.funnelId === funnelId).length;
+  }
+
+  const campaignLeads = leads.filter((l) => l.funnelId != null);
+
+  function handleConvertLead(lead) {
+    setConvertingLeadId(lead.id);
+    setPrefill({ name: lead.name, phone: lead.phone, notes: lead.message, source: "Kampanya" });
+    setSheetOpen(true);
+  }
+
+  async function handleCustomerSaved() {
+    if (convertingLeadId) {
+      try {
+        await updateLeadStatus(convertingLeadId, "Müşteri Oldu");
+      } catch (error) {
+        toast.error(error.message || "Başvuru durumu güncellenemedi.");
+      }
+      setConvertingLeadId(null);
+    }
+  }
+
+  async function handleCreateAppointment(lead) {
+    try {
+      const customer = await addCustomer({ name: lead.name, phone: lead.phone, notes: lead.message, source: "Kampanya" });
+      setAppointmentTarget({ leadId: lead.id, customer });
+    } catch (error) {
+      toast.error(error.message || "Müşteri kartı oluşturulamadı.");
+    }
+  }
+
+  async function handleAppointmentSaved() {
+    if (appointmentTarget) {
+      try {
+        await updateLeadStatus(appointmentTarget.leadId, "Randevu Verildi");
+      } catch (error) {
+        toast.error(error.message || "Başvuru durumu güncellenemedi.");
+      }
+    }
   }
 
   async function handleCopyLink(slug) {
@@ -132,6 +182,30 @@ export default function Funnels() {
           title="Funnel'ı sil"
           description={`"${pendingDelete.name}" kampanya sayfasını kalıcı olarak silmek istediğinize emin misiniz? Yayındaysa sayfa da erişilemez hale gelir.`}
           onConfirm={confirmDelete}
+        />
+      )}
+
+      <div className="space-y-3 border-t border-border pt-6">
+        <h2 className="text-sm font-semibold text-foreground">Kampanya Başvuruları ({campaignLeads.length})</h2>
+        <IncomingLeads leads={campaignLeads} onConvert={handleConvertLead} onCreateAppointment={handleCreateAppointment} />
+      </div>
+
+      <CustomerSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        customer={null}
+        prefill={prefill}
+        onSaved={handleCustomerSaved}
+      />
+
+      {appointmentTarget && (
+        <AppointmentFormDialog
+          key={appointmentTarget.customer.id}
+          open
+          onOpenChange={(o) => !o && setAppointmentTarget(null)}
+          appointment={null}
+          initialCustomerId={appointmentTarget.customer.id}
+          onSaved={handleAppointmentSaved}
         />
       )}
     </div>

@@ -82,6 +82,12 @@ export const APPOINTMENT_SERVICE_TYPES = [
 
 export const APPOINTMENT_STATUSES = ["Beklemede", "Onaylandı", "Tamamlandı", "İptal Edildi"];
 
+// Randevu takviminin hangi saatleri "slot" olarak gösterdiği — çalışma
+// saatleri dışı/aynı slotta ikinci randevu Takvim'de kapalı görünür (bkz.
+// admin/lib/appointmentSlots.js). Şimdilik sabit; ileride ayarlardan
+// değiştirilebilir bir alana taşınabilir.
+export const WORKING_HOURS = { startHour: 9, endHour: 18, slotMinutes: 60 };
+
 export const APPOINTMENT_STATUS_STYLES = {
   "Beklemede": "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400",
   "Onaylandı": "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",

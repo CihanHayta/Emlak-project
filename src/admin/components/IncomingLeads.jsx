@@ -27,12 +27,19 @@ import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
  * (with a confirm step) — converting it to a customer card does NOT remove
  * it, so an accidental click or a cancelled CustomerSheet never loses the
  * original submission.
+ *
+ * `leads` (opsiyonel): verilirse tüm başvurular yerine SADECE bu liste
+ * gösterilir — Funnels.jsx bunu kampanyaya özel başvuruları filtrelemek
+ * için kullanıyor. Verilmezse (Basvurular.jsx'teki eski davranış) kendi
+ * `getLeads()`/`subscribeToLeads()` cache'inden tüm başvuruları okur.
  */
-export default function IncomingLeads({ onConvert, onCreateAppointment }) {
-  const [leads, setLeads] = useState(getLeads());
+export default function IncomingLeads({ onConvert, onCreateAppointment, leads: leadsProp }) {
+  const [allLeads, setAllLeads] = useState(getLeads());
   const [pendingDelete, setPendingDelete] = useState(null);
 
-  useEffect(() => subscribeToLeads(() => setLeads(getLeads())), []);
+  useEffect(() => subscribeToLeads(() => setAllLeads(getLeads())), []);
+
+  const leads = leadsProp ?? allLeads;
 
   async function confirmDelete() {
     const id = pendingDelete.id;
