@@ -183,7 +183,14 @@ export default function FunnelPage() {
                 allowFullScreen
               />
             ) : (
-              <video src={funnel.videoUrl} controls playsInline />
+              <video
+                src={funnel.videoUrl}
+                controls
+                controlsList="nodownload noremoteplayback"
+                disablePictureInPicture
+                playsInline
+                onContextMenu={(e) => e.preventDefault()}
+              />
             )}
           </div>
           {funnel.formEnabled && (
