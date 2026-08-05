@@ -10,6 +10,8 @@ import {
   updateTenantWhatsapp,
   findTenantByWhatsappWabaId,
   findTenantsWithExpiringWhatsappToken,
+  updateTenantFacebookPage,
+  findTenantByFacebookPageId,
 } from "../repositories/tenant.repository.js";
 import { createDefaultTenant } from "../models/tenant.model.js";
 import { slugify } from "../utils/slugify.js";
@@ -53,6 +55,19 @@ export async function disconnectTenantWhatsapp(tenantId) {
 /** Token yenileme işi (bkz. jobs/whatsappTokenRefresh.job.js) için. */
 export async function getTenantsWithExpiringWhatsappToken(beforeTimestamp) {
   return findTenantsWithExpiringWhatsappToken(beforeTimestamp);
+}
+
+/** Meta Lead Ads webhook'u, kimliksiz gelen olayın hangi tenant'a ait olduğunu `entry.id` (Facebook Sayfa id'si) üzerinden bulmak için kullanır. */
+export async function getTenantByFacebookPageId(pageId) {
+  return findTenantByFacebookPageId(pageId);
+}
+
+export async function connectTenantFacebookPage(tenantId, data) {
+  await updateTenantFacebookPage(tenantId, data);
+}
+
+export async function disconnectTenantFacebookPage(tenantId) {
+  await updateTenantFacebookPage(tenantId, null);
 }
 
 /**

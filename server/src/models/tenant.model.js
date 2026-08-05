@@ -26,5 +26,9 @@ export function createDefaultTenant({ name, slug, ownerUserId, phone = null, tax
     // WhatsApp Embedded Signup bağlantısı — bkz. services/whatsappOAuth.service.js.
     // Aynı şifreleme kuralı geçerli.
     whatsapp: null,
+    // Facebook Sayfası bağlantısı — Instagram reklam (Lead Ads) formlarından
+    // gelen başvuruları çekmek için (bkz. services/metaLeadAds.service.js).
+    // Aynı şifreleme kuralı geçerli.
+    facebookPage: null,
   });
 }

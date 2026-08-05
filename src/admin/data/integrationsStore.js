@@ -100,3 +100,45 @@ export async function disconnectWhatsapp() {
   whatsappCache = { connected: false };
   notifyWhatsapp();
 }
+
+// ---- Facebook Sayfası / Instagram Reklam Lead'leri (ayrı durum nesnesi, aynı desen) ----
+
+let facebookPageCache = { connected: false };
+let facebookPageLoadPromise = null;
+const facebookPageListeners = new Set();
+
+function notifyFacebookPage() {
+  facebookPageListeners.forEach((callback) => callback());
+}
+
+async function refreshFacebookPage() {
+  try {
+    facebookPageCache = await apiClient.get("/facebook-page/status");
+  } catch (error) {
+    console.error("Facebook Sayfası bağlantı durumu alınamadı:", error);
+    facebookPageCache = { connected: false };
+  }
+  notifyFacebookPage();
+}
+
+export function getFacebookPageStatus() {
+  if (!facebookPageLoadPromise) facebookPageLoadPromise = refreshFacebookPage();
+  return facebookPageCache;
+}
+
+export function subscribeToFacebookPageStatus(callback) {
+  facebookPageListeners.add(callback);
+  return () => facebookPageListeners.delete(callback);
+}
+
+/** Elle bağlama formu — bkz. Settings.jsx#FacebookPageManualConnectDialog. */
+export async function connectFacebookPageManual({ pageId, pageAccessToken, pageName }) {
+  facebookPageCache = await apiClient.post("/facebook-page/connect-manual", { pageId, pageAccessToken, pageName });
+  notifyFacebookPage();
+}
+
+export async function disconnectFacebookPage() {
+  await apiClient.post("/facebook-page/disconnect");
+  facebookPageCache = { connected: false };
+  notifyFacebookPage();
+}

@@ -16,6 +16,7 @@ import { errorMiddleware } from "./middleware/error.middleware.js";
 import { apiRouter } from "./routes/index.js";
 import { instagramWebhookRouter } from "./webhook/instagram.webhook.js";
 import { whatsappWebhookRouter } from "./webhook/whatsapp.webhook.js";
+import { metaLeadAdsWebhookRouter } from "./webhook/metaLeadAds.webhook.js";
 import { MOCK_UPLOADS_ROOT } from "./firebase/mock/storage.mock.js";
 
 export const app = express();
@@ -42,6 +43,7 @@ app.use(cookieParser());
 // body üzerinde değil.
 app.use("/webhooks/instagram", webhookRateLimit, instagramWebhookRouter);
 app.use("/webhooks/whatsapp", webhookRateLimit, whatsappWebhookRouter);
+app.use("/webhooks/meta-leads", webhookRateLimit, metaLeadAdsWebhookRouter);
 
 // FIREBASE_MODE=mock iken yüklenen dosyalar buradan servis edilir (bkz.
 // firebase/mock/storage.mock.js). Rate limit'ten ÖNCE bağlanır — bir video

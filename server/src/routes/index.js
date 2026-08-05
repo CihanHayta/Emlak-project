@@ -13,6 +13,7 @@ import { publicPropertyRouter } from "./publicProperty.routes.js";
 import { conversationRouter } from "./conversation.routes.js";
 import { instagramRouter } from "./instagram.routes.js";
 import { whatsappRouter } from "./whatsapp.routes.js";
+import { facebookPageRouter } from "./facebookPage.routes.js";
 import { funnelRouter } from "./funnel.routes.js";
 import { publicFunnelRouter } from "./publicFunnel.routes.js";
 
@@ -34,5 +35,6 @@ apiRouter.use("/public/properties", publicPropertyRouter);
 apiRouter.use("/conversations", conversationRouter);
 apiRouter.use("/instagram", instagramRouter);
 apiRouter.use("/whatsapp", whatsappRouter);
+apiRouter.use("/facebook-page", facebookPageRouter);
 apiRouter.use("/funnels", funnelRouter);
 apiRouter.use("/public/funnels", publicFunnelRouter);

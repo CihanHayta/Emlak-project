@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Plus, Trash2, Pencil, Link2Off } from "lucide-react";
-import { InstagramIcon, WhatsAppIcon } from "../../components/common/BrandIcons";
+import { InstagramIcon, WhatsAppIcon, FacebookIcon } from "../../components/common/BrandIcons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,10 @@ import {
   connectWhatsapp,
   connectWhatsappManual,
   disconnectWhatsapp,
+  getFacebookPageStatus,
+  subscribeToFacebookPageStatus,
+  connectFacebookPageManual,
+  disconnectFacebookPage,
 } from "../data/integrationsStore";
 import { startWhatsappEmbeddedSignup, isEmbeddedSignupConfigured } from "../lib/whatsappEmbeddedSignup";
 
@@ -219,6 +223,7 @@ export default function Settings() {
       <TabsContent value="entegrasyonlar" className="space-y-4">
         <InstagramIntegrationCard />
         <WhatsAppIntegrationCard />
+        <FacebookPageIntegrationCard />
       </TabsContent>
 
       <AddUserDialog open={addOpen} onOpenChange={setAddOpen} />
@@ -439,6 +444,132 @@ function WhatsAppManualConnectDialog({ open, onOpenChange }) {
               Görünen Telefon Numarası <span className="font-normal text-muted-foreground">(opsiyonel)</span>
             </Label>
             <Input id="wa-phone-display" value={displayPhoneNumber} onChange={(e) => setDisplayPhoneNumber(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={isSubmitting} className="w-full bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60">
+              {isSubmitting ? "Bağlanıyor…" : "Bağla"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Ayarlar > Entegrasyonlar — Instagram reklamlarındaki (Lead Ads/Instant Form) başvuruları çekmek için Facebook Sayfası bağlantısı. */
+function FacebookPageIntegrationCard() {
+  const [status, setStatus] = useState(getFacebookPageStatus());
+  const [manualOpen, setManualOpen] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  useEffect(() => subscribeToFacebookPageStatus(() => setStatus(getFacebookPageStatus())), []);
+
+  async function handleDisconnect() {
+    setDisconnecting(true);
+    try {
+      await disconnectFacebookPage();
+      toast.success("Facebook Sayfası bağlantısı kaldırıldı.");
+    } catch (error) {
+      toast.error(error.message || "Bağlantı kaldırılamadı.");
+    } finally {
+      setDisconnecting(false);
+    }
+  }
+
+  return (
+    <div className="max-w-xl space-y-3 rounded-2xl border border-border p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+            <FacebookIcon className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Instagram Reklam Lead&apos;leri</p>
+            <p className="text-xs text-muted-foreground">
+              {status.connected ? `${status.pageName || status.pageId} bağlı` : "Bağlı değil"}
+            </p>
+          </div>
+        </div>
+
+        {status.connected ? (
+          <Button type="button" variant="outline" size="sm" onClick={handleDisconnect} disabled={disconnecting}>
+            <Link2Off className="h-4 w-4" />
+            {disconnecting ? "Kaldırılıyor…" : "Bağlantıyı Kaldır"}
+          </Button>
+        ) : (
+          <Button type="button" size="sm" onClick={() => setManualOpen(true)} className="bg-brand-gold text-white hover:bg-brand-gold-dark">
+            Sayfayı Bağla
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Instagram/Facebook&apos;ta &quot;Instant Form&quot; (Lead Ads) tipi reklam verdiğinde, formu dolduranlar otomatik olarak Başvurular sayfasında görünür.
+      </p>
+      <FacebookPageManualConnectDialog open={manualOpen} onOpenChange={setManualOpen} />
+    </div>
+  );
+}
+
+/**
+ * Facebook Sayfası bağlama formu — admin, Meta Graph API Explorer'dan
+ * (developers.facebook.com/tools/explorer) aldığı Page Access Token'ı ve
+ * Page ID'sini panelden yapıştırır.
+ */
+function FacebookPageManualConnectDialog({ open, onOpenChange }) {
+  const [pageId, setPageId] = useState("");
+  const [pageAccessToken, setPageAccessToken] = useState("");
+  const [pageName, setPageName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function reset() {
+    setPageId("");
+    setPageAccessToken("");
+    setPageName("");
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await connectFacebookPageManual({
+        pageId: pageId.trim(),
+        pageAccessToken: pageAccessToken.trim(),
+        pageName: pageName.trim() || undefined,
+      });
+      toast.success("Facebook Sayfası bağlandı.");
+      reset();
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error.message || "Sayfa bağlanamadı.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Facebook Sayfasını Bağla</DialogTitle>
+          <DialogDescription>
+            Graph API Explorer&apos;dan (developers.facebook.com/tools/explorer) Sayfanı seçip{" "}
+            <code>leads_retrieval</code>, <code>pages_manage_metadata</code> izinleriyle ürettiğin Page Access Token&apos;ı yapıştır.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="fb-page-id">Page ID</Label>
+            <Input id="fb-page-id" required value={pageId} onChange={(e) => setPageId(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="fb-page-token">Page Access Token</Label>
+            <Input id="fb-page-token" required value={pageAccessToken} onChange={(e) => setPageAccessToken(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="fb-page-name">
+              Sayfa Adı <span className="font-normal text-muted-foreground">(opsiyonel)</span>
+            </Label>
+            <Input id="fb-page-name" value={pageName} onChange={(e) => setPageName(e.target.value)} />
           </div>
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting} className="w-full bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60">

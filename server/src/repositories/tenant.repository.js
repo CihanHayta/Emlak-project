@@ -89,6 +89,20 @@ export async function findTenantsWithExpiringWhatsappToken(beforeTimestamp) {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
+/** Facebook Sayfası bağlantısı kurulunca/kaldırılınca çağrılır — `data` null ise bağlantıyı temizler. */
+export async function updateTenantFacebookPage(id, data) {
+  const col = await collection();
+  await col.doc(id).update({ facebookPage: data });
+}
+
+/** Webhook'ta `entry.id` (leadgen olayını gönderen Facebook Sayfası'nın id'si) elimizde oluyor — sayfa id'sinden tenant'a dönmek için. */
+export async function findTenantByFacebookPageId(pageId) {
+  const snapshot = await (await collection()).where("facebookPage.pageId", "==", pageId).limit(1).get();
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() };
+}
+
 /**
  * `tenants/{id}.usage.{field}`'ı `delta` kadar artırır (negatifse azaltır),
  * transaction içinde oku-hesapla-yaz yaparak — mock ve gerçek Firestore
