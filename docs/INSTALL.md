@@ -1,10 +1,61 @@
 # INSTALL.md — Yeni Müşteri Kurulumu
 
 > Senaryo: Bu projeyi ikinci (üçüncü, ...) bir emlak firmasına satıyorsunuz.
-> Aşağıdaki adımlar, sıfırdan yeni bir Firebase projesiyle bu kod tabanını
-> onlar için ayağa kaldırır. Mimari gerekçeler için `ARCHITECTURE.md`,
-> güvenlik detayları için `SECURITY.md`, deploy sonrası kontrol için
-> `CHECKLIST.md`'ye bakın.
+> Mimari gerekçeler için `ARCHITECTURE.md`, güvenlik detayları için
+> `SECURITY.md`, deploy sonrası kontrol için `CHECKLIST.md`'ye bakın.
+
+## Önce Karar Verin: Paylaşımlı mı, İzole mi?
+
+| | **Paylaşımlı backend (önerilen)** | **İzole backend** |
+|---|---|---|
+| Kurulum süresi | Dakikalar (bkz. aşağıdaki bölüm) | Saatler (Adım 1-10) |
+| Instagram/WhatsApp | Sizin tek onaylı Meta App'inizle **anında** çalışır | Müşteri kendi Meta App'ini kurup **kendi App Review'unu** yapmak zorunda |
+| Müşterinin kendi domaini/markası | Aynen korunur — ayrı Vercel projesi | Aynen korunur — ayrı Vercel projesi |
+| Ne zaman tercih edilir | Varsayılan — hemen hemen her durumda | Müşteri özellikle "verim tamamen ayrı bir bulut hesabında dursun" istiyorsa |
+
+**Aksi belirtilmedikçe paylaşımlı yolu kullanın.** Aşağıdaki bölüm o yol;
+Adım 1-10 (bu dosyanın geri kalanı) izole yol içindir.
+
+## Paylaşımlı Backend'e Yeni Tenant Ekleme
+
+Mevcut, çalışan backend + Firestore aynı kalır — hiçbir yeni Firebase
+projesi, Railway servisi veya Meta App gerekmez.
+
+1. **Tenant + owner hesabı açın** (mevcut backend'in ortam değişkenlerine
+   erişiminiz olan bir yerden, örn. kendi makinenizden `server/.env` ile):
+   ```bash
+   cd server
+   node scripts/bootstrap-owner.js sahibi@ornekemlak.com GucluBirSifre123 "Örnek Emlak" "Sahibinin Adı Soyadı"
+   ```
+   Ekrana basılan **tenant id**'yi not edin.
+2. **Yeni bir Vercel projesi** açın (müşterinin kendi domaini/markası için
+   ayrı frontend deploy'u — kök dizinden, Vite otomatik algılanır):
+   - `VITE_API_URL` → **mevcut** (paylaşımlı) backend'in adresi — değişmez.
+   - `VITE_TENANT_ID` → 1. adımda üretilen tenant id.
+   - `VITE_FIREBASE_*` → **mevcut** (paylaşımlı) Firebase projesinin
+     `firebaseConfig` değerleri — değişmez, kopyala-yapıştır.
+3. **Backend'in `CORS_ORIGINS`'ine** yeni Vercel domainini ekleyip
+   (virgülle ayırarak, zaten çoklu domain destekliyor) backend'i yeniden
+   deploy edin.
+4. Marka/görsel özelleştirme — `src/config/siteConfig.js` (işletme adı,
+   telefon, adres, WhatsApp, sosyal linkler), `index.html` (başlık/meta),
+   `public/favicon.svg`, `src/styles/tokens.css`'teki `--brand-navy`/
+   `--brand-gold` değerleri — bunlar `.env`'den DEĞİL kod içinden okunur,
+   yeni müşterinin markasına göre elle değiştirip bu Vercel projesine özel
+   commit/deploy edilmesi gerekir.
+5. Müşteri kendi admin panelinden giriş yapıp Ayarlar → Entegrasyonlar →
+   "Instagram Hesabını Bağla" der — Meta App Review onaylıysa bu anında
+   çalışır, sizin hiçbir ek işleminize gerek kalmaz.
+
+Doğrulama için yine `CHECKLIST.md`'yi kullanın (Firebase Console adımları
+hariç, onlar zaten tamamlanmış durumda).
+
+---
+
+## İzole Backend Kurulumu (opsiyonel — bkz. yukarıdaki karar tablosu)
+
+Aşağıdaki adımlar, sıfırdan yeni bir Firebase projesiyle bu kod tabanını
+o müşteri için TAMAMEN ayrı bir altyapıda ayağa kaldırır.
 
 ## Adım 1 — Yeni Firebase Projesi
 
@@ -53,7 +104,8 @@ Proje Ayarları → Hizmet Hesapları → Firebase Admin SDK →
 | `server/.env` | `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_STORAGE_BUCKET` — Adım 4'teki JSON'dan. `CORS_ORIGINS` — yeni müşterinin frontend adresi. |
 | `.env` (kök) | `VITE_FIREBASE_*` — Adım 3'teki `firebaseConfig`'ten. `VITE_API_URL` — yeni müşterinin backend adresi. `VITE_TENANT_ID` — Adım 6'da üretilecek. |
 | `.firebaserc` | `"default"` proje id'si → yeni Firebase proje id'sine. |
-| **Kod içinde hiçbir dosya değişmez** | `src/firebase/config.js` sadece `.env`'i okur, hiçbir yerde proje id'si/API key sabit yazılı değildir (bilerek — bkz. `ARCHITECTURE.md`). |
+| `src/firebase/config.js` | **Değişmez** — sadece `.env`'i okur, hiçbir yerde proje id'si/API key sabit yazılı değildir (bilerek — bkz. `ARCHITECTURE.md`). |
+| `src/config/siteConfig.js`, `index.html`, `public/favicon.svg`, `src/styles/tokens.css` | **Elle değişir** — işletme adı/telefon/adres/marka rengi `.env`'den DEĞİL kod içinden okunur (bkz. yukarıdaki "Paylaşımlı Backend'e Yeni Tenant Ekleme" Adım 4). |
 
 Tam environment variable listesi için `ARCHITECTURE.md`'nin
 "Environment Variables" bölümüne (ya da doğrudan `server/.env.example` /

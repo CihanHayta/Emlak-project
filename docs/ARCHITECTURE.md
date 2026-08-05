@@ -1,11 +1,27 @@
 # ARCHITECTURE.md — Mimari, Veri Akışı ve Teknik Kararlar
 
-> İş modeli (her kararın temeli): Bu proje çok kiracılı bir SaaS DEĞİL.
-> **Tek kiracılı, satış başına ayrı bir Firebase projesine kurulan** bir
-> üründür. Kod tabanı (bu repo) her müşteride aynı kalır, değişen tek şey
-> `.env` dosyaları ve `src/firebase/config.js`'in okuduğu değerlerdir. Kod
-> içindeki `tenantId` alanları/izolasyonu yine de var ve zararsız — artık
-> "aynı projede birden fazla firma" için değil, gelecekte gerekirse diye.
+> İş modeli (her kararın temeli): Kod tabanı (bu repo) tenant izolasyonunu
+> **yapısal olarak** zorunlu kılıyor (`base.repository.js`, bkz. "Tenant
+> İzolasyonu" bölümü) — bu sayede iki dağıtım şekli de aynı kod üzerinden
+> desteklenir:
+>
+> - **Paylaşımlı backend (önerilen, bkz. `INSTALL.md`):** Tek Firebase
+>   projesi + tek backend, birden fazla müşteri aynı sistemde ayrı ayrı
+>   `tenants/{id}` kaydı olarak yaşar. Yeni müşteri = yeni tenant kaydı +
+>   kendi Vercel deploy'u (kendi domain/marka), backend/veritabanı aynı
+>   kalır. Instagram/WhatsApp gibi tek-webhook-URL'i olan entegrasyonlar
+>   SADECE bu modda tüm müşteriler için çalışır — gelen her mesaj, hangi
+>   tenant'a ait olduğunu Instagram/WABA hesap ID'sinden bulur (bkz.
+>   `server/src/services/tenant.service.js#getTenantByInstagramAccountId`/
+>   `#getTenantByWhatsappWabaId`, çağıran: `server/src/webhook/*.webhook.js`).
+> - **İzole backend (opsiyonel):** Bir müşteri kendi altyapısını
+>   (kendi Firebase projesi, kendi Railway'i) özellikle istiyorsa, aynı kod
+>   tabanı `.env` değişiklikleriyle oraya da kurulabilir — sadece o
+>   müşterinin Instagram/WhatsApp'ı kendi ayrı Meta App'i üzerinden
+>   bağlanmak zorunda kalır (webhook tek adrese düştüğü için paylaşamaz).
+>
+> Varsayılan/beklenen yol paylaşımlı backend'dir — izole kurulum, özellikle
+> istenmedikçe seçilmemeli.
 
 ## Genel Mimari
 
@@ -216,8 +232,10 @@ bu backend'de değil, frontend cache'inde yapılıyor. Tam koleksiyon/doküman
   sesi/anlık uyarısı ayrı ve gerçek bir sistemdir, karıştırmayın.)
 - **"Yetkiler" sekmesi** (Ayarlar sayfası) hâlâ kozmetik/yerel — gerçek
   RBAC ile bağlı değil.
-- **Instagram/Facebook DM modülü** hiç başlanmadı — sıfırdan bir modül.
 - **Restore işlemi** hiç test edilmedi (bkz. `BACKUP.md`).
+- **Otomatik/self-servis tenant provisioning yok** — yeni bir tenant açmak
+  hâlâ elle `node scripts/bootstrap-owner.js` çalıştırmayı gerektiriyor,
+  admin panelden veya bir API uçtan yapılamıyor.
 
 ## Bir Sonraki Adımı Nereden Bulurum?
 

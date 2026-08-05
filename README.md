@@ -5,9 +5,12 @@ CRM (ilan, müşteri/lead, randevu, Instagram/WhatsApp mesajlaşma, kampanya
 sayfaları). React + Vite frontend, Node/Express backend, Firebase (Auth +
 Firestore + Storage).
 
-Her müşteri (emlak ofisi) kendi Firebase projesinde, kendi Railway
-backend'inde ve kendi Vercel frontend'inde çalışır — tek kod tabanı, ortam
-değişkenleriyle (`.env`) müşteriye özelleştirilir.
+Çok kiracılı: birden fazla emlak ofisi (tenant) aynı paylaşımlı backend +
+Firestore üzerinde, tenant izolasyonu yapısal olarak zorunlu kılınarak
+(`server/src/repositories/base.repository.js`) izole çalışır. Her müşteri
+yine de kendi markalı/domainli **ayrı** frontend deploy'una sahiptir —
+sadece backend/veritabanı paylaşımlıdır. Yeni müşteri eklemek için bkz.
+`docs/INSTALL.md`.
 
 ## Kurulum ve geliştirme
 
