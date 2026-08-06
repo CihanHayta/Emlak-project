@@ -69,7 +69,17 @@ async function buildTenantApp(tenantId) {
 
 function getTenantApp(tenantId) {
   if (!tenantAppPromises.has(tenantId)) {
-    tenantAppPromises.set(tenantId, buildTenantApp(tenantId));
+    const promise = buildTenantApp(tenantId).catch((err) => {
+      // Başarısız bir denemeyi SONSUZA KADAR cache'lemeyiz — aksi halde
+      // geçici bir sorun (örn. henüz Firestore'a yazılmamış kimlik bilgisi,
+      // ağ hatası) düzeldikten SONRA bile process yeniden başlayana kadar
+      // her istekte aynı eski hatayı döndürmeye devam eder. Cache'ten
+      // düşürüp hatayı olduğu gibi yeniden fırlatıyoruz — bir sonraki
+      // çağrı temiz bir şekilde yeniden dener.
+      tenantAppPromises.delete(tenantId);
+      throw err;
+    });
+    tenantAppPromises.set(tenantId, promise);
   }
   return tenantAppPromises.get(tenantId);
 }
