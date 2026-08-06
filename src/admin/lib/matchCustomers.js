@@ -29,12 +29,17 @@ export function findMatchingCustomers(listing, customers) {
       if (listing.rooms && interests.includes(listing.rooms)) score += 1;
       if (customer.desiredProvince && customer.desiredProvince === listingProvince) score += 1;
       if (customer.desiredDistrict && listing.district && customer.desiredDistrict === listing.district) score += 2;
+      // `Math.round` şart — `customer.budgetMax * 1.15` gibi ondalık çarpımlar
+      // kayan nokta hassasiyeti yüzünden tam sınırdaki bir fiyatı (örn.
+      // 1.500.000 * 1.15 = 1.724.999,9999999998) yanlışlıkla reddedebiliyor,
+      // canlı testte doğrulandı — TL zaten kuruş hassasiyeti istemediği için
+      // yuvarlama güvenli.
       if (
         listingPrice > 0 &&
         customer.budgetMin &&
         customer.budgetMax &&
-        listingPrice >= customer.budgetMin * 0.85 &&
-        listingPrice <= customer.budgetMax * 1.15
+        listingPrice >= Math.round(customer.budgetMin * 0.85) &&
+        listingPrice <= Math.round(customer.budgetMax * 1.15)
       ) {
         score += 2;
       }

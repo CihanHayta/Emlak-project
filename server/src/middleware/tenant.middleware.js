@@ -18,6 +18,14 @@ export async function tenantMiddleware(req, _res, next) {
     return next(ApiError.forbidden("Bu hesabın aboneliği iptal edilmiş."));
   }
 
-  req.context = { tenantId: req.user.tenantId, userId: req.user.uid, role: req.user.role };
+  req.context = {
+    tenantId: req.user.tenantId,
+    userId: req.user.uid,
+    role: req.user.role,
+    // Owner'ın "Ayarlar > Yetkiler" sayfasından özelleştirdiği rol->izin
+    // override'ı — bkz. authorize.middleware.js. Yoksa null, o zaman
+    // authorize() BASE_PERMISSIONS'taki varsayılana döner.
+    rolePermissions: tenant.rolePermissions ?? null,
+  };
   next();
 }

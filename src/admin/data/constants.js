@@ -94,15 +94,3 @@ export const APPOINTMENT_STATUS_STYLES = {
   "Tamamlandı": "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400",
   "İptal Edildi": "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400",
 };
-
-export const USER_ROLES = ["Admin", "Personel", "Danışman"];
-
-// What each role is allowed to do — a simple permission matrix used by the
-// Ayarlar > Kullanıcılar page. Real enforcement (hiding/blocking actions
-// based on the logged-in user's role) is a natural next step once real
-// multi-user auth exists; today this just drives the permissions UI.
-export const ROLE_PERMISSIONS = {
-  Admin: ["İlan Yönetimi", "Müşteri Yönetimi", "Randevu Yönetimi", "Kullanıcı Yönetimi", "Raporlar"],
-  Personel: ["İlan Yönetimi", "Müşteri Yönetimi", "Randevu Yönetimi"],
-  Danışman: ["Müşteri Yönetimi", "Randevu Yönetimi"],
-};

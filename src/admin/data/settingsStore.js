@@ -1,49 +1,71 @@
 /**
- * Ayarlar (Settings) store: the role -> permission matrix shown on the
- * "Yetkiler" tab. Still localStorage-only/cosmetic — the actual permission
- * enforcement lives server-side in server/src/middleware/authorize.middleware.js
- * and isn't wired to this UI (kullanıcı hesapları artık userStore.js +
- * gerçek backend üzerinden yönetiliyor, bkz. Settings.jsx).
+ * Ayarlar > Yetkiler sekmesi — rol->izin matrisi artık GERÇEK backend
+ * yetkilendirmesine bağlı (bkz. server/src/middleware/authorize.middleware.js,
+ * server/src/config/permissions.js). Eskiden sadece localStorage'a yazan
+ * kozmetik bir referans tablosuydu; artık `tenants/{id}.rolePermissions`'a
+ * kaydediyor ve her API isteğinde gerçekten uygulanıyor. Diğer *Store.js
+ * dosyalarındaki cache+subscribe deseninin aynısı (bkz. integrationsStore.js).
  */
-import { USER_ROLES, ROLE_PERMISSIONS } from "./constants";
+import { apiClient } from "../../lib/apiClient";
 
-const PERMISSIONS_KEY = "sahin-admin-role-permissions";
+// Backend'deki izin anahtarlarının (properties:read vb.) Türkçe karşılığı —
+// bkz. server/src/config/permissions.js#PERMISSION_CATALOG (tek doğruluk
+// kaynağı orası; burası sadece görüntü etiketi).
+export const PERMISSION_LABELS = {
+  "properties:read": "İlanları Görüntüleme",
+  "properties:write": "İlan Ekleme/Düzenleme",
+  "customers:read": "Müşterileri Görüntüleme",
+  "customers:write": "Müşteri Ekleme/Düzenleme",
+  "appointments:read": "Randevuları Görüntüleme",
+  "appointments:write": "Randevu Oluşturma/Düzenleme",
+  "conversations:read": "Mesajları Görüntüleme",
+  "conversations:write": "Mesaj Gönderme",
+  "leads:read": "Başvuruları Görüntüleme",
+  "leads:write": "Başvuru İşleme",
+  "uploads:write": "Dosya Yükleme",
+};
 
-export const ALL_PERMISSIONS = ["İlan Yönetimi", "Müşteri Yönetimi", "Randevu Yönetimi", "Kullanıcı Yönetimi", "Raporlar"];
+let cache = { rolePermissions: {}, catalog: [], roles: [] };
+let loadPromise = null;
+const listeners = new Set();
 
-function readPermissions() {
+function notify() {
+  listeners.forEach((callback) => callback());
+}
+
+async function refresh() {
   try {
-    const raw = localStorage.getItem(PERMISSIONS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    // fall through to seed
+    cache = await apiClient.get("/tenant/role-permissions");
+  } catch (error) {
+    console.error("Yetki bilgisi alınamadı:", error);
+    cache = { rolePermissions: {}, catalog: [], roles: [] };
   }
-  localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(ROLE_PERMISSIONS));
-  return ROLE_PERMISSIONS;
+  notify();
 }
 
-export function getRolePermissions() {
-  return readPermissions();
+function ensureLoaded() {
+  if (!loadPromise) loadPromise = refresh();
+  return loadPromise;
 }
 
-export function togglePermission(role, permission) {
-  const current = readPermissions();
-  const rolePerms = current[role] ?? [];
-  const next = {
-    ...current,
-    [role]: rolePerms.includes(permission) ? rolePerms.filter((p) => p !== permission) : [...rolePerms, permission],
-  };
-  localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(next));
-  window.dispatchEvent(new CustomEvent("settingsstore:change"));
+/** `{ rolePermissions: { agent: [...], assistant: [...] }, catalog: [...], roles: [...] }` */
+export function getRolePermissionsState() {
+  ensureLoaded();
+  return cache;
 }
 
 export function subscribeToSettings(callback) {
-  window.addEventListener("settingsstore:change", callback);
-  window.addEventListener("storage", callback);
-  return () => {
-    window.removeEventListener("settingsstore:change", callback);
-    window.removeEventListener("storage", callback);
-  };
+  listeners.add(callback);
+  return () => listeners.delete(callback);
 }
 
-export { USER_ROLES };
+/** Checkbox tıklanınca — izni ekler/çıkarır, backend'e kaydeder, sonucu (gerçekten kaydedileni) cache'e yazar. */
+export async function toggleRolePermission(role, permission) {
+  const current = cache.rolePermissions[role] ?? [];
+  const next = current.includes(permission) ? current.filter((p) => p !== permission) : [...current, permission];
+  const result = await apiClient.patch("/tenant/role-permissions", {
+    rolePermissions: { ...cache.rolePermissions, [role]: next },
+  });
+  cache = { ...cache, rolePermissions: result.rolePermissions };
+  notify();
+}

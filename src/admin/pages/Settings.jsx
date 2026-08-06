@@ -26,13 +26,7 @@ import {
 import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
 import { getUsers, addUser, updateUser, deleteUser, subscribeToUsers, ROLE_LABELS, ASSIGNABLE_ROLES } from "../data/userStore";
 import { getSession } from "../lib/auth";
-import {
-  getRolePermissions,
-  togglePermission,
-  subscribeToSettings,
-  USER_ROLES,
-  ALL_PERMISSIONS,
-} from "../data/settingsStore";
+import { getRolePermissionsState, toggleRolePermission, subscribeToSettings, PERMISSION_LABELS } from "../data/settingsStore";
 import {
   getInstagramStatus,
   subscribeToInstagramStatus,
@@ -64,14 +58,22 @@ const ROLE_BADGE = {
 export default function Settings() {
   const isOwner = getSession()?.role === "owner";
   const [users, setUsers] = useState(getUsers());
-  const [permissions, setPermissions] = useState(getRolePermissions());
+  const [permissionsState, setPermissionsState] = useState(getRolePermissionsState());
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => subscribeToUsers(() => setUsers(getUsers())), []);
-  useEffect(() => subscribeToSettings(() => setPermissions(getRolePermissions())), []);
+  useEffect(() => subscribeToSettings(() => setPermissionsState(getRolePermissionsState())), []);
+
+  async function handleTogglePermission(role, permission) {
+    try {
+      await toggleRolePermission(role, permission);
+    } catch (error) {
+      toast.error(error.message || "İzin güncellenemedi.");
+    }
+  }
 
   // OAuth callback backend'den `?instagram=connected|error` ile geri
   // döndüğünde bir kere toast göster, sonra query param'ı temizle (F5'te
@@ -196,22 +198,23 @@ export default function Settings() {
 
       <TabsContent value="yetkiler" className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Her rolün hangi bölümlere erişebileceğini belirleyin.
+          Danışman ve Personel rollerinin hangi işlemleri yapabileceğini belirleyin — buradaki her değişiklik anında
+          uygulanır (Admin her zaman tüm yetkilere sahiptir, buradan kısıtlanamaz).
         </p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {USER_ROLES.map((role) => (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {ASSIGNABLE_ROLES.map((role) => (
             <div key={role} className="space-y-3 rounded-2xl border border-border p-4">
               <span className="inline-block rounded-full bg-muted px-2.5 py-1 text-xs font-semibold">
-                {role}
+                {ROLE_LABELS[role]}
               </span>
               <div className="space-y-2">
-                {ALL_PERMISSIONS.map((permission) => (
+                {permissionsState.catalog.map((permission) => (
                   <label key={permission} className="flex items-center gap-2 text-sm">
                     <Checkbox
-                      checked={permissions[role]?.includes(permission) ?? false}
-                      onCheckedChange={() => togglePermission(role, permission)}
+                      checked={permissionsState.rolePermissions[role]?.includes(permission) ?? false}
+                      onCheckedChange={() => handleTogglePermission(role, permission)}
                     />
-                    {permission}
+                    {PERMISSION_LABELS[permission] ?? permission}
                   </label>
                 ))}
               </div>

@@ -37,5 +37,10 @@ export function createDefaultTenant({ name, slug, ownerUserId, phone = null, tax
     // — sadece encryptedPrivateKey şifreli (bkz. utils/crypto.util.js),
     // diğerleri sır değil (aynı instagram/whatsapp alanlarındaki desen).
     firebase: null,
+    // Owner'ın "Ayarlar > Yetkiler" sayfasından özelleştirdiği rol->izin
+    // override'ı — bkz. config/permissions.js, authorize.middleware.js.
+    // Boşsa (null) her rol için BASE_PERMISSIONS'taki varsayılan kullanılır.
+    // Şekli: { agent: ["properties:read", ...], assistant: [...] }
+    rolePermissions: null,
   });
 }

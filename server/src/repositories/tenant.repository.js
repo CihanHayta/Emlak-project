@@ -97,6 +97,26 @@ export async function updateTenantFirebase(id, data) {
   await col.doc(id).update({ firebase: data });
 }
 
+/**
+ * Yedekleme işi için (bkz. jobs/backupTenants.job.js) — kendi Firebase
+ * projesi bağlı (silinmemiş) tüm tenant'ları döner. Tenant sayısı az
+ * olacağından (B2B, elle onboard edilen müşteriler) tümünü çekip JS'te
+ * filtrelemek, Firestore'un eşitsizlik sorgusu kısıtlarıyla uğraşmaktan
+ * daha basit.
+ */
+export async function findTenantsWithFirebaseConnected() {
+  const snapshot = await (await collection()).get();
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }))
+    .filter((tenant) => !tenant.deletedAt && tenant.firebase);
+}
+
+/** Owner "Ayarlar > Yetkiler" sayfasından kaydedince çağrılır — bkz. tenant.service.js#setTenantRolePermissions. */
+export async function updateTenantRolePermissions(id, data) {
+  const col = await collection();
+  await col.doc(id).update({ rolePermissions: data });
+}
+
 /** Facebook Sayfası bağlantısı kurulunca/kaldırılınca çağrılır — `data` null ise bağlantıyı temizler. */
 export async function updateTenantFacebookPage(id, data) {
   const col = await collection();

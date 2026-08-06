@@ -13,12 +13,15 @@ import {
   updateTenantFacebookPage,
   findTenantByFacebookPageId,
   updateTenantFirebase,
+  findTenantsWithFirebaseConnected,
+  updateTenantRolePermissions,
 } from "../repositories/tenant.repository.js";
 import { createDefaultTenant } from "../models/tenant.model.js";
 import { slugify } from "../utils/slugify.js";
 import { ApiError } from "../utils/ApiError.js";
 import { encryptToken } from "../utils/crypto.util.js";
 import { env } from "../config/env.js";
+import { BASE_PERMISSIONS, CUSTOMIZABLE_ROLES, PERMISSION_CATALOG } from "../config/permissions.js";
 
 export async function getTenantById(id) {
   return findTenantById(id);
@@ -100,6 +103,54 @@ export async function connectTenantFirebaseProject(tenantId, { serviceAccountJso
     const { invalidateTenantFirebaseApp } = await import("../firebase/admin.js");
     invalidateTenantFirebaseApp(tenantId);
   }
+}
+
+/** Yedekleme işi için (bkz. jobs/backupTenants.job.js). */
+export async function getTenantsWithFirebaseConnected() {
+  return findTenantsWithFirebaseConnected();
+}
+
+/**
+ * Ayarlar > Yetkiler sayfası için: her özelleştirilebilir rolün ŞU ANKİ
+ * etkin izin listesini döner (tenant override'ı varsa o, yoksa
+ * BASE_PERMISSIONS'taki varsayılan) — sayfa hep "gerçek, o an uygulanan"
+ * durumu göstersin diye, ayrı bir "henüz kaydedilmemiş taslak" kavramı yok.
+ */
+export async function getTenantRolePermissions(tenantId) {
+  const tenant = await findTenantById(tenantId);
+  if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
+  const overrides = tenant.rolePermissions ?? {};
+  const effective = {};
+  for (const role of CUSTOMIZABLE_ROLES) {
+    effective[role] = overrides[role] ?? BASE_PERMISSIONS[role] ?? [];
+  }
+  return effective;
+}
+
+/**
+ * Ayarlar > Yetkiler sayfasından kaydedilince çağrılır. Sadece
+ * CUSTOMIZABLE_ROLES'taki roller ve PERMISSION_CATALOG'daki izinler kabul
+ * edilir — owner/admin'i kısıtlamaya ya da entegrasyon/kullanıcı yönetimi
+ * gibi hassas izinleri (tenant:manage, users:*) bu yoldan açmaya karşı
+ * (bkz. config/permissions.js).
+ */
+export async function setTenantRolePermissions(tenantId, rolePermissions) {
+  if (!rolePermissions || typeof rolePermissions !== "object" || Array.isArray(rolePermissions)) {
+    throw ApiError.validation("Geçersiz izin verisi.");
+  }
+
+  const sanitized = {};
+  for (const [role, perms] of Object.entries(rolePermissions)) {
+    if (!CUSTOMIZABLE_ROLES.includes(role)) {
+      throw ApiError.validation(`"${role}" rolünün izinleri buradan değiştirilemez.`);
+    }
+    if (!Array.isArray(perms) || perms.some((p) => !PERMISSION_CATALOG.includes(p))) {
+      throw ApiError.validation(`"${role}" için geçersiz izin listesi.`);
+    }
+    sanitized[role] = perms;
+  }
+
+  await updateTenantRolePermissions(tenantId, sanitized);
 }
 
 /**
