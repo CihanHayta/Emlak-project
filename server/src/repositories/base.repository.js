@@ -1,5 +1,5 @@
 // server/src/repositories/base.repository.js
-import { getFirestore } from "../firebase/firestore.client.js";
+import { getTenantFirestore } from "../firebase/firestore.client.js";
 import { TenantScopeError } from "../utils/TenantScopeError.js";
 
 /**
@@ -27,22 +27,25 @@ export class BaseRepository {
     }
   }
 
-  async #rawCollection() {
-    const db = await getFirestore();
+  /** `context.tenantId`'nin KENDİ Firebase projesindeki koleksiyona bağlanır
+   * — her tenant artık ayrı bir projede yaşadığı için hangi koleksiyonun
+   * "hangi veritabanı"nda olduğu burada, context'e göre çözülür. */
+  async #rawCollection(context) {
+    const db = await getTenantFirestore(context.tenantId);
     return db.collection(this.#collectionName);
   }
 
   /** Alt sınıflar bunun üzerine SADECE ek `.where()/.orderBy()/.limit()` zincirleyebilir. */
   async scopedQuery(context) {
     this.#assertTenantId(context);
-    const collection = await this.#rawCollection();
+    const collection = await this.#rawCollection(context);
     return collection.where("tenantId", "==", context.tenantId).where("deletedAt", "==", null);
   }
 
   /** Var olan (veya yeni oluşturulacak) bir dokümana tenant-güvenli referans. */
   async scopedDocRef(context, id) {
     this.#assertTenantId(context);
-    const collection = await this.#rawCollection();
+    const collection = await this.#rawCollection(context);
     return collection.doc(id);
   }
 
@@ -67,7 +70,7 @@ export class BaseRepository {
 
   async create(context, data) {
     this.#assertTenantId(context);
-    const collection = await this.#rawCollection();
+    const collection = await this.#rawCollection(context);
     const ref = collection.doc();
     const payload = { ...data, tenantId: context.tenantId };
     await ref.set(payload);

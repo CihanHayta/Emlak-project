@@ -46,7 +46,7 @@ function extractStoragePath(url, tenantId) {
  */
 export async function deleteProperty(context, id) {
   const property = await getProperty(context, id);
-  const storage = await getStorageClient();
+  const storage = await getStorageClient(context.tenantId);
 
   const urls = [...(property.images ?? []), property.videoUrl].filter(Boolean);
   for (const url of urls) {

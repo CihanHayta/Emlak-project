@@ -25,7 +25,7 @@ export async function uploadFile({ tenantId, buffer, mimeType, kind }) {
 
   const extension = EXTENSION_BY_MIME_TYPE[mimeType] ?? "bin";
   const storagePath = `tenants/${tenantId}/${kind}/${randomUUID()}.${extension}`;
-  const storage = await getStorageClient();
+  const storage = await getStorageClient(tenantId);
   const result = await storage.upload(buffer, storagePath, { contentType: mimeType });
 
   await recordStorageUsage(tenantId, buffer.length);

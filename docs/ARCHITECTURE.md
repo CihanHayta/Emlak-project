@@ -1,27 +1,28 @@
 # ARCHITECTURE.md — Mimari, Veri Akışı ve Teknik Kararlar
 
-> İş modeli (her kararın temeli): Kod tabanı (bu repo) tenant izolasyonunu
-> **yapısal olarak** zorunlu kılıyor (`base.repository.js`, bkz. "Tenant
-> İzolasyonu" bölümü) — bu sayede iki dağıtım şekli de aynı kod üzerinden
-> desteklenir:
+> İş modeli (her kararın temeli): **Hibrit mimari** — backend (Railway) ve
+> Meta App (Instagram/WhatsApp) her zaman **paylaşımlı/satıcının**, ama her
+> müşterinin Firestore/Storage'ı **kendi ayrı Firebase projesinde, kendi
+> Google faturasında** durur. Satıcı kurulumu yapar, kullanım masrafını
+> müşteri öder.
 >
-> - **Paylaşımlı backend (önerilen, bkz. `INSTALL.md`):** Tek Firebase
->   projesi + tek backend, birden fazla müşteri aynı sistemde ayrı ayrı
->   `tenants/{id}` kaydı olarak yaşar. Yeni müşteri = yeni tenant kaydı +
->   kendi Vercel deploy'u (kendi domain/marka), backend/veritabanı aynı
->   kalır. Instagram/WhatsApp gibi tek-webhook-URL'i olan entegrasyonlar
->   SADECE bu modda tüm müşteriler için çalışır — gelen her mesaj, hangi
->   tenant'a ait olduğunu Instagram/WABA hesap ID'sinden bulur (bkz.
+> - **Paylaşımlı olan:** Tek backend süreci, tek Firebase Authentication
+>   projesi, tek Meta App/webhook adresi. Instagram/WhatsApp gibi
+>   tek-webhook-URL'i olan entegrasyonlar SADECE bu sayede her müşteride
+>   sıfır ek işlemle çalışır — gelen her mesaj, hangi tenant'a ait olduğunu
+>   Instagram/WABA hesap ID'sinden bulur (bkz.
 >   `server/src/services/tenant.service.js#getTenantByInstagramAccountId`/
 >   `#getTenantByWhatsappWabaId`, çağıran: `server/src/webhook/*.webhook.js`).
-> - **İzole backend (opsiyonel):** Bir müşteri kendi altyapısını
->   (kendi Firebase projesi, kendi Railway'i) özellikle istiyorsa, aynı kod
->   tabanı `.env` değişiklikleriyle oraya da kurulabilir — sadece o
->   müşterinin Instagram/WhatsApp'ı kendi ayrı Meta App'i üzerinden
->   bağlanmak zorunda kalır (webhook tek adrese düştüğü için paylaşamaz).
+> - **Tenant'a özel olan:** Her `tenants/{id}` dokümanı kendi Firebase
+>   projesinin (şifreli) kimlik bilgilerini taşır (`tenant.firebase` alanı,
+>   bkz. "Tenant İzolasyonu" bölümü) — `base.repository.js` üzerinden geçen
+>   HER sorgu, `context.tenantId`'ye göre doğru projeye yönlendirilir
+>   (`server/src/firebase/admin.js`'in tenant-bazlı App cache'i üzerinden).
+>   Frontend Firestore/Storage'a hiç doğrudan bağlanmadığı için (bkz.
+>   `SECURITY.md`) `VITE_FIREBASE_*` her müşteride **aynı** kalır (merkezi
+>   projenin config'i, sadece Auth için) — değişen tek şey `VITE_TENANT_ID`.
 >
-> Varsayılan/beklenen yol paylaşımlı backend'dir — izole kurulum, özellikle
-> istenmedikçe seçilmemeli.
+> Yeni müşteri ekleme adımları için bkz. `INSTALL.md`.
 
 ## Genel Mimari
 
@@ -125,11 +126,21 @@ src/
 
 ## Firebase Nasıl Initialize Edildi
 
-**Backend (`server/src/firebase/admin.js`):** Tembel (lazy) singleton —
-sadece `FIREBASE_MODE=live` iken ve ilk gerçek çağrıda `admin.initializeApp()`
-çalışır, mock modda hiç yüklenmez. Kimlik bilgisi `FIREBASE_PROJECT_ID` +
-`FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY` env değişkenlerinden
-(`admin.credential.cert(...)`) okunur.
+**Backend (`server/src/firebase/admin.js`):** İKİ tür Firebase App var —
+sadece `FIREBASE_MODE=live` iken ve ilk gerçek çağrıda kurulur, mock modda
+hiç yüklenmez:
+- **Merkezi app** (tembel/lazy singleton) — `tenants` dizinini ve Firebase
+  Authentication'ı barındırır, kimlik bilgisi `FIREBASE_PROJECT_ID`/
+  `FIREBASE_CLIENT_EMAIL`/`FIREBASE_PRIVATE_KEY` env değişkenlerinden.
+- **Tenant app'leri** (tembel, `Map<tenantId, Promise<App>>` cache'i) — her
+  tenant kendi Firebase projesine karşı ayrı bir named `admin.App`. Kimlik
+  bilgisi env'den DEĞİL, merkezi `tenants/{id}.firebase` dokümanından okunur
+  (private key `crypto.util.js#decryptToken` ile şifresi çözülerek). İlk
+  çağrıda kurulup cache'lenir; `invalidateTenantFirebaseApp(tenantId)` key
+  rotasyonunda cache'i düşürür.
+
+`getAuth()` HER ZAMAN merkezi app'i kullanır — Authentication tenant'a göre
+bölünmez (bkz. yukarıdaki "İş modeli" notu).
 
 **Frontend (`src/firebase/config.js`):**
 ```js
@@ -154,13 +165,29 @@ Bu sayede:
 
 ## Tenant İzolasyonu — `BaseRepository`
 
-`tenants` ve `users` DIŞINDAKİ her koleksiyon repository'si `BaseRepository`'yi
-extend eder. `#collection` bir **private class field** olduğu için alt
-sınıflar bile ona doğrudan erişemez — tek yol `scopedQuery`/`scopedDocRef`
-gibi metotlardır, hepsi `context.tenantId` olmadan çalışmayı reddeder
-(`TenantScopeError` fırlatır). Bu, "tenantId filtresini unuttum" hatasının
-kod seviyesinde imkânsız olması demektir — bir konvansiyon değil, JS
-dilinin private field garantisiyle zorlanan bir kural.
+`tenants` DIŞINDAKİ her koleksiyon repository'si `BaseRepository`'yi extend
+eder. `context.tenantId` olmadan hiçbir sorgu kurulamaz (`#assertTenantId`,
+`TenantScopeError` fırlatır) — bu bir konvansiyon değil, her `scoped*`
+metodunun girişinde zorlanan bir kuraldır.
+
+Artık `context.tenantId` sadece bir sorgu FİLTRESİ değil, aynı zamanda
+**hangi Firebase projesine bağlanılacağını** da belirliyor:
+`#rawCollection(context)` → `getTenantFirestore(context.tenantId)`
+(`firebase/firestore.client.js`) → o tenant'ın kendi projesindeki Firestore
+instance'ı (bkz. yukarıdaki "Firebase Nasıl Initialize Edildi"). Yani bir
+`context.tenantId` unutulursa artık sadece "başka bir müşterinin verisini
+görme" riski değil, doğrudan `TenantScopeError` ile **hiç sorgu kurulamaz** —
+hangi projeye bağlanılacağı bile bilinemez.
+
+Tek istisna `tenant.repository.js`'tir — `BaseRepository`'yi extend etmez,
+merkezi projedeki `tenants` dizinine doğrudan (tenant-scope'suz) erişir,
+çünkü bir tenant'ın "kendi kendinin scope'u" olması anlamsızdır.
+
+Credential'lar hiçbir zaman `context`'e binmez (webhook'lar
+`tenant.middleware.js`'den geçmediği için orada tutulsa 3 webhook dosyasında
+tekrar etmesi gerekirdi, ayrıca `TenantScopeError`'ın hata mesajı
+`JSON.stringify(context)` yaptığı için credential sızıntısı riski olurdu) —
+çözümleme `getTenantFirestore(tenantId)` içinde, tenantId'den lazy olarak yapılır.
 
 ## Frontend Veri Deseni ("cache+subscribe")
 

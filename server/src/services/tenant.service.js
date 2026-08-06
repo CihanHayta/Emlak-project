@@ -12,10 +12,13 @@ import {
   findTenantsWithExpiringWhatsappToken,
   updateTenantFacebookPage,
   findTenantByFacebookPageId,
+  updateTenantFirebase,
 } from "../repositories/tenant.repository.js";
 import { createDefaultTenant } from "../models/tenant.model.js";
 import { slugify } from "../utils/slugify.js";
 import { ApiError } from "../utils/ApiError.js";
+import { encryptToken } from "../utils/crypto.util.js";
+import { env } from "../config/env.js";
 
 export async function getTenantById(id) {
   return findTenantById(id);
@@ -68,6 +71,35 @@ export async function connectTenantFacebookPage(tenantId, data) {
 
 export async function disconnectTenantFacebookPage(tenantId) {
   await updateTenantFacebookPage(tenantId, null);
+}
+
+/**
+ * Tenant'ı KENDİ Firebase projesine bağlar — `serviceAccountJson` müşterinin
+ * kendi Google hesabında oluşturduğu projenin "Yeni özel anahtar oluştur"
+ * JSON'u (ham, `firebase-admin`'in beklediği `project_id`/`client_email`/
+ * `private_key` alan adlarıyla). Bundan sonra bu tenant'a ait HER repository
+ * sorgusu bu projeye gider (bkz. base.repository.js, firebase/admin.js).
+ * `bootstrap-owner.js`'ten (yeni müşteri kurulumu) çağrılır.
+ */
+export async function connectTenantFirebaseProject(tenantId, { serviceAccountJson, storageBucket }) {
+  const projectId = serviceAccountJson?.project_id;
+  const clientEmail = serviceAccountJson?.client_email;
+  const privateKey = serviceAccountJson?.private_key;
+  if (!projectId || !clientEmail || !privateKey) {
+    throw ApiError.validation("Geçersiz service account JSON — project_id/client_email/private_key eksik.");
+  }
+  if (!storageBucket) throw ApiError.validation("storageBucket zorunlu.");
+
+  const encryptedPrivateKey = encryptToken(privateKey);
+  await updateTenantFirebase(tenantId, { projectId, clientEmail, storageBucket, encryptedPrivateKey });
+
+  // Bu tenant için önceden cache'lenmiş (yanlış/eski) bir Firebase App varsa
+  // düşür — key rotasyonunda veya ilk bağlantıdan hemen sonra aynı process
+  // içinde tekrar kullanılırsa güncel bilgiyle yeniden kurulsun diye.
+  if (env.firebaseMode !== "mock") {
+    const { invalidateTenantFirebaseApp } = await import("../firebase/admin.js");
+    invalidateTenantFirebaseApp(tenantId);
+  }
 }
 
 /**

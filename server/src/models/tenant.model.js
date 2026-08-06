@@ -30,5 +30,12 @@ export function createDefaultTenant({ name, slug, ownerUserId, phone = null, tax
     // gelen başvuruları çekmek için (bkz. services/metaLeadAds.service.js).
     // Aynı şifreleme kuralı geçerli.
     facebookPage: null,
+    // Bu tenant'ın KENDİ Firebase projesi (kendi Google hesabı/faturası) —
+    // bağlanana kadar null, bu sırada o tenant'a ait hiçbir repository
+    // sorgusu çalışmaz (bkz. firebase/admin.js#fetchTenantFirebaseConfig).
+    // Şekli: { projectId, clientEmail, storageBucket, encryptedPrivateKey }
+    // — sadece encryptedPrivateKey şifreli (bkz. utils/crypto.util.js),
+    // diğerleri sır değil (aynı instagram/whatsapp alanlarındaki desen).
+    firebase: null,
   });
 }

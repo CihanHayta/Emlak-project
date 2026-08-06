@@ -89,6 +89,14 @@ export async function findTenantsWithExpiringWhatsappToken(beforeTimestamp) {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
+/** Tenant kendi Firebase projesine bağlanınca çağrılır — bkz.
+ * tenant.service.js#connectTenantFirebaseProject. `data` null ise bağlantıyı
+ * temizler (o andan itibaren bu tenant'a ait hiçbir sorgu çalışmaz). */
+export async function updateTenantFirebase(id, data) {
+  const col = await collection();
+  await col.doc(id).update({ firebase: data });
+}
+
 /** Facebook Sayfası bağlantısı kurulunca/kaldırılınca çağrılır — `data` null ise bağlantıyı temizler. */
 export async function updateTenantFacebookPage(id, data) {
   const col = await collection();
