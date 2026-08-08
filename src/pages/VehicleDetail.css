@@ -1,12 +1,31 @@
 /* VehicleDetail.jsx — property-detail.css'in üzerine, sadece araca özel ek sınıflar. */
 
+.vehicle-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.vehicle-header-row__listing-no {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: var(--gray-500);
+}
+
 .vehicle-status-badge {
-  margin-left: 0.5rem;
   border-radius: 9999px;
-  padding: 0.125rem 0.625rem;
+  padding: 0.1875rem 0.75rem;
   font-size: 0.6875rem;
   font-weight: 700;
   color: #fff;
+  white-space: nowrap;
+}
+.vehicle-status-badge--active {
+  background-color: var(--emerald-500);
 }
 .vehicle-status-badge--sold {
   background-color: #dc2626;
@@ -14,22 +33,8 @@
 .vehicle-status-badge--reserved {
   background-color: #d97706;
 }
-
-.vehicle-tags {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-}
-
-.vehicle-tag {
-  border-radius: 9999px;
-  border: 1px solid var(--gray-100);
-  background-color: var(--gray-50);
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--gray-600);
+.vehicle-status-badge--unpublished {
+  background-color: var(--gray-500);
 }
 
 .vehicle-km-expertise {
@@ -68,8 +73,83 @@
   text-decoration: underline;
 }
 
+/* --- Sekmeler --- */
+.vehicle-tabs {
+  margin-top: 1.5rem;
+}
+
+.vehicle-tabs__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  border-bottom: 1px solid var(--gray-100);
+  padding-bottom: 0.5rem;
+}
+
+.vehicle-tabs__trigger {
+  border: none;
+  background: transparent;
+  border-radius: 9999px;
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.vehicle-tabs__trigger:hover {
+  background-color: var(--gray-50);
+  color: var(--gray-700);
+}
+.vehicle-tabs__trigger--active {
+  background-color: var(--brand-navy);
+  color: #fff;
+}
+
+.vehicle-tabs__panel {
+  padding-top: 1.5rem;
+}
+
+.vehicle-tabs__panel-content {
+  font-size: 0.875rem;
+}
+
+.vehicle-tabs__panel-subtitle {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.vehicle-tabs__empty {
+  color: var(--gray-500);
+  font-size: 0.875rem;
+}
+
+.vehicle-expertise-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  background-color: rgba(16, 185, 129, 0.06);
+  padding: 1rem;
+  text-decoration: none;
+  color: var(--emerald-600);
+}
+.vehicle-expertise-cta__title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+.vehicle-expertise-cta__subtitle {
+  margin: 0.125rem 0 0;
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+/* --- Teknik özellik satırları (sekme içinde) --- */
 .vehicle-tech-specs {
-  margin-top: 1rem;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem 1.5rem;
@@ -92,23 +172,17 @@
   color: var(--brand-navy);
 }
 
-/* property-detail__section-title'ı DEĞİŞTİRMİYORUZ (PropertyDetail.css'te
-   paylaşılan bir sınıf) — ikonlu başlıklar için ayrı bir sınıf. */
-.vehicle-section-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.vehicle-tech-specs__equipment {
+  grid-column: 1 / -1;
+  margin-top: 1rem;
 }
 
-.vehicle-section-icon {
-  color: var(--brand-gold);
-}
-
+/* --- Hasar / boya --- */
 .vehicle-damage-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 @media (min-width: 640px) {
   .vehicle-damage-summary {
@@ -134,22 +208,23 @@
   color: var(--brand-navy);
 }
 
-.vehicle-parts-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.375rem;
-}
-
-.vehicle-parts-list__item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-radius: 0.625rem;
-  background-color: var(--gray-50);
-  padding: 0.5rem 0.75rem;
+.vehicle-parts-table {
+  width: 100%;
+  margin-top: 1.25rem;
+  border-collapse: collapse;
   font-size: 0.875rem;
+}
+.vehicle-parts-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  color: var(--gray-500);
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--gray-100);
+}
+.vehicle-parts-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--gray-100);
   color: var(--gray-700);
 }
 
@@ -168,6 +243,7 @@
   color: #dc2626;
 }
 
+/* --- Bakım geçmişi --- */
 .vehicle-history-list {
   list-style: none;
   margin: 0;
@@ -202,4 +278,106 @@
 .vehicle-history-list__desc {
   width: 100%;
   color: var(--gray-500);
+}
+
+/* --- Sağ sidebar kartları --- */
+.vehicle-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.vehicle-price-card,
+.vehicle-contact-card,
+.vehicle-info-card {
+  border-radius: 1rem;
+  border: 1px solid var(--gray-100);
+  background-color: #fff;
+  padding: 1.25rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.vehicle-price-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.vehicle-price-card__specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--gray-600);
+}
+.vehicle-price-card__specs span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.vehicle-contact-card__title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.vehicle-contact-card__agency {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+.vehicle-contact-card__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  border-radius: 0.75rem;
+  padding: 0.625rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--gray-100);
+  color: var(--brand-navy);
+}
+.vehicle-contact-card__btn:last-child {
+  margin-bottom: 0;
+}
+.vehicle-contact-card__btn--call {
+  background-color: var(--brand-navy);
+  color: #fff;
+  border-color: var(--brand-navy);
+}
+.vehicle-contact-card__btn--whatsapp {
+  background-color: #25d366;
+  color: #fff;
+  border-color: #25d366;
+}
+.vehicle-contact-card__btn--message {
+  background-color: #fff;
+}
+
+.vehicle-info-card__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px dashed var(--gray-100);
+  font-size: 0.8125rem;
+}
+.vehicle-info-card__row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.vehicle-info-card__row span {
+  color: var(--gray-500);
+}
+.vehicle-info-card__row strong {
+  color: var(--brand-navy);
+  text-align: right;
 }

@@ -30,6 +30,13 @@ export function createDefaultVehicle({
   enginePower = "",
   drivetrain = "",
   color = "",
+  doorCount = null,
+  seatCount = null,
+  plateNationality = "TR",
+  warranty = false,
+  serviceMaintained = false,
+  inspectionValidUntil = null,
+  keyCount = null,
   title,
   price,
   negotiable = false,
@@ -69,6 +76,13 @@ export function createDefaultVehicle({
     enginePower, // örn. "132 HP", serbest metin
     drivetrain, // "Önden Çekiş" | "Arkadan İtiş" | "4x4"
     color,
+    doorCount, // örn. 4
+    seatCount, // örn. 5
+    plateNationality, // "TR" | "Yabancı Plaka" vb. — serbest metin, TR varsayılan
+    warranty,
+    serviceMaintained,
+    inspectionValidUntil, // muayene geçerlilik tarihi, ISO string ("YYYY-MM-DD")
+    keyCount,
     title,
     listingNo: String(Math.floor(100000 + Math.random() * 900000)),
     price,

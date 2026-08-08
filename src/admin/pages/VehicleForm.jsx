@@ -66,6 +66,13 @@ function buildInitialForm(vehicle) {
       enginePower: "",
       drivetrain: "",
       color: "",
+      doorCount: "",
+      seatCount: "",
+      plateNationality: "TR",
+      warranty: false,
+      serviceMaintained: false,
+      inspectionValidUntil: "",
+      keyCount: "",
       title: "",
       price: "",
       negotiable: false,
@@ -102,6 +109,13 @@ function buildInitialForm(vehicle) {
     enginePower: vehicle.enginePower ?? "",
     drivetrain: vehicle.drivetrain ?? "",
     color: vehicle.color ?? "",
+    doorCount: vehicle.doorCount || "",
+    seatCount: vehicle.seatCount || "",
+    plateNationality: vehicle.plateNationality ?? "TR",
+    warranty: vehicle.warranty ?? false,
+    serviceMaintained: vehicle.serviceMaintained ?? false,
+    inspectionValidUntil: vehicle.inspectionValidUntil ?? "",
+    keyCount: vehicle.keyCount || "",
     title: vehicle.title ?? "",
     // property.model.js'teki price ile aynı desen: hazır biçimlendirilmiş
     // gösterim string'i ("450.000 TL") — sadece rakamları geri çıkar.
@@ -197,6 +211,13 @@ export default function VehicleForm() {
       enginePower: form.enginePower,
       drivetrain: form.drivetrain,
       color: form.color,
+      doorCount: Number(form.doorCount) || null,
+      seatCount: Number(form.seatCount) || null,
+      plateNationality: form.plateNationality,
+      warranty: form.warranty,
+      serviceMaintained: form.serviceMaintained,
+      inspectionValidUntil: form.inspectionValidUntil || null,
+      keyCount: Number(form.keyCount) || null,
       title: form.title,
       price: form.price ? `${formatThousands(form.price)} TL` : "",
       negotiable: form.negotiable,
@@ -358,6 +379,36 @@ export default function VehicleForm() {
             <Label htmlFor="v-engine-power">Motor Gücü</Label>
             <Input id="v-engine-power" value={form.enginePower} onChange={(e) => set("enginePower", e.target.value)} placeholder="Örn: 132 HP" />
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="v-door-count">Kapı Sayısı</Label>
+            <Input id="v-door-count" type="number" min="0" max="6" value={form.doorCount} onChange={(e) => set("doorCount", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="v-seat-count">Koltuk Sayısı</Label>
+            <Input id="v-seat-count" type="number" min="0" max="20" value={form.seatCount} onChange={(e) => set("seatCount", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="v-plate">Plaka Uyruğu</Label>
+            <Input id="v-plate" value={form.plateNationality} onChange={(e) => set("plateNationality", e.target.value)} placeholder="Örn: TR" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="v-inspection">Muayene Geçerlilik Tarihi</Label>
+            <Input id="v-inspection" type="date" value={form.inspectionValidUntil} onChange={(e) => set("inspectionValidUntil", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="v-key-count">Anahtar Sayısı</Label>
+            <Input id="v-key-count" type="number" min="0" max="10" value={form.keyCount} onChange={(e) => set("keyCount", e.target.value)} />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="flex items-center gap-2 rounded-xl border border-border p-3 text-sm">
+            <Switch checked={form.warranty} onCheckedChange={(v) => set("warranty", v)} />
+            Garantisi Devam Ediyor
+          </label>
+          <label className="flex items-center gap-2 rounded-xl border border-border p-3 text-sm">
+            <Switch checked={form.serviceMaintained} onCheckedChange={(v) => set("serviceMaintained", v)} />
+            Servis Bakımlı
+          </label>
         </div>
       </section>
 

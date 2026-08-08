@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -9,33 +9,51 @@ import {
   CheckCircle2,
   Send,
   FileCheck2,
-  ShieldAlert,
-  Wrench,
   Check,
+  Phone,
+  MessageCircle,
 } from "lucide-react";
 import { getVehicleById } from "../data/vehicles";
 import { useVehiclesVersion } from "../hooks/useVehiclesVersion";
 import { useInquiryForm } from "../hooks/useInquiryForm";
 import { WhatsAppIcon } from "../components/common/BrandIcons";
-import { buildWhatsAppLink } from "../config/siteConfig";
-import PropertyGallery from "../components/listings/PropertyGallery";
+import { SITE, buildWhatsAppLink } from "../config/siteConfig";
+import VehicleGallery from "../components/listings/VehicleGallery";
+import CarDamageDiagram from "../components/listings/CarDamageDiagram";
 import SimilarVehicles from "../components/listings/SimilarVehicles";
-// property-detail.css'i BİLEREK aynen kullanıyoruz — düzen (galeri + bilgi
-// sütunu + form + benzer-öğeler sidebar'ı) tamamen aynı, sadece hangi
-// spec'lerin gösterildiği farklı. bkz. PropertyDetail.jsx'in eşdeğeri.
+// property-detail.css'i BİLEREK aynen kullanıyoruz — form/benzer-öğeler
+// sidebar'ı, "bulunamadı" hâli gibi ortak parçalar için. bkz. o dosyanın
+// PropertyDetail.jsx'teki eşdeğeri.
 import "./PropertyDetail.css";
 import "./VehicleDetail.css";
 
-const STATUS_LABELS = { active: "Aktif", reserved: "Rezerve", sold: "Satıldı", unpublished: "Yayından Kaldırıldı" };
+const STATUS_LABELS = { active: "Aktif İlan", reserved: "Rezerve", sold: "Satıldı", unpublished: "Yayından Kaldırıldı" };
+const CATEGORY_LABELS = { satilik: "Satılık", kiralik: "Kiralık" };
+const TABS = [
+  { id: "ozellikler", label: "Araç Özellikleri" },
+  { id: "ekspertiz", label: "Ekspertiz Raporu" },
+  { id: "boya", label: "Boya & Değişen" },
+  { id: "ilan", label: "Fiyat & İlan Bilgileri" },
+  { id: "aciklama", label: "Açıklama" },
+];
 
-/** "/arac/:id" — PropertyDetail.jsx ile aynı desen (galeri/form/benzer-öğeler), araç spec'lerine uyarlanmış. */
+function formatDate(value) {
+  if (!value) return "—";
+  const ms = typeof value === "object" && value._seconds != null ? value._seconds * 1000 : value;
+  const date = new Date(ms);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("tr-TR");
+}
+
+/** "/arac/:id" — ekran görüntüsündeki profesyonel ilan sayfası düzenine uyarlandı: galeri + sekmeler solda, fiyat/iletişim/ilan bilgisi kartları sağda. */
 export default function VehicleDetail() {
   const { id } = useParams();
   useVehiclesVersion();
   const vehicle = getVehicleById(id);
+  const [activeTab, setActiveTab] = useState(TABS[0].id);
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    setActiveTab(TABS[0].id);
   }, [id]);
 
   if (!vehicle) {
@@ -68,32 +86,25 @@ export default function VehicleDetail() {
 
       <section className="property-detail__grid">
         <div className="property-detail__main">
-          <PropertyGallery property={vehicle} />
+          <div className="vehicle-header-row">
+            <span className="vehicle-header-row__listing-no">
+              <Tag className="icon-4" />
+              İlan No: {vehicle.listingNo}
+            </span>
+            <span className={`vehicle-status-badge vehicle-status-badge--${vehicle.status}`}>
+              {STATUS_LABELS[vehicle.status] ?? STATUS_LABELS.active}
+            </span>
+          </div>
+
+          <VehicleGallery vehicle={vehicle} />
 
           <div className="property-detail__header">
             <div>
-              <div className="property-detail__listing-no">
-                <Tag className="icon-4" />
-                İlan No: {vehicle.listingNo}
-                {isUnavailable && (
-                  <span className={`vehicle-status-badge vehicle-status-badge--${vehicle.status}`}>
-                    {STATUS_LABELS[vehicle.status]}
-                  </span>
-                )}
-              </div>
               <h1 className="property-detail__title">{vehicle.title}</h1>
               <p className="property-detail__location">
                 {vehicle.brand} {vehicle.model} · {vehicle.color}
               </p>
-              {(vehicle.negotiable || vehicle.tradeIn || vehicle.creditEligible) && (
-                <div className="vehicle-tags">
-                  {vehicle.negotiable && <span className="vehicle-tag">Pazarlık Payı Var</span>}
-                  {vehicle.tradeIn && <span className="vehicle-tag">Takas Yapılır</span>}
-                  {vehicle.creditEligible && <span className="vehicle-tag">Krediye Uygun</span>}
-                </div>
-              )}
             </div>
-            <p className="property-detail__price">{vehicle.price}</p>
           </div>
 
           {/* Kilometre + ekspertiz raporu — spec'in özellikle vurguladığı, dikkat çekici alan. */}
@@ -118,118 +129,226 @@ export default function VehicleDetail() {
             )}
           </div>
 
-          <div className="property-detail__specs property-detail__specs--cols-3">
-            <div className="property-detail__spec-item">
-              <Fuel className="property-detail__spec-icon" />
-              <div className="property-detail__spec-text">
-                <p className="property-detail__spec-label">Yakıt</p>
-                <p className="property-detail__spec-value">{vehicle.fuelType}</p>
-              </div>
+          {/* Sekmeler */}
+          <div className="vehicle-tabs">
+            <div className="vehicle-tabs__list" role="tablist">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`vehicle-tabs__trigger${activeTab === tab.id ? " vehicle-tabs__trigger--active" : ""}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-            <div className="property-detail__spec-item">
-              <Cog className="property-detail__spec-icon" />
-              <div className="property-detail__spec-text">
-                <p className="property-detail__spec-label">Vites</p>
-                <p className="property-detail__spec-value">{vehicle.transmission}</p>
-              </div>
-            </div>
-            {vehicle.bodyType && (
-              <div className="property-detail__spec-item">
-                <Tag className="property-detail__spec-icon" />
-                <div className="property-detail__spec-text">
-                  <p className="property-detail__spec-label">Kasa Tipi</p>
-                  <p className="property-detail__spec-value">{vehicle.bodyType}</p>
+
+            <div className="vehicle-tabs__panel">
+              {activeTab === "ozellikler" && (
+                <div className="vehicle-tech-specs">
+                  <TechSpecRow label="Marka" value={vehicle.brand} />
+                  <TechSpecRow label="Model" value={vehicle.model} />
+                  <TechSpecRow label="Yıl" value={vehicle.year} />
+                  <TechSpecRow label="Yakıt" value={vehicle.fuelType} />
+                  <TechSpecRow label="Vites" value={vehicle.transmission} />
+                  <TechSpecRow label="Kilometre" value={`${Number(vehicle.km).toLocaleString("tr-TR")} km`} />
+                  {vehicle.bodyType && <TechSpecRow label="Kasa Tipi" value={vehicle.bodyType} />}
+                  {vehicle.drivetrain && <TechSpecRow label="Çekiş" value={vehicle.drivetrain} />}
+                  {vehicle.engineSize && <TechSpecRow label="Motor Hacmi" value={vehicle.engineSize} />}
+                  {vehicle.enginePower && <TechSpecRow label="Motor Gücü" value={vehicle.enginePower} />}
+                  {vehicle.color && <TechSpecRow label="Renk" value={vehicle.color} />}
+                  {vehicle.doorCount && <TechSpecRow label="Kapı Sayısı" value={vehicle.doorCount} />}
+                  {vehicle.seatCount && <TechSpecRow label="Koltuk Sayısı" value={vehicle.seatCount} />}
+                  {vehicle.plateNationality && <TechSpecRow label="Plaka / Uyruk" value={vehicle.plateNationality} />}
+                  <TechSpecRow label="Garanti" value={vehicle.warranty ? "Var" : "Yok"} />
+                  <TechSpecRow label="Servis Bakımlı" value={vehicle.serviceMaintained ? "Evet" : "Hayır"} />
+                  {vehicle.inspectionValidUntil && <TechSpecRow label="Muayene Geçerlilik" value={formatDate(vehicle.inspectionValidUntil)} />}
+                  {vehicle.keyCount != null && <TechSpecRow label="Anahtar Sayısı" value={vehicle.keyCount} />}
+
+                  {vehicle.equipment?.length > 0 && (
+                    <div className="vehicle-tech-specs__equipment">
+                      <h3 className="vehicle-tabs__panel-subtitle">Donanımlar</h3>
+                      <ul className="property-detail__amenities-list">
+                        {vehicle.equipment.map((item) => (
+                          <li key={item} className="property-detail__amenity-item">
+                            <Check className="property-detail__amenity-icon" />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
+              )}
 
-          {/* Teknik özellikler — daha kapsamlı liste. */}
-          <div className="vehicle-tech-specs">
-            {vehicle.engineSize && <TechSpecRow label="Motor Hacmi" value={vehicle.engineSize} />}
-            {vehicle.enginePower && <TechSpecRow label="Motor Gücü" value={vehicle.enginePower} />}
-            {vehicle.drivetrain && <TechSpecRow label="Çekiş Tipi" value={vehicle.drivetrain} />}
-            {vehicle.color && <TechSpecRow label="Renk" value={vehicle.color} />}
-          </div>
+              {activeTab === "ekspertiz" && (
+                <div className="vehicle-tabs__panel-content">
+                  {vehicle.expertiseReportUrl ? (
+                    <a
+                      href={vehicle.expertiseReportUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="vehicle-expertise-cta"
+                    >
+                      <FileCheck2 className="icon-5" />
+                      <div>
+                        <p className="vehicle-expertise-cta__title">Ekspertiz Raporunu Görüntüle</p>
+                        <p className="vehicle-expertise-cta__subtitle">{vehicle.expertiseReportName ?? "PDF dosyası"} — yeni sekmede açılır</p>
+                      </div>
+                    </a>
+                  ) : (
+                    <p className="vehicle-tabs__empty">Bu araç için henüz bir ekspertiz raporu yüklenmemiş.</p>
+                  )}
 
-          {vehicle.description && (
-            <div className="property-detail__section">
-              <h2 className="property-detail__section-title">Araç Hakkında</h2>
-              <p className="property-detail__description">{vehicle.description}</p>
-            </div>
-          )}
+                  {vehicle.history?.length > 0 && (
+                    <div className="vehicle-tabs__panel-content" style={{ marginTop: "1.5rem" }}>
+                      <h3 className="vehicle-tabs__panel-subtitle">Bakım / Araç Geçmişi</h3>
+                      <ul className="vehicle-history-list">
+                        {vehicle.history.map((entry, index) => (
+                          <li key={index} className="vehicle-history-list__item">
+                            <span className="vehicle-history-list__date">{entry.date}</span>
+                            <span className="vehicle-history-list__km">{Number(entry.km || 0).toLocaleString("tr-TR")} km</span>
+                            <span className="vehicle-history-list__action">{entry.action}</span>
+                            {entry.description && <span className="vehicle-history-list__desc">{entry.description}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
 
-          {/* Hasar / Ekspertiz bilgileri */}
-          {hasDamageInfo && (
-            <div className="property-detail__section">
-              <h2 className="property-detail__section-title vehicle-section-title">
-                <ShieldAlert className="icon-5 vehicle-section-icon" />
-                Hasar / Ekspertiz Bilgileri
-              </h2>
-              <div className="vehicle-damage-summary">
-                <DamageStat label="Tramer Kaydı" value={vehicle.tramerRecord || "Belirtilmemiş"} />
-                {vehicle.damageAmount > 0 && <DamageStat label="Hasar Tutarı" value={`${vehicle.damageAmount.toLocaleString("tr-TR")} TL`} />}
-                <DamageStat label="Değişen Parça" value={vehicle.changedPartsCount ?? 0} />
-                <DamageStat label="Boyalı Parça" value={vehicle.paintedPartsCount ?? 0} />
-                <DamageStat label="Lokal Boyalı Parça" value={vehicle.localPaintedPartsCount ?? 0} />
-              </div>
-              {vehicle.partsStatus?.length > 0 && (
-                <ul className="vehicle-parts-list">
-                  {vehicle.partsStatus.map((row, index) => (
-                    <li key={index} className="vehicle-parts-list__item">
-                      <span>{row.part}</span>
-                      <span className={`vehicle-part-status vehicle-part-status--${row.status === "Orijinal" ? "ok" : "warn"}`}>
-                        {row.status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              {activeTab === "boya" && (
+                <div className="vehicle-tabs__panel-content">
+                  {hasDamageInfo ? (
+                    <>
+                      <div className="vehicle-damage-summary">
+                        <DamageStat label="Tramer Kaydı" value={vehicle.tramerRecord || "Belirtilmemiş"} />
+                        {vehicle.damageAmount > 0 && <DamageStat label="Hasar Tutarı" value={`${vehicle.damageAmount.toLocaleString("tr-TR")} TL`} />}
+                        <DamageStat label="Değişen Parça" value={vehicle.changedPartsCount ?? 0} />
+                        <DamageStat label="Boyalı Parça" value={vehicle.paintedPartsCount ?? 0} />
+                        <DamageStat label="Lokal Boyalı Parça" value={vehicle.localPaintedPartsCount ?? 0} />
+                      </div>
+                      <CarDamageDiagram partsStatus={vehicle.partsStatus} />
+                      {vehicle.partsStatus?.length > 0 && (
+                        <table className="vehicle-parts-table">
+                          <thead>
+                            <tr>
+                              <th>Parça</th>
+                              <th>Durum</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {vehicle.partsStatus.map((row, index) => (
+                              <tr key={index}>
+                                <td>{row.part}</td>
+                                <td>
+                                  <span className={`vehicle-part-status vehicle-part-status--${row.status === "Orijinal" ? "ok" : "warn"}`}>
+                                    {row.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </>
+                  ) : (
+                    <p className="vehicle-tabs__empty">Bu araç için hasar/boya bilgisi girilmemiş.</p>
+                  )}
+                </div>
+              )}
+
+              {activeTab === "ilan" && (
+                <div className="vehicle-tech-specs">
+                  <TechSpecRow label="Fiyat" value={vehicle.price} />
+                  <TechSpecRow label="Kategori" value={CATEGORY_LABELS[vehicle.category] ?? vehicle.category} />
+                  <TechSpecRow label="Durum" value={STATUS_LABELS[vehicle.status] ?? STATUS_LABELS.active} />
+                  <TechSpecRow label="Pazarlık Payı" value={vehicle.negotiable ? "Var" : "Yok"} />
+                  <TechSpecRow label="Takas" value={vehicle.tradeIn ? "Yapılır" : "Yapılmaz"} />
+                  <TechSpecRow label="Krediye Uygunluk" value={vehicle.creditEligible ? "Uygun" : "Uygun Değil"} />
+                  <TechSpecRow label="İlan Tarihi" value={formatDate(vehicle.createdAt)} />
+                  <TechSpecRow label="Son Güncelleme" value={formatDate(vehicle.updatedAt)} />
+                  <TechSpecRow label="İlan No" value={vehicle.listingNo} />
+                </div>
+              )}
+
+              {activeTab === "aciklama" && (
+                <div className="vehicle-tabs__panel-content">
+                  {vehicle.description ? (
+                    <p className="property-detail__description">{vehicle.description}</p>
+                  ) : (
+                    <p className="vehicle-tabs__empty">Bu araç için ek açıklama girilmemiş.</p>
+                  )}
+                </div>
               )}
             </div>
-          )}
-
-          {/* Donanımlar */}
-          {vehicle.equipment?.length > 0 && (
-            <div className="property-detail__section">
-              <h2 className="property-detail__section-title">Donanımlar</h2>
-              <ul className="property-detail__amenities-list">
-                {vehicle.equipment.map((item) => (
-                  <li key={item} className="property-detail__amenity-item">
-                    <Check className="property-detail__amenity-icon" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Bakım / Araç Geçmişi */}
-          {vehicle.history?.length > 0 && (
-            <div className="property-detail__section">
-              <h2 className="property-detail__section-title vehicle-section-title">
-                <Wrench className="icon-5 vehicle-section-icon" />
-                Bakım / Araç Geçmişi
-              </h2>
-              <ul className="vehicle-history-list">
-                {vehicle.history.map((entry, index) => (
-                  <li key={index} className="vehicle-history-list__item">
-                    <span className="vehicle-history-list__date">{entry.date}</span>
-                    <span className="vehicle-history-list__km">{Number(entry.km || 0).toLocaleString("tr-TR")} km</span>
-                    <span className="vehicle-history-list__action">{entry.action}</span>
-                    {entry.description && <span className="vehicle-history-list__desc">{entry.description}</span>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          </div>
         </div>
 
-        <div className="property-detail__form-wrap">
-          <VehicleInquirySection key={vehicle.id} vehicle={vehicle} />
-        </div>
+        <div className="property-detail__sidebar vehicle-sidebar">
+          <div className="vehicle-price-card">
+            <p className="property-detail__price">{vehicle.price}</p>
+            {isUnavailable && (
+              <span className={`vehicle-status-badge vehicle-status-badge--${vehicle.status}`}>
+                {STATUS_LABELS[vehicle.status]}
+              </span>
+            )}
+            <div className="vehicle-price-card__specs">
+              <span><Gauge className="icon-4" /> {Number(vehicle.km).toLocaleString("tr-TR")} km</span>
+              <span><Fuel className="icon-4" /> {vehicle.fuelType}</span>
+              <span><Cog className="icon-4" /> {vehicle.transmission}</span>
+            </div>
+          </div>
 
-        <div className="property-detail__sidebar">
+          {/* İletişim — ajans bilgisi (gerçek), tekil bir "satıcı" uydurulmadı. */}
+          <div className="vehicle-contact-card">
+            <h2 className="vehicle-contact-card__title">İletişim</h2>
+            <p className="vehicle-contact-card__agency">{SITE.name}</p>
+            <a href={SITE.phoneHref} className="vehicle-contact-card__btn vehicle-contact-card__btn--call">
+              <Phone className="icon-4" />
+              {SITE.phoneDisplay}
+            </a>
+            <a
+              href={buildWhatsAppLink(`Merhaba, "${vehicle.title}" (İlan No: ${vehicle.listingNo}) ile ilgileniyorum.`)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="vehicle-contact-card__btn vehicle-contact-card__btn--whatsapp"
+            >
+              <WhatsAppIcon className="icon-4" />
+              WhatsApp
+            </a>
+            <a href="#vehicle-inquiry-form" className="vehicle-contact-card__btn vehicle-contact-card__btn--message">
+              <MessageCircle className="icon-4" />
+              Mesaj Gönder
+            </a>
+          </div>
+
+          {/* İlan Bilgileri — hepsi gerçek veri (uydurma yok). */}
+          <div className="vehicle-info-card">
+            <h2 className="vehicle-contact-card__title">İlan Bilgileri</h2>
+            <InfoRow label="İlan Tarihi" value={formatDate(vehicle.createdAt)} />
+            <InfoRow label="Son Güncelleme" value={formatDate(vehicle.updatedAt)} />
+            <InfoRow label="İlan No" value={vehicle.listingNo} />
+            <InfoRow label="Kategori" value={CATEGORY_LABELS[vehicle.category] ?? vehicle.category} />
+            <InfoRow label="Durum" value={STATUS_LABELS[vehicle.status] ?? STATUS_LABELS.active} />
+            {vehicle.bodyType && <InfoRow label="Kasa Tipi" value={vehicle.bodyType} />}
+            {vehicle.enginePower && <InfoRow label="Motor Gücü" value={vehicle.enginePower} />}
+            {vehicle.engineSize && <InfoRow label="Motor Hacmi" value={vehicle.engineSize} />}
+            {vehicle.drivetrain && <InfoRow label="Çekiş" value={vehicle.drivetrain} />}
+            {vehicle.doorCount && <InfoRow label="Kapı Sayısı" value={vehicle.doorCount} />}
+            <InfoRow label="Takasa Uygun" value={vehicle.tradeIn ? "Evet" : "Hayır"} />
+            <InfoRow label="Krediye Uygun" value={vehicle.creditEligible ? "Evet" : "Hayır"} />
+          </div>
+
           <SimilarVehicles vehicle={vehicle} />
+        </div>
+
+        <div id="vehicle-inquiry-form" className="property-detail__form-wrap">
+          <VehicleInquirySection key={vehicle.id} vehicle={vehicle} />
         </div>
       </section>
     </>
@@ -250,6 +369,15 @@ function DamageStat({ label, value }) {
     <div className="vehicle-damage-summary__stat">
       <p className="vehicle-damage-summary__label">{label}</p>
       <p className="vehicle-damage-summary__value">{value}</p>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }) {
+  return (
+    <div className="vehicle-info-card__row">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }

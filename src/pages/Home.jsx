@@ -5,7 +5,7 @@ import ServiceHighlights from "../components/home/ServiceHighlights";
 import AllListingsSection from "../components/home/AllListingsSection";
 import VehicleCard from "../components/common/VehicleCard";
 import { Car } from "lucide-react";
-import { getFeaturedVideos } from "../data/properties";
+import { getFeaturedVideos, getAllProperties } from "../data/properties";
 import { usePropertiesVersion } from "../hooks/usePropertiesVersion";
 import { getSaleVehicles } from "../data/vehicles";
 import { useVehiclesVersion } from "../hooks/useVehiclesVersion";
@@ -19,14 +19,31 @@ import { useVehiclesVersion } from "../hooks/useVehiclesVersion";
  *
  * All four video rows pull from the real backend via data/properties.js.
  */
+const HOME_SECTION_MIN_ITEMS = 5;
+
+/**
+ * "Satılık Evler"/"Kiralık Evler" video ilanlarla dolduruyordu — video
+ * yoksa (ya da az sayıda video ilan varsa) satır neredeyse boş görünüyordu.
+ * Önce video'lu ilanları göster, yetmezse aynı kategorideki (Arsa hariç)
+ * video'suz ilanlarla HOME_SECTION_MIN_ITEMS'a tamamla — ana sayfa hiçbir
+ * zaman boş/seyrek görünmesin diye.
+ */
+function getHomeEvSection(category) {
+  const videos = getFeaturedVideos(category);
+  if (videos.length >= HOME_SECTION_MIN_ITEMS) return videos;
+  const videoIds = new Set(videos.map((p) => p.id));
+  const rest = getAllProperties().filter((p) => p.category === category && p.type !== "Arsa" && !videoIds.has(p.id));
+  return [...videos, ...rest].slice(0, HOME_SECTION_MIN_ITEMS);
+}
+
 export default function Home() {
   usePropertiesVersion(); // re-render once the async listings fetch resolves
   useVehiclesVersion();
-  const saleVideos = getFeaturedVideos("satilik");
-  const rentVideos = getFeaturedVideos("kiralik");
+  const saleEv = getHomeEvSection("satilik");
+  const rentEv = getHomeEvSection("kiralik");
   const saleLandVideos = getFeaturedVideos("satilik", "Arsa");
   const rentLandVideos = getFeaturedVideos("kiralik", "Arsa");
-  const saleVehicles = getSaleVehicles().slice(0, 4);
+  const saleVehicles = getSaleVehicles().slice(0, 5);
 
   return (
     <>
@@ -36,13 +53,13 @@ export default function Home() {
       <VideoShowcase
         title="Satılık Evler "
         seeAllHref="/satilik"
-        properties={saleVideos}
+        properties={saleEv}
       />
 
       <VideoShowcase
         title="Kiralık Evler"
         seeAllHref="/kiralik"
-        properties={rentVideos}
+        properties={rentEv}
       />
 
       <ServiceHighlights />
