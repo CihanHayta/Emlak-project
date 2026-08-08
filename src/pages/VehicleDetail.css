@@ -1,0 +1,205 @@
+/* VehicleDetail.jsx — property-detail.css'in üzerine, sadece araca özel ek sınıflar. */
+
+.vehicle-status-badge {
+  margin-left: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #fff;
+}
+.vehicle-status-badge--sold {
+  background-color: #dc2626;
+}
+.vehicle-status-badge--reserved {
+  background-color: #d97706;
+}
+
+.vehicle-tags {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.vehicle-tag {
+  border-radius: 9999px;
+  border: 1px solid var(--gray-100);
+  background-color: var(--gray-50);
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gray-600);
+}
+
+.vehicle-km-expertise {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 1rem;
+  border: 1px solid var(--gray-100);
+  background-color: var(--gray-50);
+  padding: 0.75rem 1rem;
+}
+
+.vehicle-km-expertise__km {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.vehicle-km-expertise__divider {
+  color: var(--gray-100);
+}
+
+.vehicle-km-expertise__report {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 700;
+  color: var(--emerald-600);
+  text-decoration: none;
+}
+.vehicle-km-expertise__report:hover {
+  text-decoration: underline;
+}
+
+.vehicle-tech-specs {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1.5rem;
+}
+
+.vehicle-tech-specs__row {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px dashed var(--gray-100);
+  padding-bottom: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.vehicle-tech-specs__label {
+  color: var(--gray-500);
+}
+
+.vehicle-tech-specs__value {
+  font-weight: 600;
+  color: var(--brand-navy);
+}
+
+/* property-detail__section-title'ı DEĞİŞTİRMİYORUZ (PropertyDetail.css'te
+   paylaşılan bir sınıf) — ikonlu başlıklar için ayrı bir sınıf. */
+.vehicle-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.vehicle-section-icon {
+  color: var(--brand-gold);
+}
+
+.vehicle-damage-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+@media (min-width: 640px) {
+  .vehicle-damage-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.vehicle-damage-summary__stat {
+  border-radius: 0.75rem;
+  border: 1px solid var(--gray-100);
+  padding: 0.625rem 0.75rem;
+}
+
+.vehicle-damage-summary__label {
+  margin: 0 0 0.125rem;
+  font-size: 0.6875rem;
+  color: var(--gray-500);
+}
+
+.vehicle-damage-summary__value {
+  margin: 0;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.vehicle-parts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.375rem;
+}
+
+.vehicle-parts-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 0.625rem;
+  background-color: var(--gray-50);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--gray-700);
+}
+
+.vehicle-part-status {
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.vehicle-part-status--ok {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: var(--emerald-600);
+}
+.vehicle-part-status--warn {
+  background-color: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.vehicle-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.vehicle-history-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  border-left: 3px solid var(--brand-gold);
+  padding: 0.375rem 0 0.375rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.vehicle-history-list__date {
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.vehicle-history-list__km {
+  color: var(--gray-500);
+}
+
+.vehicle-history-list__action {
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+.vehicle-history-list__desc {
+  width: 100%;
+  color: var(--gray-500);
+}

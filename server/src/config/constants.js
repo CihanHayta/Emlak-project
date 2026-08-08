@@ -51,5 +51,10 @@ export const RATE_LIMITS = {
 export const UPLOAD_LIMITS = {
   image: { maxSizeBytes: 10 * 1024 * 1024, mimeTypes: ["image/jpeg", "image/png", "image/webp"] },
   video: { maxSizeBytes: 200 * 1024 * 1024, mimeTypes: ["video/mp4", "video/quicktime"] },
-  document: { maxSizeBytes: 20 * 1024 * 1024, mimeTypes: ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] },
+  // Araç ekspertiz raporu/servis-tramer-garanti belgeleri gibi kullanımlar
+  // için BİLEREK sadece PDF — "sadece PDF yüklenebilsin, başka dosya türü
+  // reddedilsin" gereksinimi burada, backend seviyesinde uygulanıyor
+  // (frontend'in accept="application/pdf"'i sadece kozmetik bir yardımcı,
+  // asıl güvence burası — bkz. upload.middleware.js'in fileFilter'ı).
+  document: { maxSizeBytes: 10 * 1024 * 1024, mimeTypes: ["application/pdf"] },
 };

@@ -8,6 +8,10 @@ import {
   Tag,
   CheckCircle2,
   Send,
+  FileCheck2,
+  ShieldAlert,
+  Wrench,
+  Check,
 } from "lucide-react";
 import { getVehicleById } from "../data/vehicles";
 import { useVehiclesVersion } from "../hooks/useVehiclesVersion";
@@ -20,6 +24,9 @@ import SimilarVehicles from "../components/listings/SimilarVehicles";
 // sütunu + form + benzer-öğeler sidebar'ı) tamamen aynı, sadece hangi
 // spec'lerin gösterildiği farklı. bkz. PropertyDetail.jsx'in eşdeğeri.
 import "./PropertyDetail.css";
+import "./VehicleDetail.css";
+
+const STATUS_LABELS = { active: "Aktif", reserved: "Rezerve", sold: "Satıldı", unpublished: "Yayından Kaldırıldı" };
 
 /** "/arac/:id" — PropertyDetail.jsx ile aynı desen (galeri/form/benzer-öğeler), araç spec'lerine uyarlanmış. */
 export default function VehicleDetail() {
@@ -45,6 +52,11 @@ export default function VehicleDetail() {
     );
   }
 
+  const isUnavailable = vehicle.status === "sold" || vehicle.status === "reserved";
+  const hasDamageInfo =
+    vehicle.tramerRecord || vehicle.damageAmount > 0 || vehicle.changedPartsCount > 0 ||
+    vehicle.paintedPartsCount > 0 || vehicle.localPaintedPartsCount > 0 || vehicle.partsStatus?.length > 0;
+
   return (
     <>
       <section className="property-detail__back-section">
@@ -63,23 +75,50 @@ export default function VehicleDetail() {
               <div className="property-detail__listing-no">
                 <Tag className="icon-4" />
                 İlan No: {vehicle.listingNo}
+                {isUnavailable && (
+                  <span className={`vehicle-status-badge vehicle-status-badge--${vehicle.status}`}>
+                    {STATUS_LABELS[vehicle.status]}
+                  </span>
+                )}
               </div>
               <h1 className="property-detail__title">{vehicle.title}</h1>
               <p className="property-detail__location">
                 {vehicle.brand} {vehicle.model} · {vehicle.color}
               </p>
+              {(vehicle.negotiable || vehicle.tradeIn || vehicle.creditEligible) && (
+                <div className="vehicle-tags">
+                  {vehicle.negotiable && <span className="vehicle-tag">Pazarlık Payı Var</span>}
+                  {vehicle.tradeIn && <span className="vehicle-tag">Takas Yapılır</span>}
+                  {vehicle.creditEligible && <span className="vehicle-tag">Krediye Uygun</span>}
+                </div>
+              )}
             </div>
             <p className="property-detail__price">{vehicle.price}</p>
           </div>
 
+          {/* Kilometre + ekspertiz raporu — spec'in özellikle vurguladığı, dikkat çekici alan. */}
+          <div className="vehicle-km-expertise">
+            <span className="vehicle-km-expertise__km">
+              <Gauge className="icon-4" />
+              {Number(vehicle.km).toLocaleString("tr-TR")} km
+            </span>
+            {vehicle.expertiseReportUrl && (
+              <>
+                <span className="vehicle-km-expertise__divider">|</span>
+                <a
+                  href={vehicle.expertiseReportUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="vehicle-km-expertise__report"
+                >
+                  <FileCheck2 className="icon-4" />
+                  Ekspertiz Raporu
+                </a>
+              </>
+            )}
+          </div>
+
           <div className="property-detail__specs property-detail__specs--cols-3">
-            <div className="property-detail__spec-item">
-              <Gauge className="property-detail__spec-icon" />
-              <div className="property-detail__spec-text">
-                <p className="property-detail__spec-label">KM</p>
-                <p className="property-detail__spec-value">{Number(vehicle.km).toLocaleString("tr-TR")}</p>
-              </div>
-            </div>
             <div className="property-detail__spec-item">
               <Fuel className="property-detail__spec-icon" />
               <div className="property-detail__spec-text">
@@ -94,12 +133,93 @@ export default function VehicleDetail() {
                 <p className="property-detail__spec-value">{vehicle.transmission}</p>
               </div>
             </div>
+            {vehicle.bodyType && (
+              <div className="property-detail__spec-item">
+                <Tag className="property-detail__spec-icon" />
+                <div className="property-detail__spec-text">
+                  <p className="property-detail__spec-label">Kasa Tipi</p>
+                  <p className="property-detail__spec-value">{vehicle.bodyType}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Teknik özellikler — daha kapsamlı liste. */}
+          <div className="vehicle-tech-specs">
+            {vehicle.engineSize && <TechSpecRow label="Motor Hacmi" value={vehicle.engineSize} />}
+            {vehicle.enginePower && <TechSpecRow label="Motor Gücü" value={vehicle.enginePower} />}
+            {vehicle.drivetrain && <TechSpecRow label="Çekiş Tipi" value={vehicle.drivetrain} />}
+            {vehicle.color && <TechSpecRow label="Renk" value={vehicle.color} />}
           </div>
 
           {vehicle.description && (
             <div className="property-detail__section">
               <h2 className="property-detail__section-title">Araç Hakkında</h2>
               <p className="property-detail__description">{vehicle.description}</p>
+            </div>
+          )}
+
+          {/* Hasar / Ekspertiz bilgileri */}
+          {hasDamageInfo && (
+            <div className="property-detail__section">
+              <h2 className="property-detail__section-title vehicle-section-title">
+                <ShieldAlert className="icon-5 vehicle-section-icon" />
+                Hasar / Ekspertiz Bilgileri
+              </h2>
+              <div className="vehicle-damage-summary">
+                <DamageStat label="Tramer Kaydı" value={vehicle.tramerRecord || "Belirtilmemiş"} />
+                {vehicle.damageAmount > 0 && <DamageStat label="Hasar Tutarı" value={`${vehicle.damageAmount.toLocaleString("tr-TR")} TL`} />}
+                <DamageStat label="Değişen Parça" value={vehicle.changedPartsCount ?? 0} />
+                <DamageStat label="Boyalı Parça" value={vehicle.paintedPartsCount ?? 0} />
+                <DamageStat label="Lokal Boyalı Parça" value={vehicle.localPaintedPartsCount ?? 0} />
+              </div>
+              {vehicle.partsStatus?.length > 0 && (
+                <ul className="vehicle-parts-list">
+                  {vehicle.partsStatus.map((row, index) => (
+                    <li key={index} className="vehicle-parts-list__item">
+                      <span>{row.part}</span>
+                      <span className={`vehicle-part-status vehicle-part-status--${row.status === "Orijinal" ? "ok" : "warn"}`}>
+                        {row.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* Donanımlar */}
+          {vehicle.equipment?.length > 0 && (
+            <div className="property-detail__section">
+              <h2 className="property-detail__section-title">Donanımlar</h2>
+              <ul className="property-detail__amenities-list">
+                {vehicle.equipment.map((item) => (
+                  <li key={item} className="property-detail__amenity-item">
+                    <Check className="property-detail__amenity-icon" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Bakım / Araç Geçmişi */}
+          {vehicle.history?.length > 0 && (
+            <div className="property-detail__section">
+              <h2 className="property-detail__section-title vehicle-section-title">
+                <Wrench className="icon-5 vehicle-section-icon" />
+                Bakım / Araç Geçmişi
+              </h2>
+              <ul className="vehicle-history-list">
+                {vehicle.history.map((entry, index) => (
+                  <li key={index} className="vehicle-history-list__item">
+                    <span className="vehicle-history-list__date">{entry.date}</span>
+                    <span className="vehicle-history-list__km">{Number(entry.km || 0).toLocaleString("tr-TR")} km</span>
+                    <span className="vehicle-history-list__action">{entry.action}</span>
+                    {entry.description && <span className="vehicle-history-list__desc">{entry.description}</span>}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>
@@ -113,6 +233,24 @@ export default function VehicleDetail() {
         </div>
       </section>
     </>
+  );
+}
+
+function TechSpecRow({ label, value }) {
+  return (
+    <div className="vehicle-tech-specs__row">
+      <span className="vehicle-tech-specs__label">{label}</span>
+      <span className="vehicle-tech-specs__value">{value}</span>
+    </div>
+  );
+}
+
+function DamageStat({ label, value }) {
+  return (
+    <div className="vehicle-damage-summary__stat">
+      <p className="vehicle-damage-summary__label">{label}</p>
+      <p className="vehicle-damage-summary__value">{value}</p>
+    </div>
   );
 }
 

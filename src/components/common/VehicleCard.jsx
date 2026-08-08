@@ -6,15 +6,22 @@ import { useResolvedMediaUrl } from "../../lib/useResolvedMediaUrl";
 // alanların gösterildiği farklı. Ayrı bir CSS dosyası yazmaya değmez.
 import "./PropertyCard.css";
 
+const STATUS_LABELS = { sold: "Satıldı", reserved: "Rezerve" };
+
 /** PropertyCard.jsx ile aynı desen — bkz. o dosyanın yorumu. */
 export default function VehicleCard({ vehicle }) {
-  const { id, title, brand, model, year, km, fuelType, transmission, price, image, hasVideo, videoDuration, listingNo } = vehicle;
+  const { id, title, brand, model, year, km, fuelType, transmission, price, image, hasVideo, videoDuration, listingNo, status } = vehicle;
   const resolvedImage = useResolvedMediaUrl(image);
+  const statusLabel = STATUS_LABELS[status];
 
   return (
     <Link to={`/arac/${id}`} className="property-card">
       <div className="property-card__media">
         <img src={resolvedImage ?? ""} alt={title} loading="lazy" className="property-card__image" />
+
+        {statusLabel && (
+          <span className={`vehicle-card__status vehicle-card__status--${status}`}>{statusLabel}</span>
+        )}
 
         {hasVideo && (
           <>
