@@ -7,12 +7,14 @@ import PropertyCard from "../common/PropertyCard";
 import "./VideoShowcase.css";
 
 /**
- * A horizontally-scrolling row of property "video tour" cards, used several
- * times on the homepage (Satılık Evler, Satılık Arsalar, Kiralık İlanlar,
- * Kiralık Arsalar). Everything (title, "see all" link, the listings
- * themselves) is passed in as props so this one component drives every row.
+ * A horizontally-scrolling row of cards, used several times on the homepage
+ * (Satılık Evler, Satılık Arsalar, Kiralık İlanlar, Kiralık Arsalar — video
+ * tours — ve Satılık Araçlar). Everything (title, "see all" link, the
+ * items themselves, which card component renders each one) is passed in as
+ * props so this one component drives every row instead of each row
+ * duplicating the same Swiper carousel markup.
  */
-export default function VideoShowcase({ title, seeAllHref, properties }) {
+export default function VideoShowcase({ title, seeAllHref, properties, CardComponent = PropertyCard, icon: Icon = PlayCircle }) {
   // Unique DOM ids so multiple instances of this component on the homepage
   // don't fight over the same nav button ids. Derived from `title` (not
   // `seeAllHref`) since two rows can share the same "see all" link — e.g.
@@ -25,7 +27,7 @@ export default function VideoShowcase({ title, seeAllHref, properties }) {
     <section className="video-showcase">
       <div className="video-showcase__header">
         <h2 className="video-showcase__title">
-          <PlayCircle className="video-showcase__title-icon" />
+          <Icon className="video-showcase__title-icon" />
           {title}
         </h2>
         <Link to={seeAllHref} className="video-showcase__see-all">
@@ -47,7 +49,11 @@ export default function VideoShowcase({ title, seeAllHref, properties }) {
         >
           {properties.map((property) => (
             <SwiperSlide key={property.id} className="video-showcase__slide">
-              <PropertyCard property={property} />
+              {/* PropertyCard/VehicleCard prop adları farklı (property/vehicle) —
+                  ikisini birden geçmek, ikisini de değiştirmeden bu satırın
+                  hangi CardComponent'i aldığından bağımsız çalışmasını sağlıyor
+                  (kullanılmayan prop React'te sessizce yok sayılır). */}
+              <CardComponent property={property} vehicle={property} />
             </SwiperSlide>
           ))}
         </Swiper>
