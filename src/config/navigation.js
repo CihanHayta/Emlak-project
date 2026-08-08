@@ -8,6 +8,7 @@ export const NAV_LINKS = [
   { label: "Anasayfa", to: "/" },
   { label: "Satılık", to: "/satilik" },
   { label: "Kiralık", to: "/kiralik" },
+  { label: "Araçlar", to: "/araclar" },
   { label: "Hakkımızda", to: "/hakkimizda" },
   { label: "Hizmetlerimiz", to: "/hizmetlerimiz" },
   { label: "İletişim", to: "/iletisim" },

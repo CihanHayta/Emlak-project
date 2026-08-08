@@ -14,6 +14,7 @@ export const BASE_PERMISSIONS = {
   admin: ["*"],
   agent: [
     "properties:read", "properties:write",
+    "vehicles:read", "vehicles:write",
     "customers:read", "customers:write",
     "appointments:read", "appointments:write",
     "conversations:read", "conversations:write",
@@ -22,13 +23,14 @@ export const BASE_PERMISSIONS = {
   ],
   assistant: [
     "properties:read",
+    "vehicles:read",
     "customers:read", "customers:write",
     "appointments:read", "appointments:write",
     "conversations:read", "conversations:write",
     "leads:read", "leads:write",
     "uploads:write",
   ],
-  viewer: ["properties:read", "customers:read", "appointments:read", "leads:read"],
+  viewer: ["properties:read", "vehicles:read", "customers:read", "appointments:read", "leads:read"],
 };
 
 // Owner "Ayarlar > Yetkiler" sayfasından SADECE bu rollerin izinlerini
@@ -42,6 +44,7 @@ export const CUSTOMIZABLE_ROLES = ["agent", "assistant"];
 // owner/admin'e özel kalmalı, Yetkiler sayfasından asla açılamamalı.
 export const PERMISSION_CATALOG = [
   "properties:read", "properties:write",
+  "vehicles:read", "vehicles:write",
   "customers:read", "customers:write",
   "appointments:read", "appointments:write",
   "conversations:read", "conversations:write",

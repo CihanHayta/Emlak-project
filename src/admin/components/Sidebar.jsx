@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Building2,
+  Car,
   FileText,
   CalendarDays,
   Users,
@@ -25,6 +26,7 @@ import { toMillis } from "../../lib/firestoreTimestamp";
 const NAV_ITEMS = [
   { label: "Dashboard", to: "/admin", icon: LayoutDashboard, end: true },
   { label: "İlanlar", to: "/admin/ilanlar", icon: Building2 },
+  { label: "Araçlar", to: "/admin/araclar", icon: Car },
   { label: "Başvurular", to: "/admin/basvurular", icon: FileText, badgeKey: "newLeads" },
   { label: "Randevular", to: "/admin/randevular", icon: CalendarDays },
   { label: "Müşteriler", to: "/admin/musteriler", icon: Users, badgeKey: "newCustomers" },

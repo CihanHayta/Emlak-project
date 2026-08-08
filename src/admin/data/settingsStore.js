@@ -14,6 +14,8 @@ import { apiClient } from "../../lib/apiClient";
 export const PERMISSION_LABELS = {
   "properties:read": "İlanları Görüntüleme",
   "properties:write": "İlan Ekleme/Düzenleme",
+  "vehicles:read": "Araçları Görüntüleme",
+  "vehicles:write": "Araç Ekleme/Düzenleme",
   "customers:read": "Müşterileri Görüntüleme",
   "customers:write": "Müşteri Ekleme/Düzenleme",
   "appointments:read": "Randevuları Görüntüleme",

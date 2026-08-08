@@ -9,6 +9,8 @@ import Hizmetlerimiz from "./pages/Hizmetlerimiz";
 import Iletisim from "./pages/Iletisim";
 import Gizlilik from "./pages/Gizlilik";
 import PropertyDetail from "./pages/PropertyDetail";
+import Araclar from "./pages/Araclar";
+import VehicleDetail from "./pages/VehicleDetail";
 import FunnelPage from "./pages/FunnelPage";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +27,8 @@ const Login = lazy(() => import("./admin/pages/Login"));
 const Dashboard = lazy(() => import("./admin/pages/Dashboard"));
 const Listings = lazy(() => import("./admin/pages/Listings"));
 const ListingForm = lazy(() => import("./admin/pages/ListingForm"));
+const Vehicles = lazy(() => import("./admin/pages/Vehicles"));
+const VehicleForm = lazy(() => import("./admin/pages/VehicleForm"));
 const Appointments = lazy(() => import("./admin/pages/Appointments"));
 const Customers = lazy(() => import("./admin/pages/Customers"));
 const Basvurular = lazy(() => import("./admin/pages/Basvurular"));
@@ -61,6 +65,8 @@ export default function App() {
           <Route path="iletisim" element={<Iletisim />} />
           <Route path="gizlilik-politikasi" element={<Gizlilik />} />
           <Route path="ilan/:id" element={<PropertyDetail />} />
+          <Route path="araclar" element={<Araclar />} />
+          <Route path="arac/:id" element={<VehicleDetail />} />
         </Route>
 
         {/* Kampanya (funnel) sayfaları — BİLEREK <Layout/> DIŞINDA, genel
@@ -90,6 +96,9 @@ export default function App() {
             <Route path="ilanlar" element={<Listings />} />
             <Route path="ilanlar/yeni" element={<ListingForm />} />
             <Route path="ilanlar/:id" element={<ListingForm />} />
+            <Route path="araclar" element={<Vehicles />} />
+            <Route path="araclar/yeni" element={<VehicleForm />} />
+            <Route path="araclar/:id" element={<VehicleForm />} />
             <Route path="basvurular" element={<Basvurular />} />
             <Route path="randevular" element={<Appointments />} />
             <Route path="musteriler" element={<Customers />} />
