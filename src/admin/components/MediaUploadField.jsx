@@ -26,20 +26,27 @@ export default function MediaUploadField({ label, accept, isVideo = false, value
     const files = [...fileList];
     const kind = isVideo ? "video" : "image";
     setUploadingCount((count) => count + files.length);
-    // uploadMediaFile bir ağ isteği — büyüsün küçüsün her dosya reddedilebilir
-    // (bağlantı kesilir, sunucu kapalıdır, dosya izin verilen boyutu aşar).
-    // Önceki (IndexedDB) sürümde bu hiçbir yere yakalanmıyordu: hiçbir şey
-    // eklenmez, hiçbir hata görünmezdi — "yükleyemiyorum ama neden
-    // bilmiyorum" tam olarak bu yüzden oluyordu.
-    try {
-      const newUrls = await Promise.all(files.map((file) => uploadMediaFile(file, kind)));
-      onChange([...value, ...newUrls]);
-    } catch (error) {
-      console.error("Medya dosyası yüklenemedi:", error);
-      toast.error(error.message || "Dosya yüklenemedi. Lütfen tekrar deneyin.");
-    } finally {
-      setUploadingCount((count) => count - files.length);
-    }
+    // Promise.all DEĞİL Promise.allSettled: birden fazla dosya seçilince
+    // (asıl kullanım şekli — bkz. dosya input'undaki multiple), Promise.all
+    // paketteki TEK bir dosya reddedilince (ör. 10MB sınırını aşan bir
+    // fotoğraf) hepsini reddediyordu — o ana kadar sunucuya BAŞARIYLA
+    // yüklenmiş diğer dosyalar bile onChange'e hiç ulaşmıyor, kullanıcı
+    // "hiçbir resim yüklenmiyor" sanıyordu (canlıda 2026-08-13'te
+    // yakalandı). Her dosya bağımsız değerlendirilmeli: başarılı olanlar
+    // eklenir, başarısız olanlar hangi dosyanın neden başarısız olduğunu
+    // gösteren ayrı bir toast'la bildirilir.
+    const results = await Promise.allSettled(files.map((file) => uploadMediaFile(file, kind)));
+    const newUrls = results.filter((result) => result.status === "fulfilled").map((result) => result.value);
+    if (newUrls.length) onChange([...value, ...newUrls]);
+
+    results.forEach((result, index) => {
+      if (result.status !== "rejected") return;
+      const fileName = files[index].name;
+      console.error(`Medya dosyası yüklenemedi (${fileName}):`, result.reason);
+      toast.error(`${fileName}: ${result.reason.message || "Dosya yüklenemedi. Lütfen tekrar deneyin."}`);
+    });
+
+    setUploadingCount((count) => count - files.length);
   }
 
   function handleRemove(index) {
