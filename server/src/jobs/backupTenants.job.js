@@ -89,18 +89,34 @@ async function listAlreadyBackedUpPaths(centralBucket, tenantId) {
 }
 
 /** Saf mantık (I/O yok) — hangi dosyaların HENÜZ yedeklenmediğini bulur, bkz. testler. */
-function filesNeedingBackup(tenantFileNames, alreadyBackedUpPaths) {
+export function filesNeedingBackup(tenantFileNames, alreadyBackedUpPaths) {
   return tenantFileNames.filter((name) => !alreadyBackedUpPaths.has(name));
 }
 
-async function backupTenantStorage(tenantId, centralBucket, getTenantStorageBucket) {
+/**
+ * Bazı tenant'lar (özellikle SaaS pivotundan ÖNCEKİ tek işletme kurulumu)
+ * kendi Firebase projesi olarak MERKEZİ projeyi kullanıyor — yani
+ * `tenantBucket` ve `centralBucket` fiilen AYNI GCS bucket'ı. Bu durumda
+ * prefix'siz `tenantBucket.getFiles()` kendi ürettiğimiz `storage-backups/`
+ * ve `backups/` çıktısını da "yedeklenmesi gereken yeni dosya" sanıp onu da
+ * tekrar `storage-backups/{tenantId}/` altına kopyalıyordu — her çalıştığında
+ * kendi yedeğinin üstüne bir kat daha `storage-backups/{tenantId}/` ekleyip
+ * path'i büyütüyordu, ta ki GCS'in 1024 karakter obje adı sınırını aşıp
+ * hata verene kadar (canlıda 2026-08-12'de yakalandı). Bu iki kök klasörü
+ * kaynak listesinden dışlamak, aynı bucket paylaşılsa bile sorunu kökten
+ * çözüyor — ayrı bucket'ı olan tenant'larda bu isimler zaten hiç yok, yani
+ * filtre onlar için no-op.
+ */
+export function isBackupOutputPath(name) {
+  return name.startsWith(`${STORAGE_BACKUP_PREFIX}/`) || name.startsWith("backups/");
+}
+
+export async function backupTenantStorage(tenantId, centralBucket, getTenantStorageBucket) {
   const tenantBucket = await getTenantStorageBucket(tenantId);
   const alreadyBackedUpPaths = await listAlreadyBackedUpPaths(centralBucket, tenantId);
   const [tenantFiles] = await tenantBucket.getFiles();
-  const toBackup = filesNeedingBackup(
-    tenantFiles.map((file) => file.name),
-    alreadyBackedUpPaths,
-  );
+  const tenantFileNames = tenantFiles.map((file) => file.name).filter((name) => !isBackupOutputPath(name));
+  const toBackup = filesNeedingBackup(tenantFileNames, alreadyBackedUpPaths);
 
   let copiedBytes = 0;
   for (const fileName of toBackup) {
