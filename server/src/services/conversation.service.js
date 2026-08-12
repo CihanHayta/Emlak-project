@@ -1,8 +1,11 @@
 // server/src/services/conversation.service.js
+import { randomUUID } from "node:crypto";
 import { conversationRepository } from "../repositories/conversation.repository.js";
 import { createDefaultConversation } from "../models/conversation.model.js";
 import { withUpdateFields } from "../models/base.model.js";
+import { getStorageClient } from "../firebase/storage.client.js";
 import { ApiError } from "../utils/ApiError.js";
+import { logger } from "../config/logger.js";
 
 export async function listConversations(context) {
   return conversationRepository.findAll(context);
@@ -12,6 +15,36 @@ export async function getConversation(context, id) {
   const conversation = await conversationRepository.findById(context, id);
   if (!conversation) throw ApiError.notFound("Sohbet bulunamadı.");
   return conversation;
+}
+
+/**
+ * Instagram/WhatsApp'ın kendi CDN'indeki profil resmi URL'leri (ör.
+ * `profile_pic`) genelde KISA ÖMÜRLÜ ve/veya tarayıcıdan doğrudan
+ * `<img>` ile hotlink edilmeye karşı korumalı — bu yüzden panelde
+ * "Instagram resimleri görünmüyor" sorununa yol açıyordu (canlıda
+ * doğrulandı, 2026-08-09). Çözüm property/vehicle fotoğraflarındaki AYNI
+ * desen: sunucu tarafında bir kere indirip KENDİ Storage'ımıza (tenant'a
+ * özel, süresiz) kaydediyoruz, `participantAvatarUrl` olarak o zaman
+ * kendi URL'imizi tutuyoruz. İndirme/yükleme başarısız olursa (ör. URL
+ * zaten dolmuş) sessizce null'a düşer — sohbet avatarsız açılır, akış
+ * durmaz.
+ */
+async function mirrorAvatarToOwnStorage(tenantId, avatarUrl) {
+  if (!avatarUrl) return null;
+  try {
+    const response = await fetch(avatarUrl);
+    if (!response.ok) return null;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const extension = contentType.includes("png") ? "png" : "jpg";
+    const storagePath = `tenants/${tenantId}/avatars/${randomUUID()}.${extension}`;
+    const storage = await getStorageClient(tenantId);
+    const result = await storage.upload(buffer, storagePath, { contentType });
+    return result.url;
+  } catch (error) {
+    logger.warn(`Profil resmi indirilemedi/kaydedilemedi (tenant=${tenantId}): ${error.message}`);
+    return null;
+  }
 }
 
 /**
@@ -28,6 +61,7 @@ export async function findOrCreateConversation(context, { channel, externalUserI
   if (existing) return existing;
 
   const profile = fetchProfile ? await fetchProfile() : null;
+  const avatarUrl = await mirrorAvatarToOwnStorage(context.tenantId, profile?.profile_pic);
   return conversationRepository.create(
     context,
     createDefaultConversation({
@@ -35,7 +69,7 @@ export async function findOrCreateConversation(context, { channel, externalUserI
       externalUserId,
       participantName: profile?.name ?? null,
       participantUsername: profile?.username ?? null,
-      participantAvatarUrl: profile?.profile_pic ?? null,
+      participantAvatarUrl: avatarUrl,
     }),
   );
 }
