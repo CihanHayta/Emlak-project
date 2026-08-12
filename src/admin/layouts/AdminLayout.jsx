@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
@@ -45,6 +45,25 @@ export default function AdminLayout() {
   useUpcomingAppointmentReminders();
   useIncomingLeadAlerts();
   useIncomingMessageAlerts();
+
+  // `h-dvh` + `min-h-0` kutuyu ekran yüksekliğine sabitliyor ama html/body'nin
+  // KENDİSİ hâlâ kayabiliyordu (hiçbir yerde `overflow: hidden` yoktu) — bu
+  // yüzden trackpad/mouse scroll'u `main`in kendi `overflow-y-auto`'sunda
+  // durmayıp DIŞARI, belgeye taşabiliyor, bu da sidebar dahil TÜM flex
+  // düzenini yukarı kaydırıyordu (canlıda 2026-08-13'te, min-h-0 + h-dvh
+  // fix'lerinden SONRA da devam ettiği bildirildi). Admin panelindeyken
+  // body'yi tamamen kilitlemek, kaydırmanın SADECE tasarlanan iç
+  // container'larda (main, sidebar nav) kalmasını garantiliyor — dışarı asla
+  // taşamıyor. Sadece admin route'larında (public site sayfaları normal
+  // belge kaydırmasına ihtiyaç duyuyor) — bu yüzden global CSS'e değil,
+  // burada mount/unmount'a bağlı.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
