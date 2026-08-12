@@ -49,11 +49,20 @@ export default function AdminLayout() {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <TooltipProvider>
-        <div className="flex h-screen bg-background">
+        <div className="flex h-screen min-h-0 bg-background">
           <Sidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
+          {/* `min-h-0` BURADA ŞART — flex öğelerinin varsayılan `min-height:
+              auto` davranışı, uzun bir sayfa (ör. çok alanlı bir ilan formu)
+              içeriğine göre bu kutuyu 100vh'nin ÜZERİNE büyütüyordu; bu da
+              tüm SAYFAYI (sidebar dahil) kaydırılabilir yapıp, sidebar'ın
+              gerçek (h-screen) sınırının altında boş/beyaz bir alan
+              görünmesine sebep oluyordu — sadece `main` kaymalıydı, sidebar
+              hep sabit kalmalıydı. `min-h-0`, bu kutuyu ebeveyninin (100vh)
+              sınırına gerçekten uymaya zorluyor, böylece `main`in kendi
+              `overflow-y-auto`'su devreye giriyor, dış sayfa hiç kaymıyor. */}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <Topbar title={title} subtitle={subtitle} onOpenSearch={() => setSearchOpen(true)} />
-            <main className="flex-1 overflow-y-auto p-6">
+            <main className="min-h-0 flex-1 overflow-y-auto p-6">
               <Outlet />
             </main>
           </div>
