@@ -11,14 +11,17 @@ import {
   FileCheck2,
   Check,
   Phone,
-  MessageCircle,
 } from "lucide-react";
 import { getVehicleById } from "../data/vehicles";
 import { useVehiclesVersion } from "../hooks/useVehiclesVersion";
 import { useInquiryForm } from "../hooks/useInquiryForm";
 import { WhatsAppIcon } from "../components/common/BrandIcons";
 import { SITE, buildWhatsAppLink } from "../config/siteConfig";
-import VehicleGallery from "../components/listings/VehicleGallery";
+// Kaydırmalı (swipeable) galeri istendi — VehicleGallery.jsx'in statik
+// grid'i yerine PropertyGallery.jsx (Swiper) yeniden kullanılıyor: aynı
+// alan adlarını (images/image/videoUrl/hasVideo/title/id) bekliyor,
+// vehicle nesnesi zaten bunları taşıyor, sıfırdan yazmaya gerek yok.
+import PropertyGallery from "../components/listings/PropertyGallery";
 import CarDamageDiagram from "../components/listings/CarDamageDiagram";
 import SimilarVehicles from "../components/listings/SimilarVehicles";
 // property-detail.css'i BİLEREK aynen kullanıyoruz — form/benzer-öğeler
@@ -29,11 +32,13 @@ import "./VehicleDetail.css";
 
 const STATUS_LABELS = { active: "Aktif İlan", reserved: "Rezerve", sold: "Satıldı", unpublished: "Yayından Kaldırıldı" };
 const CATEGORY_LABELS = { satilik: "Satılık", kiralik: "Kiralık" };
+// "Fiyat & İlan Bilgileri" artık sekme değil — fiyat/durum/pazarlık gibi
+// bilgiler sayfanın en başına (başlığın hemen altına) taşındı, ilan
+// tarihi/no gibi geri kalanlar zaten sağdaki "İlan Bilgileri" kartında.
 const TABS = [
   { id: "ozellikler", label: "Araç Özellikleri" },
   { id: "ekspertiz", label: "Ekspertiz Raporu" },
   { id: "boya", label: "Boya & Değişen" },
-  { id: "ilan", label: "Fiyat & İlan Bilgileri" },
   { id: "aciklama", label: "Açıklama" },
 ];
 
@@ -91,12 +96,9 @@ export default function VehicleDetail() {
               <Tag className="icon-4" />
               İlan No: {vehicle.listingNo}
             </span>
-            <span className={`vehicle-status-badge vehicle-status-badge--${vehicle.status}`}>
-              {STATUS_LABELS[vehicle.status] ?? STATUS_LABELS.active}
-            </span>
           </div>
 
-          <VehicleGallery vehicle={vehicle} />
+          <PropertyGallery property={vehicle} />
 
           <div className="property-detail__header">
             <div>
@@ -105,6 +107,18 @@ export default function VehicleDetail() {
                 {vehicle.brand} {vehicle.model} · {vehicle.color}
               </p>
             </div>
+            <p className="property-detail__price">{vehicle.price}</p>
+          </div>
+
+          {/* Fiyat & İlan bilgileri — EN BAŞTA (eskiden 4. sekmede gizliydi). */}
+          <div className="vehicle-listing-summary">
+            <span className={`vehicle-status-badge vehicle-status-badge--${vehicle.status}`}>
+              {STATUS_LABELS[vehicle.status] ?? STATUS_LABELS.active}
+            </span>
+            <span className="vehicle-listing-summary__category">{CATEGORY_LABELS[vehicle.category] ?? vehicle.category}</span>
+            {vehicle.negotiable && <span className="vehicle-tag">Pazarlık Payı Var</span>}
+            {vehicle.tradeIn && <span className="vehicle-tag">Takas Yapılır</span>}
+            {vehicle.creditEligible && <span className="vehicle-tag">Krediye Uygun</span>}
           </div>
 
           {/* Kilometre + ekspertiz raporu — spec'in özellikle vurguladığı, dikkat çekici alan. */}
@@ -262,20 +276,6 @@ export default function VehicleDetail() {
                 </div>
               )}
 
-              {activeTab === "ilan" && (
-                <div className="vehicle-tech-specs">
-                  <TechSpecRow label="Fiyat" value={vehicle.price} />
-                  <TechSpecRow label="Kategori" value={CATEGORY_LABELS[vehicle.category] ?? vehicle.category} />
-                  <TechSpecRow label="Durum" value={STATUS_LABELS[vehicle.status] ?? STATUS_LABELS.active} />
-                  <TechSpecRow label="Pazarlık Payı" value={vehicle.negotiable ? "Var" : "Yok"} />
-                  <TechSpecRow label="Takas" value={vehicle.tradeIn ? "Yapılır" : "Yapılmaz"} />
-                  <TechSpecRow label="Krediye Uygunluk" value={vehicle.creditEligible ? "Uygun" : "Uygun Değil"} />
-                  <TechSpecRow label="İlan Tarihi" value={formatDate(vehicle.createdAt)} />
-                  <TechSpecRow label="Son Güncelleme" value={formatDate(vehicle.updatedAt)} />
-                  <TechSpecRow label="İlan No" value={vehicle.listingNo} />
-                </div>
-              )}
-
               {activeTab === "aciklama" && (
                 <div className="vehicle-tabs__panel-content">
                   {vehicle.description ? (
@@ -320,10 +320,6 @@ export default function VehicleDetail() {
             >
               <WhatsAppIcon className="icon-4" />
               WhatsApp
-            </a>
-            <a href="#vehicle-inquiry-form" className="vehicle-contact-card__btn vehicle-contact-card__btn--message">
-              <MessageCircle className="icon-4" />
-              Mesaj Gönder
             </a>
           </div>
 
