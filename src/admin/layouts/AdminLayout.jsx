@@ -49,17 +49,24 @@ export default function AdminLayout() {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <TooltipProvider>
-        <div className="flex h-screen min-h-0 bg-background">
+        <div className="flex h-dvh min-h-0 bg-background">
           <Sidebar />
           {/* `min-h-0` BURADA ŞART — flex öğelerinin varsayılan `min-height:
               auto` davranışı, uzun bir sayfa (ör. çok alanlı bir ilan formu)
-              içeriğine göre bu kutuyu 100vh'nin ÜZERİNE büyütüyordu; bu da
-              tüm SAYFAYI (sidebar dahil) kaydırılabilir yapıp, sidebar'ın
-              gerçek (h-screen) sınırının altında boş/beyaz bir alan
+              içeriğine göre bu kutuyu ekran yüksekliğinin ÜZERİNE
+              büyütüyordu; bu da tüm SAYFAYI (sidebar dahil) kaydırılabilir
+              yapıp, sidebar'ın gerçek sınırının altında boş/beyaz bir alan
               görünmesine sebep oluyordu — sadece `main` kaymalıydı, sidebar
-              hep sabit kalmalıydı. `min-h-0`, bu kutuyu ebeveyninin (100vh)
+              hep sabit kalmalıydı. `min-h-0`, bu kutuyu ebeveyninin
               sınırına gerçekten uymaya zorluyor, böylece `main`in kendi
-              `overflow-y-auto`'su devreye giriyor, dış sayfa hiç kaymıyor. */}
+              `overflow-y-auto`'su devreye giriyor, dış sayfa hiç kaymıyor.
+              `h-dvh` (100vh DEĞİL) — mobil Safari'de `100vh` adres çubuğu
+              gizliyken en büyük olası görünür alanı esas alıyor; adres
+              çubuğu görünürken gerçek alan daha küçük oluyor ve h-screen'in
+              alt kısmı ekranın dışına taşıp aynı "kaydırınca boşluk çıkıyor"
+              belirtisini tek başına da üretebiliyordu (canlıda 2026-08-13'te
+              yakalandı — min-h-0 fix'i yeterli gelmemişti). `dvh` (dynamic
+              viewport height) tarayıcı UI'ı açılıp kapandıkça güncelleniyor. */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <Topbar title={title} subtitle={subtitle} onOpenSearch={() => setSearchOpen(true)} />
             <main className="min-h-0 flex-1 overflow-y-auto p-6">
