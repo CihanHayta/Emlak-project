@@ -138,6 +138,7 @@ export default function CustomerSheet({ open, onOpenChange, customer, prefill, o
 
 function CustomerSheetForm({ customer, prefill, onOpenChange, onSaved, onCreatedWantsAppointment }) {
   const [form, setForm] = useState(() => buildInitialForm(customer, prefill));
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [scheduleAppointment, setScheduleAppointment] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [showListingPicker, setShowListingPicker] = useState(false);
@@ -181,12 +182,18 @@ function CustomerSheetForm({ customer, prefill, onOpenChange, onSaved, onCreated
 
   async function handleSubmit(event) {
     event.preventDefault();
+    // isSubmitting koruması burada ŞART — yoksa yavaş bağlantıda veya
+    // sabırsız çift tıklamada aynı bilgilerle İKİ AYRI müşteri kaydı
+    // oluşabiliyordu (canlıda 2026-08-13'te kanıtlandı). İlan/Araç/Login/
+    // Ayarlar/Funnel formlarının hepsinde zaten var olan AYNI desen.
+    if (isSubmitting) return;
     const payload = {
       ...form,
       budgetMin: form.budgetMin === "" ? 0 : Number(form.budgetMin),
       budgetMax: form.budgetMax === "" ? 0 : Number(form.budgetMax),
     };
 
+    setIsSubmitting(true);
     try {
       let savedCustomer;
       if (isEditing) {
@@ -203,6 +210,8 @@ function CustomerSheetForm({ customer, prefill, onOpenChange, onSaved, onCreated
       onOpenChange(false);
     } catch (error) {
       toast.error(error.message || "Müşteri kartı kaydedilemedi.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -591,8 +600,8 @@ function CustomerSheetForm({ customer, prefill, onOpenChange, onSaved, onCreated
               <Trash2 className="h-4 w-4" />
             </Button>
           )}
-          <Button type="submit" className="flex-1 bg-brand-gold text-white hover:bg-brand-gold-dark">
-            {isEditing ? "Kaydet" : "Oluştur"}
+          <Button type="submit" disabled={isSubmitting} className="flex-1 bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60">
+            {isSubmitting ? "Kaydediliyor…" : isEditing ? "Kaydet" : "Oluştur"}
           </Button>
         </SheetFooter>
       </form>
