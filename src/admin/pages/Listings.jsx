@@ -133,7 +133,12 @@ export default function Listings() {
                       )}
                     </button>
                     <div className="min-w-0">
-                      <p className="truncate font-medium">{listing.title}</p>
+                      <p className="flex items-center gap-1.5 truncate font-medium">
+                        {listing.title}
+                        {listing.status === "unpublished" && (
+                          <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">Taslak</span>
+                        )}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         #{listing.listingNo} ·{" "}
                         <span className={cn(listing.category === "satilik" ? "text-brand-gold-dark" : "text-emerald-600")}>

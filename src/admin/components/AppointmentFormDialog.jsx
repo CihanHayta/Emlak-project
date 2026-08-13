@@ -82,6 +82,7 @@ export default function AppointmentFormDialog({
   const [selectedSlot, setSelectedSlot] = useState(closestSlot(initialTimestamp));
   const [status, setStatus] = useState(appointment?.status ?? "Beklemede");
   const [note, setNote] = useState(appointment?.note ?? "");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const appointments = getAppointments();
   const daySlots = getDaySlots();
@@ -98,6 +99,10 @@ export default function AppointmentFormDialog({
       toast.error("Lütfen bir saat seçin.");
       return;
     }
+    // CustomerSheet.jsx'teki AYNI isSubmitting deseni — koruma yoksa
+    // yavaş bağlantıda/çift tıklamada aynı randevu için iki istek
+    // gidebiliyordu (2026-08-13'te QA'da bulundu).
+    if (isSubmitting) return;
     const payload = {
       customerId,
       serviceType,
@@ -107,6 +112,7 @@ export default function AppointmentFormDialog({
       note,
     };
 
+    setIsSubmitting(true);
     try {
       if (isEditing) {
         await updateAppointment(appointment.id, payload);
@@ -120,6 +126,8 @@ export default function AppointmentFormDialog({
       onOpenChange(false);
     } catch (error) {
       toast.error(error.message || "Randevu kaydedilemedi.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -240,8 +248,8 @@ export default function AppointmentFormDialog({
           </div>
 
           <DialogFooter>
-            <Button type="submit" disabled={!selectedSlot} className="w-full bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60">
-              {isEditing ? "Kaydet" : "Randevu Oluştur"}
+            <Button type="submit" disabled={!selectedSlot || isSubmitting} className="w-full bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60">
+              {isSubmitting ? "Kaydediliyor…" : isEditing ? "Kaydet" : "Randevu Oluştur"}
             </Button>
           </DialogFooter>
         </form>

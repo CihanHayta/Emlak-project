@@ -55,6 +55,12 @@ function buildInitialForm(listing) {
       photoRefs: [],
       videoRefs: [],
       showLocation: true,
+      // Yeni bir ilan varsayılan olarak TASLAK (unpublished) açılır — admin
+      // fotoğraf/açıklama eklerken yarım bir ilan herkese açık kalmasın
+      // diye (2026-08-13'te QA'da bulunan gap: "Kaydet"e basar basmaz
+      // eksik ilan bile anında canlıya çıkıyordu). Danışman hazır olunca
+      // aşağıdaki "Yayında" anahtarını açıp kaydeder.
+      status: "unpublished",
     };
   }
   return {
@@ -81,6 +87,10 @@ function buildInitialForm(listing) {
     photoRefs: listing.images?.length ? listing.images : listing.image ? [listing.image] : [],
     videoRefs: listing.videoUrl ? [listing.videoUrl] : [],
     showLocation: listing.showLocation ?? true,
+    // Eski (bu alan hiç yazılmadan oluşturulmuş) ilanlar "published"
+    // sayılır — backend'deki varsayılanla (property.model.js) aynı,
+    // geriye dönük hiçbir ilanı yanlışlıkla gizlemez.
+    status: listing.status ?? "published",
   };
 }
 
@@ -155,6 +165,7 @@ export default function ListingForm() {
       hasVideo: form.videoRefs.length > 0,
       videoUrl: form.videoRefs[0],
       showLocation: form.showLocation,
+      status: form.status,
       ...(isArsa
         ? { area: Number(form.area) || 0, zoningStatus: form.zoningStatus, rooms: undefined, floor: undefined }
         : { area: Number(form.area) || 0, rooms: form.rooms, floor: form.floor, zoningStatus: undefined }),
@@ -168,7 +179,7 @@ export default function ListingForm() {
         navigate("/admin/ilanlar");
       } else {
         const newListing = await addListing(payload);
-        toast.success("İlan yayınlandı.");
+        toast.success(form.status === "published" ? "İlan yayınlandı." : "İlan taslak olarak kaydedildi — hazır olunca “Yayında” anahtarını açmayı unutmayın.");
         // Only for brand-new listings: immediately show which existing
         // customers might want it, with a one-click WhatsApp message each.
         const matches = findMatchingCustomers(newListing, getCustomers());
@@ -183,6 +194,23 @@ export default function ListingForm() {
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-3xl space-y-6 pb-10">
+      {/* Yayın durumu — kapalıyken ilan sadece admin panelinde görünür, public
+          sitede (Satılık/Kiralık, ilan detay) hiç görünmez. Yeni bir ilan
+          BİLEREK kapalı açılır (bkz. buildInitialForm) — fotoğraf/açıklama
+          eklenirken yarım bir ilan herkese açık kalmasın diye. */}
+      <section className="flex items-center justify-between rounded-2xl border border-border p-5">
+        <div>
+          <h3 className="font-semibold">Yayın Durumu</h3>
+          <p className="text-sm text-muted-foreground">
+            {form.status === "published" ? "Bu ilan public sitede görünüyor." : "Bu ilan taslak — sadece siz görebiliyorsunuz."}
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <Switch checked={form.status === "published"} onCheckedChange={(v) => set("status", v ? "published" : "unpublished")} />
+          Yayında
+        </label>
+      </section>
+
       {/* Type + category */}
       <section className="grid grid-cols-1 gap-4 rounded-2xl border border-border p-5 sm:grid-cols-3">
         <div className="space-y-1.5">

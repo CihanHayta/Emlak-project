@@ -16,6 +16,7 @@ const ROLE_TABS = [
   { value: "owner", label: "Admin" },
   { value: "agent", label: "Danışman" },
   { value: "assistant", label: "Personel" },
+  { value: "viewer", label: "Kısıtlı" },
 ];
 
 /**

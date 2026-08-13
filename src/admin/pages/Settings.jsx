@@ -48,6 +48,7 @@ const ROLE_BADGE = {
   owner: "bg-brand-navy text-white",
   assistant: "bg-blue-100 text-blue-700",
   agent: "bg-emerald-100 text-emerald-700",
+  viewer: "bg-zinc-100 text-zinc-700",
 };
 
 /**

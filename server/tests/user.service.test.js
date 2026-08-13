@@ -56,6 +56,12 @@ describe("user.service — rol ataması ve doğrulama", () => {
     expect(created.role).toBe("assistant");
     expect(fakeAuth.setCustomUserClaims).toHaveBeenCalledWith(expect.any(String), { tenantId: "test-tenant", role: "assistant" });
   });
+
+  it('"viewer" (Kısıtlı) rolüyle hesap oluşturulabilir (2026-08-13 fix — önceden reddediliyordu)', async () => {
+    const created = await createTeamMember(context, { email: "kisitli@test.com", password: "123456", role: "viewer" });
+    expect(created.role).toBe("viewer");
+    expect(fakeAuth.setCustomUserClaims).toHaveBeenCalledWith(expect.any(String), { tenantId: "test-tenant", role: "viewer" });
+  });
 });
 
 describe("user.service — createTeamMember rollback güvenliği", () => {

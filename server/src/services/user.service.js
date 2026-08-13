@@ -10,13 +10,16 @@ import { createDefaultUser } from "../models/user.model.js";
 import { withUpdateFields } from "../models/base.model.js";
 import { ApiError } from "../utils/ApiError.js";
 
-// Admin bu uç noktadan sadece bu iki rolü oluşturabilir/atayabilir —
-// "owner" sadece scripts/bootstrap-owner.js ile, ofis başına bir kez var olur.
-const ASSIGNABLE_ROLES = new Set(["agent", "assistant"]);
+// Admin bu uç noktadan sadece bu üç rolü oluşturabilir/atayabilir —
+// "owner" sadece scripts/bootstrap-owner.js ile, ofis başına bir kez var
+// olur. "viewer" (Kısıtlı — permissions.js'de hep tanımlıydı, sadece okuma
+// izni) 2026-08-13'e kadar burada eksikti; ürün "salt-okunur personel"
+// rolü olarak satılıyorsa atanabilir olması gerekiyordu.
+const ASSIGNABLE_ROLES = new Set(["agent", "assistant", "viewer"]);
 
 function assertAssignableRole(role) {
   if (!ASSIGNABLE_ROLES.has(role)) {
-    throw ApiError.validation('Rol "agent" (Danışman) veya "assistant" (Personel) olmalı.');
+    throw ApiError.validation('Rol "agent" (Danışman), "assistant" (Personel) veya "viewer" (Kısıtlı) olmalı.');
   }
 }
 

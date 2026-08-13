@@ -33,6 +33,7 @@ export function createDefaultProperty({
   description = "",
   amenities = [],
   showLocation = true,
+  status = "published", // "published" | "unpublished" — vehicle.model.js ile aynı desen
 }) {
   return withCreateFields({
     category, // "satilik" | "kiralik"
@@ -56,5 +57,6 @@ export function createDefaultProperty({
     description,
     amenities,
     showLocation,
+    status,
   });
 }

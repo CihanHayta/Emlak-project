@@ -1,6 +1,7 @@
 // server/tests/property.service.test.js
 import { jest } from "@jest/globals";
-import { createProperty, getProperty, deleteProperty, listProperties } from "../src/services/property.service.js";
+import { createProperty, getProperty, deleteProperty, listProperties, updateProperty } from "../src/services/property.service.js";
+import { propertyRepository } from "../src/repositories/property.repository.js";
 import { resetMockFirestore } from "../src/firebase/mock/firestore.mock.js";
 import { mockStorage } from "../src/firebase/mock/storage.mock.js";
 
@@ -90,5 +91,54 @@ describe("property.service", () => {
     await deleteProperty(context, property.id);
 
     expect(deleteFileSpy).toHaveBeenCalledWith("tenants/test-tenant/properties/video.mp4");
+  });
+});
+
+describe("property.service — taslak/yayın (status) görünürlüğü (2026-08-13 fix)", () => {
+  const publicContext = { tenantId: "test-tenant", userId: null, role: "public" };
+
+  beforeEach(() => resetMockFirestore());
+
+  it("status belirtilmezse varsayılan olarak 'published' — public'te görünür", async () => {
+    const property = await createProperty(context, baseProperty({}));
+    expect(property.status).toBe("published");
+    const publicList = await listProperties(publicContext);
+    expect(publicList.some((p) => p.id === property.id)).toBe(true);
+  });
+
+  it("status='unpublished' iken public listede GÖRÜNMEZ", async () => {
+    const property = await createProperty(context, baseProperty({ status: "unpublished" }));
+    const publicList = await listProperties(publicContext);
+    expect(publicList.some((p) => p.id === property.id)).toBe(false);
+  });
+
+  it("status='unpublished' iken admin listesinde HÂLÂ görünür (kendi ilanını görebilmeli)", async () => {
+    const property = await createProperty(context, baseProperty({ status: "unpublished" }));
+    const adminList = await listProperties(context);
+    expect(adminList.some((p) => p.id === property.id)).toBe(true);
+  });
+
+  it("status='unpublished' iken public GET /properties/:id 'bulunamadı' fırlatır", async () => {
+    const property = await createProperty(context, baseProperty({ status: "unpublished" }));
+    await expect(getProperty(publicContext, property.id)).rejects.toThrow(/bulunamadı/);
+  });
+
+  it("published olarak güncellenince public'te tekrar görünür", async () => {
+    const property = await createProperty(context, baseProperty({ status: "unpublished" }));
+    await updateProperty(context, property.id, { status: "published" });
+    const publicList = await listProperties(publicContext);
+    expect(publicList.some((p) => p.id === property.id)).toBe(true);
+  });
+
+  it("eski (status alanı hiç olmayan) bir ilan public'te görünmeye devam eder (geriye dönük uyum)", async () => {
+    // createProperty/createDefaultProperty'yi BİLEREK atlayıp doğrudan
+    // repository'ye yazıyoruz — bu migration'dan ÖNCEKİ gerçek seed
+    // kayıtlarını (status alanı hiç yok) birebir simüle eder. `deletedAt:
+    // null` elle eklenmeli — withCreateFields'i atladığımız için
+    // repository'nin `deletedAt == null` sorgusu bu alan hiç yoksa kaydı
+    // hiçbir listede göstermez (base.model.js'in kendi yorumunda da yazıyor).
+    const legacy = await propertyRepository.create(context, { ...baseProperty({}), deletedAt: null });
+    const publicList = await listProperties(publicContext);
+    expect(publicList.some((p) => p.id === legacy.id)).toBe(true);
   });
 });

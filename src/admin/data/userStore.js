@@ -8,9 +8,12 @@ import { apiClient } from "../../lib/apiClient";
 
 // Backend rol string'i <-> Ayarlar sayfasında gösterilen Türkçe etiket.
 // Login.jsx'teki ROLE_TABS ile aynı eşleme.
-export const ROLE_LABELS = { owner: "Admin", agent: "Danışman", assistant: "Personel" };
-// Bu ekrandan sadece bu iki rol oluşturulabilir/atanabilir (owner tektir, bkz. server/src/services/user.service.js).
-export const ASSIGNABLE_ROLES = ["agent", "assistant"];
+export const ROLE_LABELS = { owner: "Admin", agent: "Danışman", assistant: "Personel", viewer: "Kısıtlı" };
+// "viewer" (Kısıtlı — her şeyi sadece okur, hiçbir yazma izni yok) izin
+// motorunda hep tanımlıydı ama bu ekrandan hiç atanamıyordu (2026-08-13'e
+// kadar) — server/src/services/user.service.js#ASSIGNABLE_ROLES ile
+// birlikte güncellendi.
+export const ASSIGNABLE_ROLES = ["agent", "assistant", "viewer"];
 
 let cache = [];
 let loadPromise = null;

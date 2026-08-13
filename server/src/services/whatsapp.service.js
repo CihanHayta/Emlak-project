@@ -13,6 +13,14 @@ import { ApiError } from "../utils/ApiError.js";
 
 const GRAPH_BASE = `https://graph.facebook.com/${env.metaGraphApiVersion}`;
 
+// Giden mesaj isteklerinde önceden HİÇ timeout yoktu — Meta API'si yanıt
+// vermezse (nadir ama olası: bakım, ağ sorunu) istek native fetch'in kendi
+// varsayılanına (dakikalarca) kalıyor, admin panelinde "Gönderiliyor…"
+// süresiz asılı kalıyordu (2026-08-13'te QA'da bulundu). 15sn, Meta'nın
+// normal yanıt süresinin (genelde <1sn) kat kat üzerinde — bunun üstü
+// gerçekten bir upstream sorunu demek.
+const SEND_TIMEOUT_MS = 15000;
+
 /** `GET /webhooks/whatsapp` doğrulama el sıkışması — bkz. instagram.service.js#verifyWebhookChallenge, aynı desen. */
 export function verifyWebhookChallenge(query) {
   if (query["hub.mode"] === "subscribe" && query["hub.verify_token"] === env.whatsapp.verifyToken) {
@@ -42,16 +50,29 @@ export async function sendWhatsappMessage(phoneNumberId, to, text, accessToken) 
     throw ApiError.upstream("Bu ofis için WhatsApp hattı bağlı değil.");
   }
   const url = `${GRAPH_BASE}/${phoneNumberId}/messages`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to,
-      type: "text",
-      text: { body: text },
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: text },
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw ApiError.upstream("WhatsApp mesajı gönderilemedi — sunucu zamanında yanıt vermedi. Lütfen tekrar deneyin.");
+    }
+    throw ApiError.upstream("WhatsApp mesajı gönderilemedi — bağlantı hatası. Lütfen tekrar deneyin.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     throw ApiError.upstream(body?.error?.message || "WhatsApp mesajı gönderilemedi.");
