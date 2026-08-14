@@ -2,6 +2,35 @@
 import { withCreateFields } from "./base.model.js";
 
 /**
+ * Otomasyonlar sayfası — bkz. services/automation.service.js.
+ * listingMatch/appointmentReminder proaktif (işletme-başlatan) mesajlar
+ * olduğu için Meta'nın onayladığı bir WhatsApp Template'i gerektirir —
+ * templateStatus onaylanana kadar (ve reddedilirse) sistem mesajı hazırlar
+ * ama GÖNDERMEZ, admin panelinde "tek tıkla gönder" (wa.me linki) olarak
+ * düşer — asla onaysız otomatik gönderim denenmez (Meta hesabın askıya
+ * alınması riski). offHoursReply REAKTİF (müşterinin kendi mesajına
+ * cevap, 24 saatlik pencere zaten açık) olduğu için hiç template
+ * gerekmez, açılır açılmaz aktif olur.
+ *
+ * EXPORT EDİLDİ ve `tenant.service.js#getTenantAutomations`'ta da
+ * fallback olarak kullanılıyor — bu alan BUGÜN (2026-08-14) eklendi, ondan
+ * ÖNCE oluşturulmuş tenant dokümanlarında (ör. gerçek "Şahin Emlak"
+ * tenant'ı) `automations` alanı hiç yok. Sadece burada, `createDefaultTenant`
+ * içinde tanımlansaydı, mevcut tenant'lar için `tenant.automations` hep
+ * `undefined` kalır, Otomasyonlar sayfası boş/kırık bir yanıt alırdı
+ * (canlıda 2026-08-14'te yakalandı).
+ */
+export const DEFAULT_AUTOMATIONS = {
+  listingMatch: { enabled: false, templateStatus: "not_submitted", templateName: null, templateMetaId: null },
+  appointmentReminder: { enabled: false, hoursBefore: 2, templateStatus: "not_submitted", templateName: null, templateMetaId: null },
+  offHoursReply: {
+    enabled: false,
+    businessHours: { startHour: 9, endHour: 18, days: [1, 2, 3, 4, 5] }, // days: 0=Pazar...6=Cumartesi
+    replyText: "Merhaba! Mesajınız için teşekkürler, çalışma saatlerimizde size dönüş yapacağız.",
+  },
+};
+
+/**
  * `tenants` — istisna koleksiyon: kendi kendine bir `tenantId` alanı YOK
  * (dokümanın kendi `id`'si zaten tenant kimliğidir). Diğer tüm ortak alanlar
  * (createdAt/updatedAt/deletedAt/createdBy/updatedBy) yine geçerli.
@@ -42,23 +71,6 @@ export function createDefaultTenant({ name, slug, ownerUserId, phone = null, tax
     // Boşsa (null) her rol için BASE_PERMISSIONS'taki varsayılan kullanılır.
     // Şekli: { agent: ["properties:read", ...], assistant: [...] }
     rolePermissions: null,
-    // Otomasyonlar sayfası — bkz. services/automation.service.js.
-    // listingMatch/appointmentReminder proaktif (işletme-başlatan) mesajlar
-    // olduğu için Meta'nın onayladığı bir WhatsApp Template'i gerektirir —
-    // templateStatus onaylanana kadar (ve reddedilirse) sistem mesajı
-    // hazırlar ama GÖNDERMEZ, admin panelinde "tek tıkla gönder" (wa.me
-    // linki) olarak düşer — asla onaysız otomatik gönderim denenmez (Meta
-    // hesabın askıya alınması riski). offHoursReply REAKTİF (müşterinin
-    // kendi mesajına cevap, 24 saatlik pencere zaten açık) olduğu için
-    // hiç template gerekmez, açılır açılmaz aktif olur.
-    automations: {
-      listingMatch: { enabled: false, templateStatus: "not_submitted", templateName: null, templateMetaId: null },
-      appointmentReminder: { enabled: false, hoursBefore: 2, templateStatus: "not_submitted", templateName: null, templateMetaId: null },
-      offHoursReply: {
-        enabled: false,
-        businessHours: { startHour: 9, endHour: 18, days: [1, 2, 3, 4, 5] }, // days: 0=Pazar...6=Cumartesi
-        replyText: "Merhaba! Mesajınız için teşekkürler, çalışma saatlerimizde size dönüş yapacağız.",
-      },
-    },
+    automations: DEFAULT_AUTOMATIONS,
   });
 }

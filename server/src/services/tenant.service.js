@@ -17,7 +17,7 @@ import {
   updateTenantRolePermissions,
   updateTenantAutomations,
 } from "../repositories/tenant.repository.js";
-import { createDefaultTenant } from "../models/tenant.model.js";
+import { createDefaultTenant, DEFAULT_AUTOMATIONS } from "../models/tenant.model.js";
 import { slugify } from "../utils/slugify.js";
 import { ApiError } from "../utils/ApiError.js";
 import { encryptToken } from "../utils/crypto.util.js";
@@ -193,24 +193,31 @@ async function generateUniqueSlug(name) {
   return slug;
 }
 
-/** Otomasyonlar sayfası için: tenant'ın şu anki ayarlarını döner. */
+/**
+ * Otomasyonlar sayfası için: tenant'ın şu anki ayarlarını döner.
+ * `tenant.automations ?? DEFAULT_AUTOMATIONS` ŞART — bu alan 2026-08-14'te
+ * eklendi, ondan ÖNCE oluşturulmuş tenant'larda (bkz. tenant.model.js'in
+ * DEFAULT_AUTOMATIONS yorumu) hiç yok, `undefined` sessizce Otomasyonlar
+ * sayfasını kırardı (canlıda yakalandı).
+ */
 export async function getTenantAutomations(tenantId) {
   const tenant = await findTenantById(tenantId);
   if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
-  return tenant.automations;
+  return tenant.automations ?? DEFAULT_AUTOMATIONS;
 }
 
 /**
  * Otomasyonlar sayfasından toggle/ayar değişince çağrılır. `updates`
  * kısmi olabilir (ör. sadece `listingMatch.enabled`) — mevcut ayarların
- * üzerine SIĞ (shallow, tek seviye) birleştirilir; her alt-otomasyon
- * kendi içinde tam bir obje olarak gönderilmeli (frontend zaten formu
- * hep tam obje olarak tutuyor, bkz. Automations.jsx).
+ * (yoksa DEFAULT_AUTOMATIONS'ın) üzerine SIĞ (shallow, tek seviye)
+ * birleştirilir; her alt-otomasyon kendi içinde tam bir obje olarak
+ * gönderilmeli (frontend zaten formu hep tam obje olarak tutuyor, bkz.
+ * Automations.jsx).
  */
 export async function setTenantAutomations(tenantId, updates) {
   const tenant = await findTenantById(tenantId);
   if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
-  const merged = { ...tenant.automations, ...updates };
+  const merged = { ...(tenant.automations ?? DEFAULT_AUTOMATIONS), ...updates };
   await updateTenantAutomations(tenantId, merged);
   return merged;
 }
