@@ -12,6 +12,7 @@ import { verifyWebhookChallenge, verifyWebhookSignature, fetchInstagramProfile }
 import { getTenantByInstagramAccountId } from "../services/tenant.service.js";
 import { findOrCreateConversation } from "../services/conversation.service.js";
 import { createInboundMessage } from "../services/message.service.js";
+import { checkOffHoursAndReply } from "../services/automation.service.js";
 import { decryptToken } from "../utils/crypto.util.js";
 import { logger } from "../config/logger.js";
 
@@ -112,5 +113,16 @@ async function processEntry(entry) {
       senderId,
     });
     logger.info(`Instagram webhook: yeni mesaj kaydedildi (tenant=${tenant.id}, conversation=${conversation.id}).`);
+
+    // Mesai Dışı Otomatik Yanıt — asıl mesaj kaydından TAMAMEN ayrı bir
+    // try/catch: bu otomasyonda bir hata (ör. token süresi dolmuş) olsa
+    // bile müşterinin mesajı zaten kaydedildi, webhook'un asıl görevi
+    // tamamlandı — otomasyon hatası bunu asla geri almamalı/etkilememeli.
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await checkOffHoursAndReply(context, conversation, tenant);
+    } catch (error) {
+      logger.error(`Mesai-dışı otomatik yanıt hatası: tenant=${tenant.id} conversation=${conversation.id} — ${error.message}`);
+    }
   }
 }

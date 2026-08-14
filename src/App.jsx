@@ -37,6 +37,7 @@ const Notifications = lazy(() => import("./admin/pages/Notifications"));
 const Settings = lazy(() => import("./admin/pages/Settings"));
 const Funnels = lazy(() => import("./admin/pages/Funnels"));
 const FunnelForm = lazy(() => import("./admin/pages/FunnelForm"));
+const Automations = lazy(() => import("./admin/pages/Automations"));
 
 function AdminLoadingFallback() {
   return (
@@ -106,6 +107,7 @@ export default function App() {
             <Route path="bildirimler" element={<Notifications />} />
             <Route path="funnel" element={<Funnels />} />
             <Route path="funnel/:id" element={<FunnelForm />} />
+            <Route path="otomasyonlar" element={<Automations />} />
             <Route path="ayarlar" element={<Settings />} />
           </Route>
         </Route>

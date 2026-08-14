@@ -5,6 +5,7 @@ import { app } from "./app.js";
 import { startInstagramTokenRefreshJob } from "./jobs/instagramTokenRefresh.job.js";
 import { startWhatsappTokenRefreshJob } from "./jobs/whatsappTokenRefresh.job.js";
 import { startTenantBackupJob } from "./jobs/backupTenants.job.js";
+import { startAppointmentRemindersJob } from "./jobs/appointmentReminders.job.js";
 import { notifyTelegramServerStarted, notifyTelegramFatalError } from "./utils/notifyTelegram.js";
 
 const server = app.listen(env.port, () => {
@@ -38,6 +39,12 @@ if (env.integrationsMode === "live") {
 // mock modda gerçek Firestore/Storage olmadığından yedeklemenin anlamı yok.
 if (env.firebaseMode === "live") {
   startTenantBackupJob();
+}
+
+// Randevu Hatırlatması otomasyonu hem gerçek Firestore (randevuları okumak)
+// hem gerçek WhatsApp API'si (mesaj göndermek) gerektiriyor.
+if (env.firebaseMode === "live" && env.integrationsMode === "live") {
+  startAppointmentRemindersJob();
 }
 
 function shutdown(signal) {

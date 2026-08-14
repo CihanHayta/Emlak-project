@@ -4,6 +4,19 @@ import { createProperty, getProperty, deleteProperty, listProperties, updateProp
 import { propertyRepository } from "../src/repositories/property.repository.js";
 import { resetMockFirestore } from "../src/firebase/mock/firestore.mock.js";
 import { mockStorage } from "../src/firebase/mock/storage.mock.js";
+import * as tenantRepo from "../src/repositories/tenant.repository.js";
+import { createDefaultTenant } from "../src/models/tenant.model.js";
+import { createDefaultCustomer } from "../src/models/customer.model.js";
+import { customerRepository } from "../src/repositories/customer.repository.js";
+import { automationEventRepository } from "../src/repositories/automationEvent.repository.js";
+
+/** Bir sonraki macrotask'a kadar bekler — createProperty/updateProperty'nin
+ * BİLEREK await ETMEDİĞİ (floating promise, bkz. property.service.js#notifyIfPublished)
+ * otomasyon zincirinin (birkaç microtask hop'u: getTenantById -> eşleşen
+ * müşteriler -> automationEvent yaz) test bitmeden tamamlanmasını sağlar. */
+function flushMicrotasks() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 const context = { tenantId: "test-tenant", userId: "u1", role: "owner" };
 
@@ -140,5 +153,70 @@ describe("property.service — taslak/yayın (status) görünürlüğü (2026-08
     const legacy = await propertyRepository.create(context, { ...baseProperty({}), deletedAt: null });
     const publicList = await listProperties(publicContext);
     expect(publicList.some((p) => p.id === legacy.id)).toBe(true);
+  });
+});
+
+describe("property.service — İlan Eşleşmesi otomasyonu tetikleyicisi (2026-08-13)", () => {
+  let ctx;
+
+  async function makeTenantWithAutomationEnabled() {
+    const tenant = await tenantRepo.createTenant(createDefaultTenant({ name: "Test Ofis", slug: `ofis-${Date.now()}-${Math.random()}`, ownerUserId: "owner1" }));
+    const automations = { ...tenant.automations, listingMatch: { enabled: true, templateStatus: "not_submitted", templateName: null, templateMetaId: null } };
+    await tenantRepo.updateTenant(tenant.id, { automations });
+    return { ...tenant, automations };
+  }
+
+  beforeEach(() => resetMockFirestore());
+
+  it("YAYINDAKİ bir ilan oluşturulunca eşleşen müşteri için otomasyon event'i oluşur", async () => {
+    const tenant = await makeTenantWithAutomationEnabled();
+    ctx = { tenantId: tenant.id, userId: "u1", role: "owner" };
+    await customerRepository.create(ctx, createDefaultCustomer({ name: "Ahmet", phone: "0555 123 45 67", interests: ["Daire"] }));
+
+    await createProperty(ctx, baseProperty({ status: "published" }));
+    await flushMicrotasks();
+
+    const events = await automationEventRepository.findAll(ctx);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("listingMatch");
+  });
+
+  it("TASLAK (unpublished) bir ilan oluşturulunca HİÇ otomasyon event'i oluşmaz", async () => {
+    const tenant = await makeTenantWithAutomationEnabled();
+    ctx = { tenantId: tenant.id, userId: "u1", role: "owner" };
+    await customerRepository.create(ctx, createDefaultCustomer({ name: "Ahmet", phone: "0555 123 45 67", interests: ["Daire"] }));
+
+    await createProperty(ctx, baseProperty({ status: "unpublished" }));
+    await flushMicrotasks();
+
+    expect(await automationEventRepository.findAll(ctx)).toHaveLength(0);
+  });
+
+  it("taslaktan yayına GEÇİNCE (update) otomasyon tetiklenir", async () => {
+    const tenant = await makeTenantWithAutomationEnabled();
+    ctx = { tenantId: tenant.id, userId: "u1", role: "owner" };
+    await customerRepository.create(ctx, createDefaultCustomer({ name: "Ahmet", phone: "0555 123 45 67", interests: ["Daire"] }));
+    const draft = await createProperty(ctx, baseProperty({ status: "unpublished" }));
+    await flushMicrotasks();
+    expect(await automationEventRepository.findAll(ctx)).toHaveLength(0); // taslakken hiç tetiklenmedi
+
+    await updateProperty(ctx, draft.id, { status: "published" });
+    await flushMicrotasks();
+
+    expect(await automationEventRepository.findAll(ctx)).toHaveLength(1);
+  });
+
+  it("ZATEN yayındaki bir ilanın sıradan güncellemesinde (ör. fiyat) TEKRAR tetiklenmez", async () => {
+    const tenant = await makeTenantWithAutomationEnabled();
+    ctx = { tenantId: tenant.id, userId: "u1", role: "owner" };
+    await customerRepository.create(ctx, createDefaultCustomer({ name: "Ahmet", phone: "0555 123 45 67", interests: ["Daire"] }));
+    const published = await createProperty(ctx, baseProperty({ status: "published" }));
+    await flushMicrotasks();
+    expect(await automationEventRepository.findAll(ctx)).toHaveLength(1); // oluşturmada bir kez tetiklendi
+
+    await updateProperty(ctx, published.id, { price: "2.000.000 TL" });
+    await flushMicrotasks();
+
+    expect(await automationEventRepository.findAll(ctx)).toHaveLength(1); // hâlâ 1 — ikinci kez tetiklenmedi
   });
 });

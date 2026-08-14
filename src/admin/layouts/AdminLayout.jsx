@@ -21,6 +21,7 @@ const PAGE_TITLES = [
   { prefix: "/admin/musteriler", title: "Müşteriler", subtitle: "Müşteri kartlarını ve gelen formları yönetin." },
   { prefix: "/admin/mesajlar", title: "Mesajlar", subtitle: "Müşterilerle olan yazışmalarınız." },
   { prefix: "/admin/bildirimler", title: "Bildirimler", subtitle: "Tüm bildirimleriniz." },
+  { prefix: "/admin/otomasyonlar", title: "Otomasyonlar", subtitle: "Proaktif WhatsApp mesajları ve mesai dışı otomatik yanıt." },
   { prefix: "/admin/ayarlar", title: "Ayarlar", subtitle: "Kullanıcılar ve yetkiler." },
   { prefix: "/admin", title: "Dashboard", subtitle: "Genel bakış." },
 ];

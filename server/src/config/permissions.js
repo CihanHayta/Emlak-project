@@ -39,9 +39,11 @@ export const BASE_PERMISSIONS = {
 // alınmadı.
 export const CUSTOMIZABLE_ROLES = ["agent", "assistant"];
 
-// Owner'ın verebileceği izinlerin TAM listesi — "tenant:manage"/"users:*"
-// BİLEREK burada YOK: entegrasyon bağlama ve kullanıcı yönetimi her zaman
-// owner/admin'e özel kalmalı, Yetkiler sayfasından asla açılamamalı.
+// Owner'ın verebileceği izinlerin TAM listesi — "tenant:manage"/"users:*"/
+// "automations:*" BİLEREK burada YOK: entegrasyon bağlama, kullanıcı
+// yönetimi ve otomasyon (proaktif müşteri mesajlaşması) ayarları her zaman
+// owner/admin'e özel kalmalı, Yetkiler sayfasından asla açılamamalı —
+// Funnel/Ayarlar'la aynı gerekçe (bkz. routes/funnel.routes.js).
 export const PERMISSION_CATALOG = [
   "properties:read", "properties:write",
   "vehicles:read", "vehicles:write",

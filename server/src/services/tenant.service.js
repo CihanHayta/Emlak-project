@@ -15,6 +15,7 @@ import {
   updateTenantFirebase,
   findTenantsWithFirebaseConnected,
   updateTenantRolePermissions,
+  updateTenantAutomations,
 } from "../repositories/tenant.repository.js";
 import { createDefaultTenant } from "../models/tenant.model.js";
 import { slugify } from "../utils/slugify.js";
@@ -190,6 +191,28 @@ async function generateUniqueSlug(name) {
     slug = `${base}-${suffix}`;
   }
   return slug;
+}
+
+/** Otomasyonlar sayfası için: tenant'ın şu anki ayarlarını döner. */
+export async function getTenantAutomations(tenantId) {
+  const tenant = await findTenantById(tenantId);
+  if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
+  return tenant.automations;
+}
+
+/**
+ * Otomasyonlar sayfasından toggle/ayar değişince çağrılır. `updates`
+ * kısmi olabilir (ör. sadece `listingMatch.enabled`) — mevcut ayarların
+ * üzerine SIĞ (shallow, tek seviye) birleştirilir; her alt-otomasyon
+ * kendi içinde tam bir obje olarak gönderilmeli (frontend zaten formu
+ * hep tam obje olarak tutuyor, bkz. Automations.jsx).
+ */
+export async function setTenantAutomations(tenantId, updates) {
+  const tenant = await findTenantById(tenantId);
+  if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
+  const merged = { ...tenant.automations, ...updates };
+  await updateTenantAutomations(tenantId, merged);
+  return merged;
 }
 
 export async function createTenantForOwner({ name, ownerUserId, phone }) {

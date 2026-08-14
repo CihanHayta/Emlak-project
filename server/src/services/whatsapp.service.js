@@ -79,3 +79,109 @@ export async function sendWhatsappMessage(phoneNumberId, to, text, accessToken) 
   }
   return body;
 }
+
+/**
+ * Meta'ya YENİ bir mesaj şablonu gönderir (inceleme/onay için) —
+ * `POST /{wabaId}/message_templates`. Sadece Otomasyonlar sayfasından,
+ * owner "Şablonu Meta'ya Gönder"e basınca çağrılır. `bodyText` `{{1}}`,
+ * `{{2}}` gibi yer tutucular içerir; `exampleValues` Meta'nın incelemesi
+ * için her yer tutucuya bir örnek değer verir (zorunlu, yoksa Meta
+ * şablonu reddediyor). `category: "UTILITY"` bilerek sabit — bildirim/
+ * hatırlatma amaçlı mesajlar için en hızlı onay kategorisi, "MARKETING"
+ * çok daha sıkı inceleniyor ve bizim kullanım amacımıza da uymuyor.
+ */
+export async function submitMessageTemplate(wabaId, accessToken, { name, language, bodyText, exampleValues }) {
+  if (!accessToken) throw ApiError.upstream("Bu ofis için WhatsApp hattı bağlı değil.");
+  const url = `${GRAPH_BASE}/${wabaId}/message_templates`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        name,
+        language,
+        category: "UTILITY",
+        components: [{ type: "BODY", text: bodyText, example: { body_text: [exampleValues] } }],
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === "AbortError") throw ApiError.upstream("Şablon gönderilemedi — Meta zamanında yanıt vermedi. Lütfen tekrar deneyin.");
+    throw ApiError.upstream("Şablon gönderilemedi — bağlantı hatası. Lütfen tekrar deneyin.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw ApiError.upstream(body?.error?.message || "Şablon gönderilemedi.");
+  }
+  return body; // { id, status: "PENDING", category }
+}
+
+/**
+ * Bir şablonun Meta'daki güncel onay durumunu çeker —
+ * `GET /{wabaId}/message_templates?name=...`. `name` benzersiz olduğu
+ * için (Meta bunu zorunlu kılıyor) tek sonuç bekleniyor.
+ */
+export async function getTemplateStatus(wabaId, accessToken, name) {
+  if (!accessToken) throw ApiError.upstream("Bu ofis için WhatsApp hattı bağlı değil.");
+  const url = `${GRAPH_BASE}/${wabaId}/message_templates?name=${encodeURIComponent(name)}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` }, signal: controller.signal });
+  } catch (error) {
+    if (error.name === "AbortError") throw ApiError.upstream("Şablon durumu alınamadı — Meta zamanında yanıt vermedi.");
+    throw ApiError.upstream("Şablon durumu alınamadı — bağlantı hatası.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw ApiError.upstream(body?.error?.message || "Şablon durumu alınamadı.");
+  return body?.data?.[0] ?? null; // { id, name, status: "APPROVED"|"PENDING"|"REJECTED", category }
+}
+
+/**
+ * Onaylı bir ŞABLONLA mesaj gönderir — `sendWhatsappMessage`'ın aksine
+ * 24 saatlik pencereye TABİ DEĞİL (Meta'nın proaktif/işletme-başlatan
+ * mesajlar için izin verdiği tek yol budur). `parameters` şablondaki
+ * `{{1}}`, `{{2}}`... yer tutucularının SIRAYLA karşılıklarıdır.
+ */
+export async function sendWhatsappTemplateMessage(phoneNumberId, to, templateName, languageCode, parameters, accessToken) {
+  if (!accessToken) throw ApiError.upstream("Bu ofis için WhatsApp hattı bağlı değil.");
+  const url = `${GRAPH_BASE}/${phoneNumberId}/messages`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components: [{ type: "body", parameters: parameters.map((text) => ({ type: "text", text })) }],
+        },
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === "AbortError") throw ApiError.upstream("WhatsApp şablon mesajı gönderilemedi — sunucu zamanında yanıt vermedi.");
+    throw ApiError.upstream("WhatsApp şablon mesajı gönderilemedi — bağlantı hatası.");
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw ApiError.upstream(body?.error?.message || "WhatsApp şablon mesajı gönderilemedi.");
+  }
+  return body;
+}

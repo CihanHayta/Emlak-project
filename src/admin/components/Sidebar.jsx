@@ -13,6 +13,7 @@ import {
   Plus,
   Home as HomeIcon,
   ChevronLeft,
+  Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,10 @@ const NAV_ITEMS = [
   // sadece owner'da (bkz. server/authorize.middleware.js'in "funnels:*"ı
   // agent/assistant'a hiç vermemesi).
   { label: "Funnel", to: "/admin/funnel", icon: Megaphone, ownerOnly: true },
+  // Proaktif müşteri mesajlaşması (yeni ilan, randevu hatırlatması) ve
+  // WhatsApp şablon onayı işletme sahibinin kararı — Funnel/Ayarlar'la
+  // aynı gerekçeyle sadece owner'da (bkz. server/routes/automation.routes.js).
+  { label: "Otomasyonlar", to: "/admin/otomasyonlar", icon: Zap, ownerOnly: true },
   // Sadece admin (owner) görür — Danışman/Personel için Ayarlar sayfası
   // (kullanıcı yönetimi) hiç anlamlı değil, bkz. Settings.jsx'in kendi
   // rol koruması.

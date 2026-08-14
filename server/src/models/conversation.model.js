@@ -35,5 +35,11 @@ export function createDefaultConversation({
     lastMessageDirection: "inbound", // inbound | outbound
     unreadCount: 0,
     windowExpiresAt: now + 24 * 60 * 60 * 1000,
+    // Mesai Dışı Otomatik Yanıt otomasyonu (bkz.
+    // automation.service.js#checkOffHoursAndReply) en son ne zaman bir bot
+    // yanıtı gönderdi — arka arkaya gelen birkaç mesaja her seferinde ayrı
+    // bir "kapalıyız" yanıtı gitmesin diye bir soğuma (cooldown) süresi
+    // hesaplamak için kullanılır.
+    lastAutoReplyAt: null,
   });
 }

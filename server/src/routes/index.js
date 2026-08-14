@@ -19,6 +19,7 @@ import { facebookPageRouter } from "./facebookPage.routes.js";
 import { funnelRouter } from "./funnel.routes.js";
 import { publicFunnelRouter } from "./publicFunnel.routes.js";
 import { tenantSettingsRouter } from "./tenantSettings.routes.js";
+import { automationRouter } from "./automation.routes.js";
 
 // Not: webhook route'ları (Faz 6) BİLEREK burada değil, app.js'te
 // express.json()'dan ÖNCE bağlanır — çünkü Meta imza doğrulaması ham
@@ -44,3 +45,4 @@ apiRouter.use("/facebook-page", facebookPageRouter);
 apiRouter.use("/funnels", funnelRouter);
 apiRouter.use("/public/funnels", publicFunnelRouter);
 apiRouter.use("/tenant", tenantSettingsRouter);
+apiRouter.use("/automations", automationRouter);

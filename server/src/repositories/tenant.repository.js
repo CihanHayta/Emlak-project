@@ -117,6 +117,12 @@ export async function updateTenantRolePermissions(id, data) {
   await col.doc(id).update({ rolePermissions: data });
 }
 
+/** Otomasyonlar sayfasından kaydedince çağrılır — bkz. tenant.service.js#updateTenantAutomations. */
+export async function updateTenantAutomations(id, data) {
+  const col = await collection();
+  await col.doc(id).update({ automations: data });
+}
+
 /** Facebook Sayfası bağlantısı kurulunca/kaldırılınca çağrılır — `data` null ise bağlantıyı temizler. */
 export async function updateTenantFacebookPage(id, data) {
   const col = await collection();

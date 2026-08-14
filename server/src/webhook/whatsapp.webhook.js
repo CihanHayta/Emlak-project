@@ -19,6 +19,7 @@ import { verifyWebhookChallenge, verifyWebhookSignature } from "../services/what
 import { getTenantByWhatsappWabaId } from "../services/tenant.service.js";
 import { findOrCreateConversation } from "../services/conversation.service.js";
 import { createInboundMessage } from "../services/message.service.js";
+import { checkOffHoursAndReply } from "../services/automation.service.js";
 import { logger } from "../config/logger.js";
 
 export const whatsappWebhookRouter = Router();
@@ -101,6 +102,14 @@ async function processEntry(entry) {
         senderId,
       });
       logger.info(`WhatsApp webhook: yeni mesaj kaydedildi (tenant=${tenant.id}, conversation=${conversation.id}).`);
+
+      // instagram.webhook.js ile aynı desen — bkz. o dosyanın yorumu.
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await checkOffHoursAndReply(context, conversation, tenant);
+      } catch (error) {
+        logger.error(`Mesai-dışı otomatik yanıt hatası: tenant=${tenant.id} conversation=${conversation.id} — ${error.message}`);
+      }
     }
   }
 }

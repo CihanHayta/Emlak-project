@@ -42,5 +42,23 @@ export function createDefaultTenant({ name, slug, ownerUserId, phone = null, tax
     // Boşsa (null) her rol için BASE_PERMISSIONS'taki varsayılan kullanılır.
     // Şekli: { agent: ["properties:read", ...], assistant: [...] }
     rolePermissions: null,
+    // Otomasyonlar sayfası — bkz. services/automation.service.js.
+    // listingMatch/appointmentReminder proaktif (işletme-başlatan) mesajlar
+    // olduğu için Meta'nın onayladığı bir WhatsApp Template'i gerektirir —
+    // templateStatus onaylanana kadar (ve reddedilirse) sistem mesajı
+    // hazırlar ama GÖNDERMEZ, admin panelinde "tek tıkla gönder" (wa.me
+    // linki) olarak düşer — asla onaysız otomatik gönderim denenmez (Meta
+    // hesabın askıya alınması riski). offHoursReply REAKTİF (müşterinin
+    // kendi mesajına cevap, 24 saatlik pencere zaten açık) olduğu için
+    // hiç template gerekmez, açılır açılmaz aktif olur.
+    automations: {
+      listingMatch: { enabled: false, templateStatus: "not_submitted", templateName: null, templateMetaId: null },
+      appointmentReminder: { enabled: false, hoursBefore: 2, templateStatus: "not_submitted", templateName: null, templateMetaId: null },
+      offHoursReply: {
+        enabled: false,
+        businessHours: { startHour: 9, endHour: 18, days: [1, 2, 3, 4, 5] }, // days: 0=Pazar...6=Cumartesi
+        replyText: "Merhaba! Mesajınız için teşekkürler, çalışma saatlerimizde size dönüş yapacağız.",
+      },
+    },
   });
 }

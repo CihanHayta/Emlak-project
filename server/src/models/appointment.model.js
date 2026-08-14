@@ -10,6 +10,11 @@ export function createDefaultAppointment(data) {
     dateTime: Date.now(),
     status: "Beklemede", // Beklemede | Onaylandı | Tamamlandı | İptal Edildi
     note: "",
+    // Randevu Hatırlatması otomasyonu (bkz. jobs/appointmentReminders.job.js)
+    // gönderdiğinde/hazırladığında doldurur — aynı randevu için job'ın
+    // farklı çalıştırmalarında (ör. sunucu yeniden başlarsa) ikinci bir
+    // hatırlatma/event OLUŞTURMAMASI için idempotency anahtarı.
+    reminderSentAt: null,
   };
   return withCreateFields({ ...defaults, ...data });
 }

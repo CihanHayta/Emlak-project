@@ -3,7 +3,9 @@ import { propertyRepository } from "../repositories/property.repository.js";
 import { createDefaultProperty } from "../models/property.model.js";
 import { withUpdateFields } from "../models/base.model.js";
 import { getStorageClient } from "../firebase/storage.client.js";
+import { notifyMatchingCustomersForListing } from "./automation.service.js";
 import { ApiError } from "../utils/ApiError.js";
+import { logger } from "../config/logger.js";
 
 /**
  * vehicle.service.js#isHiddenFromPublic ile aynı desen: "unpublished"
@@ -30,12 +32,38 @@ export async function getProperty(context, id) {
   return property;
 }
 
+/**
+ * "Yeni İlan Eşleşmesi" otomasyonu (bkz. automation.service.js) SADECE
+ * ilan gerçekten HERKESE AÇIKken tetiklenmeli — aksi halde müşteriye
+ * public sitede 404 verecek bir taslağı haber verirdik. `.catch(logger.error)`
+ * ile floating promise: admin'in "Kaydet" isteği eşleşen müşteri sayısı
+ * ne olursa olsun (ve WhatsApp gönderimi 15sn'e kadar sürebildiği için)
+ * ASLA bloklanmamalı — webhook'ların "hemen yanıt ver, arkada işle"
+ * felsefesiyle aynı (bkz. webhook/instagram.webhook.js).
+ */
+function notifyIfPublished(context, property) {
+  if (property.status === "unpublished") return;
+  notifyMatchingCustomersForListing(context, property).catch((error) =>
+    logger.error(`İlan eşleşme otomasyonu hatası: tenant=${context.tenantId} property=${property.id} — ${error.message}`),
+  );
+}
+
 export async function createProperty(context, data) {
-  return propertyRepository.create(context, createDefaultProperty(data));
+  const created = await propertyRepository.create(context, createDefaultProperty(data));
+  notifyIfPublished(context, created);
+  return created;
 }
 
 export async function updateProperty(context, id, updates) {
-  return propertyRepository.update(context, id, withUpdateFields(updates, { actorUserId: context.userId }));
+  const previous = await propertyRepository.findById(context, id);
+  const updated = await propertyRepository.update(context, id, withUpdateFields(updates, { actorUserId: context.userId }));
+  // Sadece taslak -> yayın GEÇİŞİNDE bildir — zaten yayındaki bir ilanın
+  // her güncellemesinde (ör. fiyat düzeltmesi) tekrar tekrar bildirim
+  // gitmesin diye.
+  if (previous?.status === "unpublished" && updated.status === "published") {
+    notifyIfPublished(context, updated);
+  }
+  return updated;
 }
 
 /**
