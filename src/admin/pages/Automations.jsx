@@ -28,6 +28,15 @@ const TEMPLATE_STATUS_INFO = {
   rejected: { label: "Reddedildi", variant: "destructive" },
 };
 
+// server/src/services/automation.service.js#AUTOMATION_TEMPLATE_DEFAULTS ile
+// AYNI metinler — sadece boş bırakıldığında ne kullanılacağını göstermek
+// için burada da tutuluyor (backend zaten kendi varsayılanını uygular,
+// burası SADECE görüntü amaçlı bir placeholder).
+const DEFAULT_TEMPLATE_TEXT = {
+  listingMatch: "Merhaba {{1}}, aradığınız kriterlere uygun yeni bir ilan bulduk: {{2}}.",
+  appointmentReminder: "Merhaba {{1}}, {{2}} tarihindeki randevunuzu hatırlatmak isteriz.",
+};
+
 const EVENT_TYPE_LABELS = { listingMatch: "Yeni İlan Eşleşmesi", appointmentReminder: "Randevu Hatırlatması" };
 const EVENT_STATUS_INFO = {
   sent: { label: "Gönderildi", variant: "default" },
@@ -75,12 +84,48 @@ export default function Automations() {
   );
 }
 
-function TemplateControls({ type, templateStatus }) {
+/** Tam olarak bir kere {{1}} ve bir kere {{2}} içeriyor mu — backend'in
+ * automation.validator.js#validateTemplatePlaceholders'ıyla AYNI kural,
+ * kullanıcı "Kaydet"e basmadan önce anında geri bildirim versin diye. */
+function hasValidPlaceholders(text) {
+  const count = (token) => text.split(token).length - 1;
+  return count("{{1}}") === 1 && count("{{2}}") === 1 && !text.includes("{{3}}");
+}
+
+function TemplateControls({ type, settings, onSettingsChange }) {
+  const { templateStatus, templateBodyText } = settings;
+  const [text, setText] = useState(templateBodyText || DEFAULT_TEMPLATE_TEXT[type]);
+  const [savingText, setSavingText] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const info = TEMPLATE_STATUS_INFO[templateStatus] ?? TEMPLATE_STATUS_INFO.not_submitted;
+  const textChanged = text.trim() !== (templateBodyText || DEFAULT_TEMPLATE_TEXT[type]);
+  const placeholdersValid = hasValidPlaceholders(text);
+
+  useEffect(() => setText(templateBodyText || DEFAULT_TEMPLATE_TEXT[type]), [templateBodyText, type]);
+
+  async function handleSaveText() {
+    if (!placeholdersValid) {
+      toast.error("Mesaj tam olarak bir kere {{1}} (müşteri adı) ve bir kere {{2}} (detay) içermeli.");
+      return;
+    }
+    setSavingText(true);
+    try {
+      const updated = await onSettingsChange({ templateBodyText: text.trim() });
+      toast.success("Mesaj metni kaydedildi.");
+      return updated;
+    } catch (error) {
+      toast.error(error.message || "Metin kaydedilemedi.");
+    } finally {
+      setSavingText(false);
+    }
+  }
 
   async function handleSubmit() {
+    if (textChanged) {
+      const saved = await handleSaveText();
+      if (!saved) return; // kaydetme başarısız oldu, Meta'ya göndermeyi deneme
+    }
     setSubmitting(true);
     try {
       await submitAutomationTemplate(type);
@@ -108,23 +153,37 @@ function TemplateControls({ type, templateStatus }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Badge variant={info.variant}>{info.label}</Badge>
-      {(templateStatus === "not_submitted" || templateStatus === "rejected") && (
-        <Button size="sm" variant="outline" disabled={submitting} onClick={handleSubmit}>
-          {submitting ? "Gönderiliyor…" : templateStatus === "rejected" ? "Tekrar Gönder" : "Şablonu Meta'ya Gönder"}
-        </Button>
-      )}
-      {templateStatus === "pending" && (
-        <Button size="sm" variant="outline" disabled={refreshing} onClick={handleRefresh}>
-          {refreshing ? "Kontrol ediliyor…" : "Onay Durumunu Yenile"}
-        </Button>
-      )}
-      {templateStatus !== "approved" && (
-        <p className="w-full text-xs text-muted-foreground">
-          Şablon onaylanana kadar mesajlar hazırlanır, aşağıdaki geçmiş listesinden tek tıkla WhatsApp&apos;tan elle gönderebilirsiniz.
-        </p>
-      )}
+    <div className="space-y-2.5">
+      <div className="space-y-1">
+        <Label htmlFor={`${type}-body`} className="text-xs text-muted-foreground">
+          Mesaj metni — {"{{1}}"} müşteri adı, {"{{2}}"} detay olarak doldurulur, istediğiniz gibi düzenleyebilirsiniz
+        </Label>
+        <Textarea id={`${type}-body`} rows={2} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} />
+        {!placeholdersValid && <p className="text-xs text-destructive">Tam olarak bir kere {"{{1}}"} ve bir kere {"{{2}}"} olmalı.</p>}
+        {textChanged && placeholdersValid && (
+          <Button size="sm" variant="outline" disabled={savingText} onClick={handleSaveText}>
+            {savingText ? "Kaydediliyor…" : "Metni Kaydet"}
+          </Button>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={info.variant}>{info.label}</Badge>
+        {templateStatus !== "pending" && (
+          <Button size="sm" variant="outline" disabled={submitting || savingText || !placeholdersValid} onClick={handleSubmit}>
+            {submitting ? "Gönderiliyor…" : templateStatus === "not_submitted" ? "Şablonu Meta'ya Gönder" : "Yeniden Gönder"}
+          </Button>
+        )}
+        {templateStatus === "pending" && (
+          <Button size="sm" variant="outline" disabled={refreshing} onClick={handleRefresh}>
+            {refreshing ? "Kontrol ediliyor…" : "Onay Durumunu Yenile"}
+          </Button>
+        )}
+        {templateStatus !== "approved" && (
+          <p className="w-full text-xs text-muted-foreground">
+            Şablon onaylanana kadar mesajlar hazırlanır, aşağıdaki geçmiş listesinden tek tıkla WhatsApp&apos;tan elle gönderebilirsiniz.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -144,6 +203,11 @@ function ListingMatchCard({ settings }) {
     }
   }
 
+  async function handleSettingsChange(partial) {
+    const updated = await updateAutomationSettings({ listingMatch: { ...settings, ...partial } });
+    return updated.listingMatch;
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -159,7 +223,7 @@ function ListingMatchCard({ settings }) {
         </div>
       </CardHeader>
       <CardContent>
-        <TemplateControls type="listingMatch" templateStatus={settings.templateStatus} />
+        <TemplateControls type="listingMatch" settings={settings} onSettingsChange={handleSettingsChange} />
       </CardContent>
     </Card>
   );
@@ -195,6 +259,11 @@ function AppointmentReminderCard({ settings }) {
     }
   }
 
+  async function handleSettingsChange(partial) {
+    const updated = await updateAutomationSettings({ appointmentReminder: { ...settings, ...partial } });
+    return updated.appointmentReminder;
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -223,7 +292,7 @@ function AppointmentReminderCard({ settings }) {
             className="w-20"
           />
         </div>
-        <TemplateControls type="appointmentReminder" templateStatus={settings.templateStatus} />
+        <TemplateControls type="appointmentReminder" settings={settings} onSettingsChange={handleSettingsChange} />
       </CardContent>
     </Card>
   );

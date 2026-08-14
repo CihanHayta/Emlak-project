@@ -16,6 +16,7 @@
 // API'yi hiç kullanmadan) elle gönderilebilir. Asla onaysız otomatik
 // gönderim denenmez (Meta hesabın askıya alınması riski).
 import { getTenantById, setTenantAutomations } from "./tenant.service.js";
+import { DEFAULT_AUTOMATIONS } from "../models/tenant.model.js";
 import { getMatchingCustomers } from "./matching.service.js";
 import { sendWhatsappMessage, sendWhatsappTemplateMessage, submitMessageTemplate, getTemplateStatus } from "./whatsapp.service.js";
 import { sendInstagramMessage } from "./instagram.service.js";
@@ -31,30 +32,43 @@ import { logger } from "../config/logger.js";
 
 const TEMPLATE_LANGUAGE = "tr";
 
-// Sabit şablon metinleri — MVP'de özelleştirilemez, sadece gönder/onayla.
+// Meta'ya gönderilecek her şablonun İKİ parçası var: (1) DEĞİŞMEYEN kısım —
+// hangi Meta template adı, hangi değişkenler ne sırayla dolduruluyor
+// (buildValues) — bunlar owner'ın kontrolünde DEĞİL, kodun kendi mantığı.
+// (2) DEĞİŞEBİLEN kısım — cümlenin kendisi (bodyText) — owner Otomasyonlar
+// sayfasından kendi metnini yazabilir (bkz. tenant.automations[type].templateBodyText),
+// yazmazsa burada tanımlı `defaultBodyText` kullanılır. Metin ne olursa
+// olsun TAM OLARAK {{1}} (müşteri adı) ve {{2}} (detay) içermeli — bkz.
+// automation.validator.js'in placeholder kontrolü.
+//
 // Bir ilan/randevu bağlantısı (URL) BİLEREK yok — tenant'ların kendi
 // public site domaini backend'de bilinmiyor (her tenant kendi Vercel
 // projesinde, tenant.model.js'te bir "site URL" alanı yok) — bunu eklemek
 // bu otomasyonun kapsamı dışında, ileride bir geliştirme olabilir.
-export const AUTOMATION_TEMPLATES = {
+export const AUTOMATION_TEMPLATE_DEFAULTS = {
   listingMatch: {
-    name: "listing_match_notification",
-    bodyText: "Merhaba {{1}}, aradığınız kriterlere uygun yeni bir ilan bulduk: {{2}}.",
+    baseName: "listing_match_notification",
+    defaultBodyText: "Merhaba {{1}}, aradığınız kriterlere uygun yeni bir ilan bulduk: {{2}}.",
     exampleValues: ["Ahmet", "3+1 Kadıköy Moda'da satılık daire, 2.750.000 TL"],
-    buildParameters: (customer, listing) => [customer.name || "Değerli müşterimiz", `${listing.title}, ${listing.price}`],
-    buildFreeText: (customer, listing) => `Merhaba ${customer.name || "Değerli müşterimiz"}, aradığınız kriterlere uygun yeni bir ilan bulduk: ${listing.title}, ${listing.price}.`,
+    buildValues: (customer, listing) => [customer.name || "Değerli müşterimiz", `${listing.title}, ${listing.price}`],
   },
   appointmentReminder: {
-    name: "appointment_reminder",
-    bodyText: "Merhaba {{1}}, {{2}} tarihindeki randevunuzu hatırlatmak isteriz.",
+    baseName: "appointment_reminder",
+    defaultBodyText: "Merhaba {{1}}, {{2}} tarihindeki randevunuzu hatırlatmak isteriz.",
     exampleValues: ["Ahmet", "15 Ağustos Cumartesi 14:00"],
-    buildParameters: (customer, appointment) => [customer.name || "Değerli müşterimiz", formatAppointmentDate(appointment.dateTime)],
-    buildFreeText: (customer, appointment) => `Merhaba ${customer.name || "Değerli müşterimiz"}, ${formatAppointmentDate(appointment.dateTime)} tarihindeki randevunuzu hatırlatmak isteriz.`,
+    buildValues: (customer, appointment) => [customer.name || "Değerli müşterimiz", formatAppointmentDate(appointment.dateTime)],
   },
 };
 
 function formatAppointmentDate(dateTimeMs) {
   return toIstanbul(dateTimeMs).format("D MMMM dddd HH:mm");
+}
+
+/** `{{1}}`, `{{2}}`'yi sırayla gerçek değerlerle değiştirir — HEM Meta'ya
+ * giden template parametreleri HEM de wa.me'deki serbest metin (pending_manual)
+ * AYNI (owner'ın yazdığı) cümleden üretilsin diye, iki ayrı metin bakımı gerekmez. */
+function interpolate(bodyText, values) {
+  return values.reduce((text, value, index) => text.split(`{{${index + 1}}}`).join(value), bodyText);
 }
 
 function buildWaLink(phoneE164, text) {
@@ -71,17 +85,19 @@ function buildWaLink(phoneE164, text) {
  * yazıp `null` dönüyor.
  */
 async function dispatchOrPrepare(context, tenant, { type, customerId, listingId = null, appointmentId = null }, customer, subject) {
-  const template = AUTOMATION_TEMPLATES[type];
+  const template = AUTOMATION_TEMPLATE_DEFAULTS[type];
   const phone = normalizeTrPhone(customer.phone);
-  const freeText = template.buildFreeText(customer, subject);
+  const automationSettings = tenant.automations?.[type] ?? DEFAULT_AUTOMATIONS[type];
+  const bodyText = automationSettings.templateBodyText || template.defaultBodyText;
+  const values = template.buildValues(customer, subject);
+  const freeText = interpolate(bodyText, values);
 
   if (!phone) {
     logger.warn(`Otomasyon atlandı — geçersiz telefon: tenant=${context.tenantId} customer=${customerId} type=${type}`);
     return null;
   }
 
-  const automationSettings = tenant.automations?.[type];
-  const templateApproved = automationSettings?.templateStatus === "approved" && automationSettings?.templateName;
+  const templateApproved = automationSettings.templateStatus === "approved" && automationSettings.templateName;
 
   if (templateApproved && tenant.whatsapp) {
     try {
@@ -92,7 +108,7 @@ async function dispatchOrPrepare(context, tenant, { type, customerId, listingId 
         toNumber,
         automationSettings.templateName,
         TEMPLATE_LANGUAGE,
-        template.buildParameters(customer, subject),
+        values,
         accessToken,
       );
       return automationEventRepository.create(
@@ -190,31 +206,36 @@ export async function checkOffHoursAndReply(context, conversation, tenant) {
 
 /**
  * Owner "Şablonu Meta'ya Gönder"e basınca çağrılır — `type` "listingMatch"
- * ya da "appointmentReminder". WhatsApp bağlı değilse ya da zaten
- * gönderilmiş/onaylanmışsa anlamlı bir hatayla reddeder.
+ * ya da "appointmentReminder". Owner'ın Otomasyonlar sayfasından yazdığı
+ * ÖZEL metni (varsa) kullanır, yazmadıysa varsayılan metni. Her
+ * gönderimde `templateVersion` bir artar ve gerçek Meta şablon adı
+ * `{{baseName}}_v{{version}}` olur — owner metni beğenmeyip düzenleyip
+ * TEKRAR gönderse bile (onaylı/bekleyen/reddedilmiş fark etmeksizin) her
+ * zaman YENİ bir isimle gider, Meta'nın "aynı isim tekrar kullanılamaz"
+ * kısıtına asla takılmaz.
  */
 export async function submitWhatsappTemplate(context, type) {
-  const template = AUTOMATION_TEMPLATES[type];
+  const template = AUTOMATION_TEMPLATE_DEFAULTS[type];
   if (!template) throw ApiError.validation(`Bilinmeyen otomasyon türü: ${type}`);
 
   const tenant = await getTenantById(context.tenantId);
   if (!tenant.whatsapp) throw ApiError.upstream("Önce WhatsApp hattınızı bağlamalısınız.");
 
-  const currentStatus = tenant.automations?.[type]?.templateStatus;
-  if (currentStatus === "approved" || currentStatus === "pending") {
-    throw ApiError.validation("Bu şablon zaten gönderilmiş.");
-  }
+  const current = tenant.automations?.[type] ?? DEFAULT_AUTOMATIONS[type];
+  const bodyText = current.templateBodyText || template.defaultBodyText;
+  const nextVersion = (current.templateVersion ?? 0) + 1;
+  const templateName = `${template.baseName}_v${nextVersion}`;
 
   const accessToken = decryptToken(tenant.whatsapp.accessToken);
   const result = await submitMessageTemplate(tenant.whatsapp.wabaId, accessToken, {
-    name: template.name,
+    name: templateName,
     language: TEMPLATE_LANGUAGE,
-    bodyText: template.bodyText,
+    bodyText,
     exampleValues: template.exampleValues,
   });
 
   return setTenantAutomations(context.tenantId, {
-    [type]: { ...tenant.automations[type], templateStatus: "pending", templateName: template.name, templateMetaId: result.id },
+    [type]: { ...current, templateStatus: "pending", templateName, templateMetaId: result.id, templateVersion: nextVersion },
   });
 }
 

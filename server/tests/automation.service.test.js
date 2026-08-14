@@ -12,7 +12,7 @@ import * as tenantRepo from "../src/repositories/tenant.repository.js";
 import { customerRepository } from "../src/repositories/customer.repository.js";
 import { conversationRepository } from "../src/repositories/conversation.repository.js";
 import { automationEventRepository } from "../src/repositories/automationEvent.repository.js";
-import { notifyMatchingCustomersForListing, checkOffHoursAndReply } from "../src/services/automation.service.js";
+import { notifyMatchingCustomersForListing, checkOffHoursAndReply, submitWhatsappTemplate } from "../src/services/automation.service.js";
 
 // toIstanbul kullanılmıyor gibi görünse de import satırı kasıtlı — dayjs'in
 // utc/timezone eklentilerini bir kere, modül yüklenirken kaydeder (date.js
@@ -173,6 +173,68 @@ describe("automation.service — checkOffHoursAndReply", () => {
     jest.spyOn(Date, "now").mockReturnValue(WEDNESDAY_LATE_NIGHT_ISTANBUL);
     await checkOffHoursAndReply(context, conversation, tenant);
 
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("automation.service — submitWhatsappTemplate (düzenlenebilir metin + versiyonlu isim)", () => {
+  let fetchSpy;
+
+  beforeEach(() => {
+    resetMockFirestore();
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({ ok: true, json: async () => ({ id: "meta-template-1", status: "PENDING" }) });
+  });
+
+  afterEach(() => fetchSpy.mockRestore());
+
+  it("özel metin YAZILMAMIŞSA varsayılan metinle, _v1 adıyla gönderir", async () => {
+    const tenant = await makeTenant();
+    const context = { tenantId: tenant.id, userId: "u1", role: "owner" };
+
+    const result = await submitWhatsappTemplate(context, "listingMatch");
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [, options] = fetchSpy.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.name).toBe("listing_match_notification_v1");
+    expect(body.components[0].text).toBe("Merhaba {{1}}, aradığınız kriterlere uygun yeni bir ilan bulduk: {{2}}.");
+    expect(result.listingMatch.templateName).toBe("listing_match_notification_v1");
+    expect(result.listingMatch.templateStatus).toBe("pending");
+    expect(result.listingMatch.templateVersion).toBe(1);
+  });
+
+  it("owner'ın YAZDIĞI özel metni kullanır", async () => {
+    const tenant = await makeTenant({
+      appointmentReminder: { enabled: false, hoursBefore: 2, templateStatus: "not_submitted", templateName: null, templateMetaId: null, templateBodyText: "Selam {{1}}! {{2}} randevunuz yaklaştı, unutmayın.", templateVersion: 0 },
+    });
+    const context = { tenantId: tenant.id, userId: "u1", role: "owner" };
+
+    await submitWhatsappTemplate(context, "appointmentReminder");
+
+    const [, options] = fetchSpy.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.name).toBe("appointment_reminder_v1");
+    expect(body.components[0].text).toBe("Selam {{1}}! {{2}} randevunuz yaklaştı, unutmayın.");
+  });
+
+  it("İKİNCİ kez gönderince (ör. metni düzeltip tekrar) versiyon artar, Meta'ya YENİ bir isim gider", async () => {
+    const tenant = await makeTenant();
+    const context = { tenantId: tenant.id, userId: "u1", role: "owner" };
+
+    await submitWhatsappTemplate(context, "listingMatch");
+    const second = await submitWhatsappTemplate(context, "listingMatch");
+
+    expect(second.listingMatch.templateVersion).toBe(2);
+    expect(second.listingMatch.templateName).toBe("listing_match_notification_v2");
+    const [, secondOptions] = fetchSpy.mock.calls[1];
+    expect(JSON.parse(secondOptions.body).name).toBe("listing_match_notification_v2");
+  });
+
+  it("WhatsApp bağlı değilse anlamlı bir hata fırlatır, Meta'ya hiç istek atmaz", async () => {
+    const tenant = await makeTenant({}, null);
+    const context = { tenantId: tenant.id, userId: "u1", role: "owner" };
+
+    await expect(submitWhatsappTemplate(context, "listingMatch")).rejects.toThrow(/WhatsApp/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

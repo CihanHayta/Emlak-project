@@ -20,9 +20,17 @@ import { withCreateFields } from "./base.model.js";
  * `undefined` kalır, Otomasyonlar sayfası boş/kırık bir yanıt alırdı
  * (canlıda 2026-08-14'te yakalandı).
  */
+// `templateBodyText: null` -> automation.service.js'teki SABİT varsayılan
+// metin kullanılır; owner Otomasyonlar sayfasından kendi metnini yazınca
+// buraya dolar. `templateVersion` her "Şablonu Gönder"de artırılır — Meta
+// aynı isimde bir şablonu İKİNCİ kez kabul etmiyor (ör. metni düzeltip
+// tekrar göndermek istendiğinde), bu yüzden gerçek Meta şablon adı
+// `{{baseAd}}_v{{templateVersion}}` şeklinde kuruluyor (bkz.
+// automation.service.js#submitWhatsappTemplate) — owner kaç kez
+// düzenleyip yeniden gönderirse göndersin asla çakışmaz.
 export const DEFAULT_AUTOMATIONS = {
-  listingMatch: { enabled: false, templateStatus: "not_submitted", templateName: null, templateMetaId: null },
-  appointmentReminder: { enabled: false, hoursBefore: 2, templateStatus: "not_submitted", templateName: null, templateMetaId: null },
+  listingMatch: { enabled: false, templateStatus: "not_submitted", templateName: null, templateMetaId: null, templateBodyText: null, templateVersion: 0 },
+  appointmentReminder: { enabled: false, hoursBefore: 2, templateStatus: "not_submitted", templateName: null, templateMetaId: null, templateBodyText: null, templateVersion: 0 },
   offHoursReply: {
     enabled: false,
     businessHours: { startHour: 9, endHour: 18, days: [1, 2, 3, 4, 5] }, // days: 0=Pazar...6=Cumartesi
