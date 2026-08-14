@@ -41,5 +41,12 @@ export function createDefaultConversation({
     // bir "kapalıyız" yanıtı gitmesin diye bir soğuma (cooldown) süresi
     // hesaplamak için kullanılır.
     lastAutoReplyAt: null,
+    // "24 Saat Penceresi Uyarısı" otomasyonu (bkz. automation.service.js#checkClosingWindows)
+    // bu sohbet için EN SON ne zaman size bir uyarı bıraktı — aynı kapanmak
+    // üzere olan pencere için tekrar tekrar uyarı düşmesin diye. Her yeni
+    // inbound mesajda (bkz. message.service.js#createInboundMessage)
+    // `windowExpiresAt` ile BİRLİKTE `null`'a sıfırlanır — müşteri tekrar
+    // yazıp pencereyi uzattığında, cevapsız kalırsa YENİDEN uyarı alabilesiniz.
+    windowAlertSentAt: null,
   });
 }

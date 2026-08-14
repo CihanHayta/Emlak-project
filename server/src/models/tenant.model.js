@@ -36,6 +36,13 @@ export const DEFAULT_AUTOMATIONS = {
     businessHours: { startHour: 9, endHour: 18, days: [1, 2, 3, 4, 5] }, // days: 0=Pazar...6=Cumartesi
     replyText: "Merhaba! Mesajınız için teşekkürler, çalışma saatlerimizde size dönüş yapacağız.",
   },
+  // Müşteri size yazdı, siz henüz cevap vermediniz, Meta'nın 24 saatlik
+  // ücretsiz mesajlaşma penceresi kapanmak üzere — REAKTİF değil, size
+  // (agent'a) İÇSEL bir uyarı, hiç dış API/onay gerektirmez. `offHoursReply.businessHours`'ı
+  // AYNEN paylaşır (ayrı bir çalışma saati alanı YOK, tek bir "ne zaman
+  // çalışıyoruz" tanımı yeterli) — sadece mesai içindeyken uyarır, mesai
+  // dışında zaten elinizden bir şey gelmez.
+  windowClosingAlert: { enabled: false, hoursBefore: 2 },
 };
 
 /**

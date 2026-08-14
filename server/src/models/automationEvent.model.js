@@ -3,9 +3,11 @@ import { withCreateFields } from "./base.model.js";
 
 /**
  * `automationEvents` — Otomasyonlar sayfasındaki aktivite kaydı. Her
- * "bir müşteriye otomasyon mesajı hazırlandı/gönderildi" olayı için bir
- * doküman. `status`:
- *  - "sent": template onaylıydı, gerçekten Meta API'siyle gönderildi.
+ * "bir müşteriye otomasyon mesajı hazırlandı/gönderildi" YA DA "size bir
+ * uyarı bırakıldı" olayı için bir doküman. `status`:
+ *  - "sent": ya template onaylıydı ve gerçekten Meta API'siyle gönderildi,
+ *    ya da (windowClosing gibi) zaten sadece İÇSEL bir bildirim — hiç dış
+ *    API çağrısı yok, Firestore'a yazılır yazılmaz "sent" sayılır.
  *  - "pending_manual": template henüz onaylı değil — mesaj hazır, `waLink`
  *    admin panelinde "Gönder" butonuna bağlanır (agent kendi WhatsApp'ından
  *    tek tıkla açıp gönderir, Business API'yi hiç kullanmaz).
@@ -15,10 +17,11 @@ import { withCreateFields } from "./base.model.js";
  *    geçersiz) — mesaj kaybolmasın diye yine de kayıt tutulur.
  */
 export function createDefaultAutomationEvent({
-  type, // "listingMatch" | "appointmentReminder" — tenant.automations'taki (bkz. tenant.model.js) alan adlarıyla BİREBİR aynı, otomasyon türleri arasında tek/tutarlı bir isimlendirme olsun diye.
-  customerId,
+  type, // "listingMatch" | "appointmentReminder" | "windowClosing" — tenant.automations'taki (bkz. tenant.model.js) alan adlarıyla BİREBİR aynı, otomasyon türleri arasında tek/tutarlı bir isimlendirme olsun diye.
+  customerId = null, // windowClosing'de sohbet henüz bir CRM müşterisine bağlanmamış olabilir — bu yüzden null'a izin veriliyor (diğer iki türde her zaman dolu).
   listingId = null,
   appointmentId = null,
+  conversationId = null, // sadece windowClosing — hangi sohbetin penceresi kapanıyor.
   channel = "whatsapp",
   status, // "sent" | "pending_manual" | "manual_sent" | "failed"
   message,
@@ -30,6 +33,7 @@ export function createDefaultAutomationEvent({
     customerId,
     listingId,
     appointmentId,
+    conversationId,
     channel,
     status,
     message,

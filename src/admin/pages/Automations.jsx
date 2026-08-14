@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Send, CalendarClock, MessageCircleReply, Loader2, ExternalLink } from "lucide-react";
+import { Send, CalendarClock, MessageCircleReply, Loader2, ExternalLink, AlarmClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -37,7 +37,7 @@ const DEFAULT_TEMPLATE_TEXT = {
   appointmentReminder: "Merhaba {{1}}, {{2}} tarihindeki randevunuzu hatırlatmak isteriz.",
 };
 
-const EVENT_TYPE_LABELS = { listingMatch: "Yeni İlan Eşleşmesi", appointmentReminder: "Randevu Hatırlatması" };
+const EVENT_TYPE_LABELS = { listingMatch: "Yeni İlan Eşleşmesi", appointmentReminder: "Randevu Hatırlatması", windowClosing: "24 Saat Penceresi Uyarısı" };
 const EVENT_STATUS_INFO = {
   sent: { label: "Gönderildi", variant: "default" },
   pending_manual: { label: "Gönderim Bekliyor", variant: "outline" },
@@ -79,6 +79,7 @@ export default function Automations() {
       <ListingMatchCard settings={settings.listingMatch} />
       <AppointmentReminderCard settings={settings.appointmentReminder} />
       <OffHoursReplyCard settings={settings.offHoursReply} />
+      <WindowClosingAlertCard settings={settings.windowClosingAlert} />
       <EventsLog events={events} />
     </div>
   );
@@ -395,6 +396,80 @@ function OffHoursReplyCard({ settings }) {
         <div className="space-y-1.5">
           <Label htmlFor="replyText">Yanıt metni</Label>
           <Textarea id="replyText" rows={3} value={replyText} onChange={(e) => setReplyText(e.target.value)} onBlur={handleReplyTextBlur} maxLength={1000} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * "24 Saat Penceresi Uyarısı" — REAKTİF değil ama dışarıya (müşteriye)
+ * hiçbir mesaj gitmez, TAMAMEN içsel: mesai saatleri içinde, bir müşteri
+ * size yazıp cevap alamamışsa ve Meta'nın 24 saatlik ücretsiz mesajlaşma
+ * penceresi kapanmak üzereyse aşağıdaki listeye bir uyarı düşer. Şablon
+ * gerekmez (dış API'ye hiç çıkmaz), açar açmaz aktif olur. Çalışma
+ * saatlerini "Mesai Dışı Otomatik Yanıt" kartındakiyle PAYLAŞIR — ayrı bir
+ * saat ayarı yok, mesai dışında zaten elinizden bir şey gelmez.
+ */
+function WindowClosingAlertCard({ settings }) {
+  const [toggling, setToggling] = useState(false);
+  const [hoursBefore, setHoursBefore] = useState(settings.hoursBefore);
+
+  useEffect(() => setHoursBefore(settings.hoursBefore), [settings.hoursBefore]);
+
+  async function handleToggle(enabled) {
+    setToggling(true);
+    try {
+      await updateAutomationSettings({ windowClosingAlert: { ...settings, enabled } });
+      toast.success(enabled ? "24 Saat Penceresi Uyarısı açıldı." : "24 Saat Penceresi Uyarısı kapatıldı.");
+    } catch (error) {
+      toast.error(error.message || "Ayar güncellenemedi.");
+    } finally {
+      setToggling(false);
+    }
+  }
+
+  async function handleHoursBlur() {
+    const value = Math.min(23, Math.max(1, Number(hoursBefore) || settings.hoursBefore));
+    setHoursBefore(value);
+    if (value === settings.hoursBefore) return;
+    try {
+      await updateAutomationSettings({ windowClosingAlert: { ...settings, hoursBefore: value } });
+      toast.success("Uyarı süresi güncellendi.");
+    } catch (error) {
+      toast.error(error.message || "Güncellenemedi.");
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2">
+              <AlarmClock className="h-4 w-4 text-brand-gold" />
+              24 Saat Penceresi Uyarısı
+            </CardTitle>
+            <CardDescription>
+              Bir müşteri yazdı, siz henüz cevap vermediniz ve ücretsiz mesajlaşma penceresi kapanmak üzere — mesai saatleri içinde aşağıdaki listeye bir uyarı düşer. Müşteriye hiçbir şey gönderilmez, şablon gerekmez.
+            </CardDescription>
+          </div>
+          <Switch checked={settings.enabled} disabled={toggling} onCheckedChange={handleToggle} />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="windowHoursBefore" className="text-sm text-muted-foreground">Kapanmasına kaç saat kala uyar:</Label>
+          <Input
+            id="windowHoursBefore"
+            type="number"
+            min={1}
+            max={23}
+            value={hoursBefore}
+            onChange={(e) => setHoursBefore(e.target.value)}
+            onBlur={handleHoursBlur}
+            className="w-20"
+          />
         </div>
       </CardContent>
     </Card>

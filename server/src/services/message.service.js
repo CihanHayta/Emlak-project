@@ -48,6 +48,10 @@ export async function createInboundMessage(context, conversationId, { text, atta
       lastMessageDirection: "inbound",
       unreadCount: (conversation.unreadCount ?? 0) + 1,
       windowExpiresAt: now + 24 * 60 * 60 * 1000,
+      // Pencere UZADI (yeni mesaj = yeni 24 saat) — önceki uyarı artık bu
+      // YENİ pencere için geçerli değil, cevapsız kalırsa otomasyon
+      // (checkClosingWindows) yeniden uyarabilsin diye sıfırlanır.
+      windowAlertSentAt: null,
     }),
   );
 

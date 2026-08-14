@@ -6,6 +6,7 @@ import { startInstagramTokenRefreshJob } from "./jobs/instagramTokenRefresh.job.
 import { startWhatsappTokenRefreshJob } from "./jobs/whatsappTokenRefresh.job.js";
 import { startTenantBackupJob } from "./jobs/backupTenants.job.js";
 import { startAppointmentRemindersJob } from "./jobs/appointmentReminders.job.js";
+import { startWindowClosingAlertsJob } from "./jobs/windowClosingAlerts.job.js";
 import { notifyTelegramServerStarted, notifyTelegramFatalError } from "./utils/notifyTelegram.js";
 
 const server = app.listen(env.port, () => {
@@ -45,6 +46,13 @@ if (env.firebaseMode === "live") {
 // hem gerçek WhatsApp API'si (mesaj göndermek) gerektiriyor.
 if (env.firebaseMode === "live" && env.integrationsMode === "live") {
   startAppointmentRemindersJob();
+}
+
+// 24 Saat Penceresi Uyarısı hiç dış API çağırmaz (sadece Firestore okur/
+// yazar) — bu yüzden sadece gerçek Firestore'a bağlı olmak yeterli,
+// integrationsMode'dan bağımsız.
+if (env.firebaseMode === "live") {
+  startWindowClosingAlertsJob();
 }
 
 function shutdown(signal) {

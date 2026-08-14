@@ -205,6 +205,55 @@ export async function checkOffHoursAndReply(context, conversation, tenant) {
 }
 
 /**
+ * jobs/windowClosingAlerts.job.js'ten çağrılır. TAMAMEN İÇSEL bir uyarı —
+ * hiçbir müşteriye mesaj gitmez, hiç Meta API çağrısı yapılmaz, sadece bir
+ * automationEvents kaydı düşer (Otomasyonlar sayfasındaki "Son Otomasyon
+ * Etkinlikleri" listesinde görünür). "Cevap bekliyor" sayılan sohbet: son
+ * mesaj MÜŞTERİDEN geldi (`lastMessageDirection === "inbound"`) VE siz
+ * henüz cevaplamadınız. Sadece mesai saatleri içinde çalışır —
+ * `offHoursReply.businessHours`'ı PAYLAŞIR (ayrı bir çalışma saati alanı
+ * yok) çünkü mesai dışında zaten elinizden bir şey gelmez, uyarmanın
+ * anlamı olmaz.
+ */
+export async function checkClosingWindows(context, tenant) {
+  const settings = tenant.automations?.windowClosingAlert;
+  if (!settings?.enabled) return;
+
+  const now = toIstanbul(Date.now());
+  const businessHours = tenant.automations?.offHoursReply?.businessHours ?? DEFAULT_AUTOMATIONS.offHoursReply.businessHours;
+  if (!isWithinBusinessHours(businessHours, now)) return;
+
+  const nowMs = Date.now();
+  const alertThreshold = nowMs + settings.hoursBefore * 60 * 60 * 1000;
+
+  const conversations = await conversationRepository.findAll(context);
+  const due = conversations.filter(
+    (c) => c.lastMessageDirection === "inbound" && !c.windowAlertSentAt && c.windowExpiresAt > nowMs && c.windowExpiresAt <= alertThreshold,
+  );
+
+  for (const conversation of due) {
+    const remainingMinutes = Math.max(1, Math.round((conversation.windowExpiresAt - nowMs) / 60000));
+    const who = conversation.participantName || conversation.participantUsername || "Bir müşteri";
+    const message = `${who} size yazdı, henüz cevap vermediniz — WhatsApp/Instagram'ın 24 saatlik ücretsiz mesajlaşma penceresi yaklaşık ${remainingMinutes} dakika içinde kapanacak.`;
+
+    // eslint-disable-next-line no-await-in-loop -- sohbet başına bağımsız kayıt, job zaten periyodik çalışıyor.
+    await automationEventRepository.create(
+      context,
+      createDefaultAutomationEvent({
+        type: "windowClosing",
+        customerId: conversation.customerId,
+        conversationId: conversation.id,
+        channel: conversation.channel,
+        status: "sent",
+        message,
+      }),
+    );
+    // eslint-disable-next-line no-await-in-loop
+    await conversationRepository.update(context, conversation.id, { windowAlertSentAt: nowMs });
+  }
+}
+
+/**
  * Owner "Şablonu Meta'ya Gönder"e basınca çağrılır — `type` "listingMatch"
  * ya da "appointmentReminder". Owner'ın Otomasyonlar sayfasından yazdığı
  * ÖZEL metni (varsa) kullanır, yazmadıysa varsayılan metni. Her

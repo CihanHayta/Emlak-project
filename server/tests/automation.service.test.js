@@ -12,7 +12,7 @@ import * as tenantRepo from "../src/repositories/tenant.repository.js";
 import { customerRepository } from "../src/repositories/customer.repository.js";
 import { conversationRepository } from "../src/repositories/conversation.repository.js";
 import { automationEventRepository } from "../src/repositories/automationEvent.repository.js";
-import { notifyMatchingCustomersForListing, checkOffHoursAndReply, submitWhatsappTemplate } from "../src/services/automation.service.js";
+import { notifyMatchingCustomersForListing, checkOffHoursAndReply, submitWhatsappTemplate, checkClosingWindows } from "../src/services/automation.service.js";
 
 // toIstanbul kullanılmıyor gibi görünse de import satırı kasıtlı — dayjs'in
 // utc/timezone eklentilerini bir kere, modül yüklenirken kaydeder (date.js
@@ -236,5 +236,92 @@ describe("automation.service — submitWhatsappTemplate (düzenlenebilir metin +
 
     await expect(submitWhatsappTemplate(context, "listingMatch")).rejects.toThrow(/WhatsApp/);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("automation.service — checkClosingWindows (24 Saat Penceresi Uyarısı)", () => {
+  const WEDNESDAY_NOON_ISTANBUL = dayjs.tz("2026-08-12 12:00", "Europe/Istanbul").valueOf();
+  const WEDNESDAY_LATE_NIGHT_ISTANBUL = dayjs.tz("2026-08-12 22:00", "Europe/Istanbul").valueOf();
+
+  beforeEach(() => resetMockFirestore());
+  afterEach(() => jest.restoreAllMocks());
+
+  async function makeConversation(context, overrides = {}) {
+    const conversation = await conversationRepository.create(context, createDefaultConversation({ channel: "whatsapp", externalUserId: "905551234567", participantName: "Ahmet" }));
+    return conversationRepository.update(context, conversation.id, overrides);
+  }
+
+  it("otomasyon kapalıyken hiç uyarı oluşturmaz", async () => {
+    const tenant = await makeTenant({ windowClosingAlert: { enabled: false, hoursBefore: 2 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    await makeConversation(context, { lastMessageDirection: "inbound", windowExpiresAt: Date.now() + 60 * 60 * 1000 });
+
+    jest.spyOn(Date, "now").mockReturnValue(WEDNESDAY_NOON_ISTANBUL);
+    await checkClosingWindows(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("mesai SAATİ DIŞINDAYSA uyarmaz (elinizden bir şey gelmez)", async () => {
+    const tenant = await makeTenant({ windowClosingAlert: { enabled: true, hoursBefore: 2 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    jest.spyOn(Date, "now").mockReturnValue(WEDNESDAY_LATE_NIGHT_ISTANBUL);
+    await makeConversation(context, { lastMessageDirection: "inbound", windowExpiresAt: WEDNESDAY_LATE_NIGHT_ISTANBUL + 60 * 60 * 1000 });
+
+    await checkClosingWindows(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("cevaplanmamış (inbound) VE penceresi yakında kapanacak bir sohbet için uyarı oluşturur, sohbeti işaretler", async () => {
+    const tenant = await makeTenant({ windowClosingAlert: { enabled: true, hoursBefore: 2 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    jest.spyOn(Date, "now").mockReturnValue(WEDNESDAY_NOON_ISTANBUL);
+    const conversation = await makeConversation(context, { lastMessageDirection: "inbound", windowExpiresAt: WEDNESDAY_NOON_ISTANBUL + 60 * 60 * 1000 }); // 1 saat sonra kapanacak, eşik 2 saat
+
+    await checkClosingWindows(context, tenant);
+
+    const events = await automationEventRepository.findAll(context);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("windowClosing");
+    expect(events[0].conversationId).toBe(conversation.id);
+    expect(events[0].message).toContain("Ahmet");
+
+    const updated = await conversationRepository.findById(context, conversation.id);
+    expect(updated.windowAlertSentAt).toBe(WEDNESDAY_NOON_ISTANBUL);
+  });
+
+  it("SİZ zaten cevapladıysanız (lastMessageDirection=outbound) uyarmaz", async () => {
+    const tenant = await makeTenant({ windowClosingAlert: { enabled: true, hoursBefore: 2 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    jest.spyOn(Date, "now").mockReturnValue(WEDNESDAY_NOON_ISTANBUL);
+    await makeConversation(context, { lastMessageDirection: "outbound", windowExpiresAt: WEDNESDAY_NOON_ISTANBUL + 60 * 60 * 1000 });
+
+    await checkClosingWindows(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("AYNI pencere için İKİNCİ kez çalıştırılınca tekrar uyarmaz (idempotency)", async () => {
+    const tenant = await makeTenant({ windowClosingAlert: { enabled: true, hoursBefore: 2 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    jest.spyOn(Date, "now").mockReturnValue(WEDNESDAY_NOON_ISTANBUL);
+    await makeConversation(context, { lastMessageDirection: "inbound", windowExpiresAt: WEDNESDAY_NOON_ISTANBUL + 60 * 60 * 1000 });
+
+    await checkClosingWindows(context, tenant);
+    await checkClosingWindows(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(1);
+  });
+
+  it("penceresi henüz uyarı eşiğinin dışındaysa (çok erken) uyarmaz", async () => {
+    const tenant = await makeTenant({ windowClosingAlert: { enabled: true, hoursBefore: 2 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    jest.spyOn(Date, "now").mockReturnValue(WEDNESDAY_NOON_ISTANBUL);
+    await makeConversation(context, { lastMessageDirection: "inbound", windowExpiresAt: WEDNESDAY_NOON_ISTANBUL + 10 * 60 * 60 * 1000 }); // 10 saat sonra, eşik 2 saat
+
+    await checkClosingWindows(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
   });
 });
