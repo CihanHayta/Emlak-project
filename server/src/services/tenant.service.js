@@ -195,29 +195,34 @@ async function generateUniqueSlug(name) {
 
 /**
  * Otomasyonlar sayfası için: tenant'ın şu anki ayarlarını döner.
- * `tenant.automations ?? DEFAULT_AUTOMATIONS` ŞART — bu alan 2026-08-14'te
- * eklendi, ondan ÖNCE oluşturulmuş tenant'larda (bkz. tenant.model.js'in
- * DEFAULT_AUTOMATIONS yorumu) hiç yok, `undefined` sessizce Otomasyonlar
- * sayfasını kırardı (canlıda yakalandı).
+ * `{ ...DEFAULT_AUTOMATIONS, ...tenant.automations }` ŞART, sadece üst
+ * seviye `??` YETMEZ: `automations` alanı hiç yoksa (2026-08-14'ten önce
+ * oluşturulmuş tenant) sorun değil ama YENİ bir otomasyon türü (ör.
+ * windowClosingAlert) eklendiğinde, `automations` alanı ZATEN VAR olan
+ * (başka bir otomasyonu daha önce açılmış) tenant'larda o yeni anahtar
+ * `undefined` kalır — `??` bunu yakalamaz çünkü tüm obje `??`'nin sol
+ * tarafına düşmüyor. Canlıda yakalandı: windowClosingAlert eklendiğinde
+ * bu tenant'ın automations'ı zaten vardı (offHoursReply açıktı), GET
+ * windowClosingAlert'i hiç döndürmedi ilk PATCH'e kadar.
  */
 export async function getTenantAutomations(tenantId) {
   const tenant = await findTenantById(tenantId);
   if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
-  return tenant.automations ?? DEFAULT_AUTOMATIONS;
+  return { ...DEFAULT_AUTOMATIONS, ...tenant.automations };
 }
 
 /**
  * Otomasyonlar sayfasından toggle/ayar değişince çağrılır. `updates`
  * kısmi olabilir (ör. sadece `listingMatch.enabled`) — mevcut ayarların
- * (yoksa DEFAULT_AUTOMATIONS'ın) üzerine SIĞ (shallow, tek seviye)
- * birleştirilir; her alt-otomasyon kendi içinde tam bir obje olarak
- * gönderilmeli (frontend zaten formu hep tam obje olarak tutuyor, bkz.
- * Automations.jsx).
+ * (yoksa DEFAULT_AUTOMATIONS'ın, bkz. getTenantAutomations yorumu) üzerine
+ * SIĞ (shallow, tek seviye) birleştirilir; her alt-otomasyon kendi içinde
+ * tam bir obje olarak gönderilmeli (frontend zaten formu hep tam obje
+ * olarak tutuyor, bkz. Automations.jsx).
  */
 export async function setTenantAutomations(tenantId, updates) {
   const tenant = await findTenantById(tenantId);
   if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
-  const merged = { ...(tenant.automations ?? DEFAULT_AUTOMATIONS), ...updates };
+  const merged = { ...DEFAULT_AUTOMATIONS, ...tenant.automations, ...updates };
   await updateTenantAutomations(tenantId, merged);
   return merged;
 }
