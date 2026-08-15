@@ -28,6 +28,13 @@ const TEMPLATE_STATUS_INFO = {
   rejected: { label: "Reddedildi", variant: "destructive" },
 };
 
+const TEMPLATE_SUBMIT_HINT = {
+  not_submitted: "Bir kere tıklamanız yeterli. Meta onayladıktan sonra bu mesaj otomatik gönderilir, tekrar tıklamanıza gerek kalmaz. Metni sonradan değiştirmek isterseniz, düzenleyip tekrar gönderebilirsiniz.",
+  pending: "Meta metni inceliyor, genelde birkaç saat içinde sonuçlanır. Aşağıdaki butonla durumu kontrol edebilirsiniz.",
+  approved: "Şablon onaylı, mesaj artık otomatik gönderiliyor — herhangi bir şey yapmanıza gerek yok. Metni değiştirirseniz, yeni metni tekrar onaya göndermeniz gerekir.",
+  rejected: "Meta bu metni onaylamadı. Metni düzenleyip tekrar gönderebilirsiniz.",
+};
+
 // server/src/services/automation.service.js#AUTOMATION_TEMPLATE_DEFAULTS ile
 // AYNI metinler — sadece boş bırakıldığında ne kullanılacağını göstermek
 // için burada da tutuluyor (backend zaten kendi varsayılanını uygular,
@@ -179,6 +186,7 @@ function TemplateControls({ type, settings, onSettingsChange }) {
             {refreshing ? "Kontrol ediliyor…" : "Onay Durumunu Yenile"}
           </Button>
         )}
+        <p className="w-full text-xs text-muted-foreground">{TEMPLATE_SUBMIT_HINT[templateStatus] ?? TEMPLATE_SUBMIT_HINT.not_submitted}</p>
         {templateStatus !== "approved" && (
           <p className="w-full text-xs text-muted-foreground">
             Şablon onaylanana kadar mesajlar hazırlanır, aşağıdaki geçmiş listesinden tek tıkla WhatsApp&apos;tan elle gönderebilirsiniz.
