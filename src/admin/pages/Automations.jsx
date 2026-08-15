@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Send, CalendarClock, MessageCircleReply, Loader2, ExternalLink, AlarmClock, UserPlus, BellRing } from "lucide-react";
+import { Send, CalendarClock, MessageCircleReply, Loader2, ExternalLink, AlarmClock, UserPlus, BellRing, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -98,7 +98,86 @@ export default function Automations() {
       <NewLeadWelcomeCard settings={settings.newLeadWelcome} />
       <LeadResponseAlertCard settings={settings.leadResponseAlert} />
       <EventsLog events={events} />
+      <AutomationsInfoCard />
     </div>
+  );
+}
+
+const INFO_GROUPS = [
+  {
+    title: "Müşteriyle iletişim kuranlar",
+    items: [
+      {
+        icon: Send,
+        title: "Yeni İlan Eşleşmesi",
+        text: "Yeni bir ilan yayına girdiğinde, aradıkları kritere uyan müşterilere otomatik haber verilir.",
+      },
+      {
+        icon: CalendarClock,
+        title: "Randevu Hatırlatması",
+        text: "Randevudan belirlediğiniz süre önce müşteriye otomatik bir hatırlatma mesajı gönderilir.",
+      },
+      {
+        icon: UserPlus,
+        title: "Yeni Lead Karşılama",
+        text: "Web formu, kampanya veya Instagram Reklam'dan gelen her yeni başvuru otomatik CRM müşterisine dönüşür ve müşteriye ilk karşılama mesajı hazırlanır.",
+      },
+      {
+        icon: MessageCircleReply,
+        title: "Mesai Dışı Otomatik Yanıt",
+        text: "Çalışma saatleri dışında gelen mesajlara anında otomatik bir yanıt gönderilir.",
+      },
+    ],
+  },
+  {
+    title: "Sadece size haber verenler (içsel — müşteriye hiçbir şey gönderilmez)",
+    items: [
+      {
+        icon: AlarmClock,
+        title: "24 Saat Penceresi Uyarısı",
+        text: "Bir müşteri yazdı ama siz henüz cevap vermediniz ve ücretsiz mesajlaşma süresi kapanmak üzere — mesai saatleri içinde size bir uyarı düşer.",
+      },
+      {
+        icon: BellRing,
+        title: "Lead Yanıt Uyarısı",
+        text: "Yeni bir başvuru belirlediğiniz süre içinde \"Yeni\" durumundan çıkmazsa (aranmadı/işlem yapılmadı) size bir uyarı düşer.",
+      },
+    ],
+  },
+];
+
+/** Sayfanın en altında, tüm otomasyonları tek bakışta özetleyen bilgi kutusu. */
+function AutomationsInfoCard() {
+  return (
+    <Card className="border-dashed bg-muted/30">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Info className="h-4 w-4 text-brand-gold" />
+          Otomasyonlar ne işe yarıyor?
+        </CardTitle>
+        <CardDescription>
+          Yukarıdaki 6 otomasyonun kısa özeti. Müşteriye mesaj gönderenler (İlan Eşleşmesi, Randevu Hatırlatması, Yeni Lead Karşılama) Meta&apos;nın onayladığı bir şablon gerektirir — onay gelene kadar mesaj hazırlanır, siz tek tıkla elle gönderirsiniz, hiçbir şey kaybolmaz. Diğerleri (Mesai Dışı Yanıt, 24 Saat Penceresi Uyarısı, Lead Yanıt Uyarısı) şablon gerektirmez, açar açmaz aktif olur.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {INFO_GROUPS.map((group) => (
+          <div key={group.title} className="space-y-2.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.title}</p>
+            <div className="space-y-2.5">
+              {group.items.map((item) => (
+                <div key={item.title} className="flex gap-3">
+                  <item.icon className="mt-0.5 h-4 w-4 shrink-0 text-brand-gold" />
+                  <div>
+                    <p className="text-sm font-medium">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">{item.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
