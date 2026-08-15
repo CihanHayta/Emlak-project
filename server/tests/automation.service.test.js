@@ -495,14 +495,27 @@ describe("automation.service — checkLeadResponseAlerts (Lead Yanıt Uyarısı)
     expect(await automationEventRepository.findAll(context)).toHaveLength(0);
   });
 
-  it("zaten uyarılmış (responseAlertSentAt dolu) başvuruyu tekrar uyarmaz", async () => {
-    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
+  it("son uyarıdan bu yana repeatMinutes henüz geçmediyse tekrar uyarmaz", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10, repeatMinutes: 30 } });
     const context = { tenantId: tenant.id, userId: null, role: "system" };
-    await makeLead(context, 15, { responseAlertSentAt: Date.now() - 5 * 60 * 1000 });
+    await makeLead(context, 15, { responseAlertSentAt: Date.now() - 5 * 60 * 1000 }); // 30dk'lık tekrar aralığının sadece 5dk'sı geçmiş
 
     await checkLeadResponseAlerts(context, tenant);
 
     expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("son uyarıdan bu yana repeatMinutes geçtiyse ve durum HÂLÂ 'Yeni'yse TEKRAR uyarır", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10, repeatMinutes: 20 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    const lastAlertAt = Date.now() - 25 * 60 * 1000; // 20dk'lık tekrar aralığı geçmiş
+    const lead = await makeLead(context, 60, { responseAlertSentAt: lastAlertAt });
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(1);
+    const updated = await leadRepository.findById(context, lead.id);
+    expect(updated.responseAlertSentAt).toBeGreaterThan(lastAlertAt);
   });
 
   it("eşik henüz geçmemişse (çok yeni) uyarmaz", async () => {
@@ -546,6 +559,19 @@ describe("automation.service — checkLeadResponseAlerts (Lead Yanıt Uyarısı)
     await checkLeadResponseAlerts(context, tenant);
 
     expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("müşteri hâlâ 'Yeni'de kalmışsa, agent durumu güncelleyene kadar TEKRAR TEKRAR uyarır", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10, repeatMinutes: 20 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    const lastAlertAt = Date.now() - 25 * 60 * 1000;
+    const customer = await makeCustomer(context, 60, { responseAlertSentAt: lastAlertAt });
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(1);
+    const updated = await customerRepository.findById(context, customer.id);
+    expect(updated.responseAlertSentAt).toBeGreaterThan(lastAlertAt);
   });
 
   it("hem bekleyen bir lead hem de 'Yeni'de kalmış bir müşteri varsa ikisi için de ayrı ayrı uyarır", async () => {

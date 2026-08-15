@@ -140,7 +140,7 @@ const INFO_GROUPS = [
       {
         icon: BellRing,
         title: "Lead Yanıt Uyarısı",
-        text: "Yeni bir başvuru belirlediğiniz süre içinde bir müşteri kartına dönüşmezse, ya da kart oluşup da \"Yeni\" durumunda takılı kalırsa (aranmadı) size bir uyarı düşer.",
+        text: "Yeni bir başvuru belirlediğiniz süre içinde bir müşteri kartına dönüşmezse, ya da kart oluşup da \"Yeni\" durumunda takılı kalırsa (aranmadı) size bir uyarı düşer — siz durumu değiştirene kadar belirlediğiniz aralıkla tekrar tekrar hatırlatır.",
       },
     ],
   },
@@ -630,12 +630,16 @@ function WindowClosingAlertCard({ settings }) {
  * başvuruları (leads) — o otomasyon kapalı olsa bile bir başvuru belirlenen
  * süre içinde bir müşteri kartına dönüşmezse uyarır; (2) müşteri kartı
  * ZATEN oluşmuş ama hâlâ "Yeni" durumundaysa (aranmadı) onu da uyarır.
+ * İlk uyarıdan sonra, durum hâlâ "Yeni"yse `repeatMinutes`'te bir TEKRAR
+ * uyarır — agent durumu güncelleyene kadar süresiz devam eder.
  */
 function LeadResponseAlertCard({ settings }) {
   const [toggling, setToggling] = useState(false);
   const [minutesThreshold, setMinutesThreshold] = useState(settings.minutesThreshold);
+  const [repeatMinutes, setRepeatMinutes] = useState(settings.repeatMinutes);
 
   useEffect(() => setMinutesThreshold(settings.minutesThreshold), [settings.minutesThreshold]);
+  useEffect(() => setRepeatMinutes(settings.repeatMinutes), [settings.repeatMinutes]);
 
   async function handleToggle(enabled) {
     setToggling(true);
@@ -655,7 +659,19 @@ function LeadResponseAlertCard({ settings }) {
     if (value === settings.minutesThreshold) return;
     try {
       await updateAutomationSettings({ leadResponseAlert: { ...settings, minutesThreshold: value } });
-      toast.success("Uyarı süresi güncellendi.");
+      toast.success("İlk uyarı süresi güncellendi.");
+    } catch (error) {
+      toast.error(error.message || "Güncellenemedi.");
+    }
+  }
+
+  async function handleRepeatBlur() {
+    const value = Math.min(1440, Math.max(5, Number(repeatMinutes) || settings.repeatMinutes));
+    setRepeatMinutes(value);
+    if (value === settings.repeatMinutes) return;
+    try {
+      await updateAutomationSettings({ leadResponseAlert: { ...settings, repeatMinutes: value } });
+      toast.success("Tekrar süresi güncellendi.");
     } catch (error) {
       toast.error(error.message || "Güncellenemedi.");
     }
@@ -670,14 +686,14 @@ function LeadResponseAlertCard({ settings }) {
               <BellRing className="h-4 w-4 text-brand-gold" />
               Lead Yanıt Uyarısı
             </CardTitle>
-            <CardDescription>Yeni bir başvuru belirlediğiniz süre içinde bir müşteri kartına dönüşmezse, ya da kart oluşup da &quot;Yeni&quot; durumunda takılı kalırsa (aranmadı) size içsel bir uyarı düşer.</CardDescription>
+            <CardDescription>Yeni bir başvuru belirlediğiniz süre içinde bir müşteri kartına dönüşmezse, ya da kart oluşup da &quot;Yeni&quot; durumunda takılı kalırsa (aranmadı) size içsel bir uyarı düşer — durum değişene kadar belirlediğiniz aralıkla tekrarlar.</CardDescription>
           </div>
           <Switch checked={settings.enabled} disabled={toggling} onCheckedChange={handleToggle} />
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         <div className="flex items-center gap-2">
-          <Label htmlFor="leadMinutesThreshold" className="text-sm text-muted-foreground">Kaç dakika içinde dönüş yapılmalı:</Label>
+          <Label htmlFor="leadMinutesThreshold" className="text-sm text-muted-foreground">İlk uyarı — kaç dakika içinde dönüş yapılmalı:</Label>
           <Input
             id="leadMinutesThreshold"
             type="number"
@@ -686,6 +702,19 @@ function LeadResponseAlertCard({ settings }) {
             value={minutesThreshold}
             onChange={(e) => setMinutesThreshold(e.target.value)}
             onBlur={handleMinutesBlur}
+            className="w-20"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="leadRepeatMinutes" className="text-sm text-muted-foreground">Hâlâ &quot;Yeni&quot;yse kaç dakikada bir tekrar hatırlat:</Label>
+          <Input
+            id="leadRepeatMinutes"
+            type="number"
+            min={5}
+            max={1440}
+            value={repeatMinutes}
+            onChange={(e) => setRepeatMinutes(e.target.value)}
+            onBlur={handleRepeatBlur}
             className="w-20"
           />
         </div>

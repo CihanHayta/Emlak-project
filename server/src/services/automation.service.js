@@ -348,10 +348,21 @@ export async function notifyNewLead(context, lead) {
   return customer;
 }
 
-function isDueForAlert(entity, nowMs, thresholdMs) {
-  if (entity.status !== "Yeni" || entity.responseAlertSentAt) return false;
-  const createdAtMs = entity.createdAt?.getTime?.() ?? entity.createdAt ?? 0;
-  return nowMs - createdAtMs >= thresholdMs;
+/**
+ * İLK uyarı `createdAt`'ten `thresholdMs` sonra; durum hâlâ "Yeni"yse
+ * (agent unuttuysa) `repeatMs`'te bir TEKRARLAR — süresiz, agent durumu
+ * "Yeni" dışına çıkarana kadar (bkz. checkLeadResponseAlerts'in üst
+ * yorumu). `responseAlertSentAt` bu yüzden "hiç uyarıldı mı" değil, "EN
+ * SON ne zaman uyarıldı" anlamına geliyor — ayrı bir "reset" gerekmiyor,
+ * status "Yeni" dışına çıktığı an bu fonksiyon zaten baştan false dönüyor.
+ */
+function isDueForAlert(entity, nowMs, thresholdMs, repeatMs) {
+  if (entity.status !== "Yeni") return false;
+  if (!entity.responseAlertSentAt) {
+    const createdAtMs = entity.createdAt?.getTime?.() ?? entity.createdAt ?? 0;
+    return nowMs - createdAtMs >= thresholdMs;
+  }
+  return nowMs - entity.responseAlertSentAt >= repeatMs;
 }
 
 function minutesSince(createdAt, nowMs) {
@@ -370,8 +381,11 @@ function minutesSince(createdAt, nowMs) {
  *     durumu hâlâ "Yeni" — yani aranıp "Arandı"/"Teklif Verildi" gibi bir
  *     sonraki aşamaya taşınmamış. Sadece "Yeni"yi izler, ondan sonraki
  *     aşamaların takibi kapsam dışı (bkz. tenant.model.js'in yorumu).
- * Her ikisi de aynı `minutesThreshold`'u paylaşır, aynı "leadResponseAlert"
- * tipiyle Otomasyonlar log'una düşer — kullanıcı için tek bir ayar, tek liste.
+ * İKİSİ DE, durum "Yeni"de kaldığı sürece `repeatMinutes`'te bir TEKRAR
+ * uyarır (bkz. isDueForAlert) — "aramayı unutmayın" tek seferlik bir not
+ * değil, agent durumu değiştirene kadar süren bir hatırlatma olsun diye.
+ * Her ikisi de aynı ayarları paylaşır, aynı "leadResponseAlert" tipiyle
+ * Otomasyonlar log'una düşer — kullanıcı için tek bir ayar, tek liste.
  */
 export async function checkLeadResponseAlerts(context, tenant) {
   const settings = tenant.automations?.leadResponseAlert;
@@ -379,9 +393,10 @@ export async function checkLeadResponseAlerts(context, tenant) {
 
   const nowMs = Date.now();
   const thresholdMs = settings.minutesThreshold * 60 * 1000;
+  const repeatMs = settings.repeatMinutes * 60 * 1000;
 
   const leads = await leadRepository.findAll(context);
-  const dueLeads = leads.filter((l) => isDueForAlert(l, nowMs, thresholdMs));
+  const dueLeads = leads.filter((l) => isDueForAlert(l, nowMs, thresholdMs, repeatMs));
   for (const lead of dueLeads) {
     const minutesAgo = minutesSince(lead.createdAt, nowMs);
     const message = `${lead.name || "Bir başvuru"} ${minutesAgo} dakika önce başvurdu, henüz müşteri kartı oluşturulmadı.`;
@@ -393,7 +408,7 @@ export async function checkLeadResponseAlerts(context, tenant) {
   }
 
   const customers = await customerRepository.findAll(context);
-  const dueCustomers = customers.filter((c) => isDueForAlert(c, nowMs, thresholdMs));
+  const dueCustomers = customers.filter((c) => isDueForAlert(c, nowMs, thresholdMs, repeatMs));
   for (const customer of dueCustomers) {
     const minutesAgo = minutesSince(customer.createdAt, nowMs);
     const message = `${customer.name || "Bir müşteri"} ${minutesAgo} dakika önce müşteri kartına eklendi, hâlâ "Yeni" durumunda — arandı mı?`;

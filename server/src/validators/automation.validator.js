@@ -39,5 +39,6 @@ export const updateAutomationSettingsValidator = [
   body("newLeadWelcome.enabled").optional().isBoolean().withMessage("newLeadWelcome.enabled boolean olmalı."),
   body("newLeadWelcome.templateBodyText").optional().isString().trim().isLength({ min: 10, max: 1000 }).withMessage("Mesaj metni 10-1000 karakter olmalı.").custom(validateTemplatePlaceholders),
   body("leadResponseAlert.enabled").optional().isBoolean().withMessage("leadResponseAlert.enabled boolean olmalı."),
-  body("leadResponseAlert.minutesThreshold").optional().isInt({ min: 1, max: 120 }).withMessage("Uyarı 1-120 dakika arasında olmalı."),
+  body("leadResponseAlert.minutesThreshold").optional().isInt({ min: 1, max: 120 }).withMessage("İlk uyarı 1-120 dakika arasında olmalı."),
+  body("leadResponseAlert.repeatMinutes").optional().isInt({ min: 5, max: 1440 }).withMessage("Tekrar uyarısı 5-1440 dakika (1 gün) arasında olmalı."),
 ];

@@ -57,8 +57,12 @@ export const DEFAULT_AUTOMATIONS = {
   //     kapalıyken de çalışır, çünkü doğrudan `leads` koleksiyonunu izler;
   // (2) müşteri kartı ZATEN oluşmuş ama durumu hâlâ "Yeni"den ilerlemediyse
   //     (aranmadı/işlem yapılmadı) — sadece "Yeni" aşamasını izler.
-  // windowClosingAlert gibi hiç dış API çağrısı yok, hiç template gerekmez.
-  leadResponseAlert: { enabled: false, minutesThreshold: 10 },
+  // `minutesThreshold`: İLK uyarıya kadar geçen süre. `repeatMinutes`:
+  // durum hâlâ "Yeni"yse bundan sonra KAÇ DAKİKADA BİR TEKRAR uyarılsın —
+  // agent gerçekten unuttuysa hatırlatma süresiz devam eder, tek seferlik
+  // bir not değildir. windowClosingAlert gibi hiç dış API çağrısı yok, hiç
+  // template gerekmez.
+  leadResponseAlert: { enabled: false, minutesThreshold: 10, repeatMinutes: 30 },
 };
 
 /**
