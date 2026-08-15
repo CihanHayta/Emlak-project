@@ -25,7 +25,17 @@ function setSession(next) {
 }
 
 async function fetchMe() {
-  const response = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
+  // GEÇİCİ TEŞHİS LOGU — canlıda "yenileyince login'e atıyor" sorununu
+  // izlemek için, kaynağı bulunca kaldırılacak.
+  console.log("[auth-debug] fetchMe çağrıldı, API_URL:", API_URL, "document.cookie (sadece httpOnly OLMAYANLAR görünür):", document.cookie || "(boş)");
+  let response;
+  try {
+    response = await fetch(`${API_URL}/auth/me`, { credentials: "include" });
+  } catch (error) {
+    console.log("[auth-debug] fetch BİZZAT ATTI (ağ hatası/CORS/vs):", error.message);
+    throw error;
+  }
+  console.log("[auth-debug] /auth/me yanıtı — status:", response.status, "ok:", response.ok, "url:", response.url);
   if (!response.ok) return null;
   const body = await response.json();
   return body.data;
