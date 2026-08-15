@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Send, CalendarClock, MessageCircleReply, Loader2, ExternalLink, AlarmClock } from "lucide-react";
+import { Send, CalendarClock, MessageCircleReply, Loader2, ExternalLink, AlarmClock, UserPlus, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -42,9 +42,17 @@ const TEMPLATE_SUBMIT_HINT = {
 const DEFAULT_TEMPLATE_TEXT = {
   listingMatch: "Merhaba {{1}}, aradığınız kriterlere uygun yeni bir ilan bulduk: {{2}}.",
   appointmentReminder: "Merhaba {{1}}, {{2}} tarihindeki randevunuzu hatırlatmak isteriz.",
+  newLeadWelcome: "Merhaba {{1}}, bizimle iletişime geçtiğiniz için teşekkür ederiz! {{2}} ile ilgili size en kısa sürede dönüş yapacağız.",
 };
 
-const EVENT_TYPE_LABELS = { listingMatch: "Yeni İlan Eşleşmesi", appointmentReminder: "Randevu Hatırlatması", windowClosing: "24 Saat Penceresi Uyarısı" };
+const EVENT_TYPE_LABELS = {
+  listingMatch: "Yeni İlan Eşleşmesi",
+  appointmentReminder: "Randevu Hatırlatması",
+  windowClosing: "24 Saat Penceresi Uyarısı",
+  newLeadAlert: "Yeni Lead Bildirimi",
+  newLeadWelcome: "Yeni Lead Karşılama",
+  leadResponseAlert: "Lead Yanıt Uyarısı",
+};
 const EVENT_STATUS_INFO = {
   sent: { label: "Gönderildi", variant: "default" },
   pending_manual: { label: "Gönderim Bekliyor", variant: "outline" },
@@ -87,6 +95,8 @@ export default function Automations() {
       <AppointmentReminderCard settings={settings.appointmentReminder} />
       <OffHoursReplyCard settings={settings.offHoursReply} />
       <WindowClosingAlertCard settings={settings.windowClosingAlert} />
+      <NewLeadWelcomeCard settings={settings.newLeadWelcome} />
+      <LeadResponseAlertCard settings={settings.leadResponseAlert} />
       <EventsLog events={events} />
     </div>
   );
@@ -233,6 +243,56 @@ function ListingMatchCard({ settings }) {
       </CardHeader>
       <CardContent>
         <TemplateControls type="listingMatch" settings={settings} onSettingsChange={handleSettingsChange} />
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * "Yeni Lead Karşılama" — web formu/kampanya/Instagram Reklam'dan gelen
+ * bir başvuru geldiğinde: CRM'e otomatik müşteri oluşturulur, size (owner'a)
+ * içsel bir "yeni lead" bildirimi düşer (aşağıdaki olay listesinde), ve
+ * müşteriye ilk karşılama mesajı gönderilir/hazırlanır. PROAKTİF olduğu
+ * için (müşteri size henüz yazmadı) listingMatch gibi Meta Template onayı
+ * gerekir. Instagram/WhatsApp DM'leri bu otomasyonun KAPSAMI DIŞINDA —
+ * onlar hiç `lead` oluşturmuyor, doğrudan Mesajlar sayfasına düşüyor.
+ */
+function NewLeadWelcomeCard({ settings }) {
+  const [toggling, setToggling] = useState(false);
+
+  async function handleToggle(enabled) {
+    setToggling(true);
+    try {
+      await updateAutomationSettings({ newLeadWelcome: { ...settings, enabled } });
+      toast.success(enabled ? "Yeni Lead Karşılama açıldı." : "Yeni Lead Karşılama kapatıldı.");
+    } catch (error) {
+      toast.error(error.message || "Ayar güncellenemedi.");
+    } finally {
+      setToggling(false);
+    }
+  }
+
+  async function handleSettingsChange(partial) {
+    const updated = await updateAutomationSettings({ newLeadWelcome: { ...settings, ...partial } });
+    return updated.newLeadWelcome;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4 text-brand-gold" />
+              Yeni Lead Karşılama
+            </CardTitle>
+            <CardDescription>Web formu/kampanya/Instagram Reklam&apos;dan gelen her yeni başvuru otomatik müşteri kaydına dönüşür, size bildirim düşer ve müşteriye ilk mesaj gönderilir.</CardDescription>
+          </div>
+          <Switch checked={settings.enabled} disabled={toggling} onCheckedChange={handleToggle} />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <TemplateControls type="newLeadWelcome" settings={settings} onSettingsChange={handleSettingsChange} />
       </CardContent>
     </Card>
   );
@@ -476,6 +536,78 @@ function WindowClosingAlertCard({ settings }) {
             value={hoursBefore}
             onChange={(e) => setHoursBefore(e.target.value)}
             onBlur={handleHoursBlur}
+            className="w-20"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * "Lead Yanıt Uyarısı" — TAMAMEN içsel, WindowClosingAlertCard ile aynı
+ * desen: müşteriye hiçbir şey gönderilmez, şablon gerekmez. Yeni bir
+ * başvuru (otomatik ya da elle) belirlediğiniz süre içinde "Yeni"
+ * durumundan çıkmazsa (aranmadı/işlem yapılmadı) aşağıdaki listeye bir
+ * uyarı düşer. Agent'ın kendi elle eklediği müşteriler (kaynak: Manuel)
+ * bu otomasyona dahil değil — zaten agent bilerek eklediği için habersiz
+ * kalmaz.
+ */
+function LeadResponseAlertCard({ settings }) {
+  const [toggling, setToggling] = useState(false);
+  const [minutesThreshold, setMinutesThreshold] = useState(settings.minutesThreshold);
+
+  useEffect(() => setMinutesThreshold(settings.minutesThreshold), [settings.minutesThreshold]);
+
+  async function handleToggle(enabled) {
+    setToggling(true);
+    try {
+      await updateAutomationSettings({ leadResponseAlert: { ...settings, enabled } });
+      toast.success(enabled ? "Lead Yanıt Uyarısı açıldı." : "Lead Yanıt Uyarısı kapatıldı.");
+    } catch (error) {
+      toast.error(error.message || "Ayar güncellenemedi.");
+    } finally {
+      setToggling(false);
+    }
+  }
+
+  async function handleMinutesBlur() {
+    const value = Math.min(120, Math.max(1, Number(minutesThreshold) || settings.minutesThreshold));
+    setMinutesThreshold(value);
+    if (value === settings.minutesThreshold) return;
+    try {
+      await updateAutomationSettings({ leadResponseAlert: { ...settings, minutesThreshold: value } });
+      toast.success("Uyarı süresi güncellendi.");
+    } catch (error) {
+      toast.error(error.message || "Güncellenemedi.");
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2">
+              <BellRing className="h-4 w-4 text-brand-gold" />
+              Lead Yanıt Uyarısı
+            </CardTitle>
+            <CardDescription>Yeni bir başvuru belirlediğiniz süre içinde &quot;Yeni&quot; durumundan çıkmazsa (aranmadı/işlem yapılmadı) size içsel bir uyarı düşer.</CardDescription>
+          </div>
+          <Switch checked={settings.enabled} disabled={toggling} onCheckedChange={handleToggle} />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="leadMinutesThreshold" className="text-sm text-muted-foreground">Kaç dakika içinde dönüş yapılmalı:</Label>
+          <Input
+            id="leadMinutesThreshold"
+            type="number"
+            min={1}
+            max={120}
+            value={minutesThreshold}
+            onChange={(e) => setMinutesThreshold(e.target.value)}
+            onBlur={handleMinutesBlur}
             className="w-20"
           />
         </div>

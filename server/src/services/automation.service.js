@@ -24,6 +24,7 @@ import { automationEventRepository } from "../repositories/automationEvent.repos
 import { conversationRepository } from "../repositories/conversation.repository.js";
 import { customerRepository } from "../repositories/customer.repository.js";
 import { createDefaultAutomationEvent } from "../models/automationEvent.model.js";
+import { createDefaultCustomer } from "../models/customer.model.js";
 import { normalizeTrPhone } from "../utils/phone.js";
 import { decryptToken } from "../utils/crypto.util.js";
 import { toIstanbul } from "../utils/date.js";
@@ -57,6 +58,12 @@ export const AUTOMATION_TEMPLATE_DEFAULTS = {
     defaultBodyText: "Merhaba {{1}}, {{2}} tarihindeki randevunuzu hatırlatmak isteriz.",
     exampleValues: ["Ahmet", "15 Ağustos Cumartesi 14:00"],
     buildValues: (customer, appointment) => [customer.name || "Değerli müşterimiz", formatAppointmentDate(appointment.dateTime)],
+  },
+  newLeadWelcome: {
+    baseName: "new_lead_welcome",
+    defaultBodyText: "Merhaba {{1}}, bizimle iletişime geçtiğiniz için teşekkür ederiz! {{2}} ile ilgili size en kısa sürede dönüş yapacağız.",
+    exampleValues: ["Ahmet", "talebiniz"],
+    buildValues: (customer, lead) => [customer.name || "Değerli müşterimiz", lead.context || lead.message || "talebiniz"],
   },
 };
 
@@ -250,6 +257,92 @@ export async function checkClosingWindows(context, tenant) {
     );
     // eslint-disable-next-line no-await-in-loop
     await conversationRepository.update(context, conversation.id, { windowAlertSentAt: nowMs });
+  }
+}
+
+/** Lead'in kaynağını (funnelId/context) LEAD_SOURCES (src/admin/data/constants.js)
+ * ile uyumlu sabit bir değere çevirir — tam SERVICES-başlığı eşleştirmesi
+ * YAPMAZ (bu sadece frontend'deki gösterim inceliği, backend'e taşınmadı),
+ * sadece en sık 4 kaynağı ayırt eder. */
+function resolveLeadSource(lead) {
+  if (lead.funnelId) return "Kampanya";
+  const ctx = (lead.context || "").toLowerCase();
+  if (ctx.includes("instagram")) return "Instagram";
+  if (ctx.includes("whatsapp")) return "WhatsApp";
+  if (ctx.includes("facebook")) return "Facebook";
+  return "Web Sitesi";
+}
+
+/**
+ * lead.service.js#createLead'den (fire-and-forget) çağrılır. Otomasyon
+ * kapalıysa ya da telefon yoksa `null` döner — lead.service.js bunu, lead'i
+ * "Müşteri Oldu" işaretleyip işaretlemeyeceğine karar vermek için kullanır
+ * (bilerek burada `updateLeadStatus` ÇAĞRILMAZ: lead.service.js'i import
+ * etmek automation.service.js ↔ lead.service.js döngüsel import'u yaratır).
+ * Açıksa: (1) CRM müşterisi otomatik oluşturulur (manuel dönüştürme akışıyla
+ * — Basvurular.jsx#handleConvertLead — AYNI alan eşlemesi: name/phone/notes),
+ * (2) size (owner'a) içsel bir "yeni lead" bildirimi düşer (Otomasyonlar
+ * sayfasındaki olay log'u — sistemde "atanmış danışman" kavramı yok, bkz.
+ * DEFAULT_AUTOMATIONS'ın newLeadWelcome yorumu), (3) dispatchOrPrepare ile
+ * müşteriye ilk karşılama mesajı gönderilir/hazırlanır.
+ */
+export async function notifyNewLead(context, lead) {
+  const tenant = await getTenantById(context.tenantId);
+  if (!tenant?.automations?.newLeadWelcome?.enabled) return null;
+  if (!lead.phone) return null;
+
+  const source = resolveLeadSource(lead);
+  const customer = await customerRepository.create(
+    context,
+    createDefaultCustomer({ name: lead.name, phone: lead.phone, source, notes: lead.message || "" }),
+  );
+
+  await automationEventRepository.create(
+    context,
+    createDefaultAutomationEvent({
+      type: "newLeadAlert",
+      customerId: customer.id,
+      status: "sent",
+      message: `Yeni lead: ${customer.name || "İsimsiz"} (${source}) — CRM'e otomatik eklendi.`,
+    }),
+  );
+
+  await dispatchOrPrepare(context, tenant, { type: "newLeadWelcome", customerId: customer.id }, customer, lead);
+
+  return customer;
+}
+
+/**
+ * jobs/leadResponseAlerts.job.js'ten çağrılır. TAMAMEN İÇSEL — checkClosingWindows
+ * ile aynı prensip, hiç mesaj gitmez. "Cevap bekliyor" sayılan müşteri:
+ * `source !== "Manuel"` (agent'ın bilerek elle eklediği bir müşteri değil —
+ * bir otomasyon/lead'den geldi), `status === "Yeni"` (agent arayınca/aşama
+ * değiştirince zaten değişir, bu yüzden ayrı bir "cevaplandı" alanına gerek
+ * yok) ve oluşturulalı `minutesThreshold` dakikadan fazla geçmiş.
+ */
+export async function checkLeadResponseAlerts(context, tenant) {
+  const settings = tenant.automations?.leadResponseAlert;
+  if (!settings?.enabled) return;
+
+  const nowMs = Date.now();
+  const thresholdMs = settings.minutesThreshold * 60 * 1000;
+
+  const customers = await customerRepository.findAll(context);
+  const due = customers.filter((c) => {
+    if (c.source === "Manuel" || c.status !== "Yeni" || c.responseAlertSentAt) return false;
+    const createdAtMs = c.createdAt?.getTime?.() ?? c.createdAt ?? 0;
+    return nowMs - createdAtMs >= thresholdMs;
+  });
+
+  for (const customer of due) {
+    const createdAtMs = customer.createdAt?.getTime?.() ?? customer.createdAt ?? 0;
+    const minutesAgo = Math.round((nowMs - createdAtMs) / 60000);
+    const message = `${customer.name || "Bir müşteri"} ${minutesAgo} dakika önce başvurdu, henüz iletişime geçilmedi.`;
+
+    // eslint-disable-next-line no-await-in-loop -- müşteri başına bağımsız kayıt, job zaten periyodik çalışıyor.
+    await automationEventRepository.create(context, createDefaultAutomationEvent({ type: "leadResponseAlert", customerId: customer.id, status: "sent", message }));
+    // eslint-disable-next-line no-await-in-loop
+    await customerRepository.update(context, customer.id, { responseAlertSentAt: nowMs });
   }
 }
 

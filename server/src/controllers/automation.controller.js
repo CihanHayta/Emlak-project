@@ -4,7 +4,7 @@ import { submitWhatsappTemplate, refreshTemplateStatus, listAutomationEvents, ma
 import { sendSuccess } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 
-const VALID_TYPES = new Set(["listingMatch", "appointmentReminder"]);
+const VALID_TYPES = new Set(["listingMatch", "appointmentReminder", "newLeadWelcome"]);
 
 function assertValidType(type) {
   if (!VALID_TYPES.has(type)) throw ApiError.validation(`Bilinmeyen otomasyon türü: ${type}`);

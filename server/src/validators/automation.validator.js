@@ -36,4 +36,8 @@ export const updateAutomationSettingsValidator = [
   body("offHoursReply.businessHours.days.*").optional().isInt({ min: 0, max: 6 }).withMessage("Gün değeri 0 (Pazar) - 6 (Cumartesi) arasında olmalı."),
   body("windowClosingAlert.enabled").optional().isBoolean().withMessage("windowClosingAlert.enabled boolean olmalı."),
   body("windowClosingAlert.hoursBefore").optional().isInt({ min: 1, max: 23 }).withMessage("Uyarı 1-23 saat önce arasında olmalı."),
+  body("newLeadWelcome.enabled").optional().isBoolean().withMessage("newLeadWelcome.enabled boolean olmalı."),
+  body("newLeadWelcome.templateBodyText").optional().isString().trim().isLength({ min: 10, max: 1000 }).withMessage("Mesaj metni 10-1000 karakter olmalı.").custom(validateTemplatePlaceholders),
+  body("leadResponseAlert.enabled").optional().isBoolean().withMessage("leadResponseAlert.enabled boolean olmalı."),
+  body("leadResponseAlert.minutesThreshold").optional().isInt({ min: 1, max: 120 }).withMessage("Uyarı 1-120 dakika arasında olmalı."),
 ];

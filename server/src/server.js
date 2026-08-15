@@ -7,6 +7,7 @@ import { startWhatsappTokenRefreshJob } from "./jobs/whatsappTokenRefresh.job.js
 import { startTenantBackupJob } from "./jobs/backupTenants.job.js";
 import { startAppointmentRemindersJob } from "./jobs/appointmentReminders.job.js";
 import { startWindowClosingAlertsJob } from "./jobs/windowClosingAlerts.job.js";
+import { startLeadResponseAlertsJob } from "./jobs/leadResponseAlerts.job.js";
 import { notifyTelegramServerStarted, notifyTelegramFatalError } from "./utils/notifyTelegram.js";
 
 const server = app.listen(env.port, () => {
@@ -53,6 +54,12 @@ if (env.firebaseMode === "live" && env.integrationsMode === "live") {
 // integrationsMode'dan bağımsız.
 if (env.firebaseMode === "live") {
   startWindowClosingAlertsJob();
+}
+
+// Lead Yanıt Uyarısı da windowClosingAlert gibi hiç dış API çağırmaz
+// (sadece Firestore okur/yazar) — integrationsMode'dan bağımsız.
+if (env.firebaseMode === "live") {
+  startLeadResponseAlertsJob();
 }
 
 function shutdown(signal) {

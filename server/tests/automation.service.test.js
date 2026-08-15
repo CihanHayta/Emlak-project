@@ -7,12 +7,20 @@ import { createDefaultTenant } from "../src/models/tenant.model.js";
 import { createDefaultCustomer } from "../src/models/customer.model.js";
 import { createDefaultProperty } from "../src/models/property.model.js";
 import { createDefaultConversation } from "../src/models/conversation.model.js";
+import { createDefaultLead } from "../src/models/lead.model.js";
 import { encryptToken } from "../src/utils/crypto.util.js";
 import * as tenantRepo from "../src/repositories/tenant.repository.js";
 import { customerRepository } from "../src/repositories/customer.repository.js";
 import { conversationRepository } from "../src/repositories/conversation.repository.js";
 import { automationEventRepository } from "../src/repositories/automationEvent.repository.js";
-import { notifyMatchingCustomersForListing, checkOffHoursAndReply, submitWhatsappTemplate, checkClosingWindows } from "../src/services/automation.service.js";
+import {
+  notifyMatchingCustomersForListing,
+  checkOffHoursAndReply,
+  submitWhatsappTemplate,
+  checkClosingWindows,
+  notifyNewLead,
+  checkLeadResponseAlerts,
+} from "../src/services/automation.service.js";
 
 // toIstanbul kullanılmıyor gibi görünse de import satırı kasıtlı — dayjs'in
 // utc/timezone eklentilerini bir kere, modül yüklenirken kaydeder (date.js
@@ -321,6 +329,168 @@ describe("automation.service — checkClosingWindows (24 Saat Penceresi Uyarıs�
     await makeConversation(context, { lastMessageDirection: "inbound", windowExpiresAt: WEDNESDAY_NOON_ISTANBUL + 10 * 60 * 60 * 1000 }); // 10 saat sonra, eşik 2 saat
 
     await checkClosingWindows(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+});
+
+describe("automation.service — notifyNewLead (Yeni Lead Karşılama)", () => {
+  let fetchSpy;
+
+  beforeEach(() => {
+    resetMockFirestore();
+    fetchSpy = jest.spyOn(global, "fetch").mockResolvedValue({ ok: true, json: async () => ({ messages: [{ id: "wamid.123" }] }) });
+  });
+
+  afterEach(() => fetchSpy.mockRestore());
+
+  it("newLeadWelcome kapalıyken null döner, hiçbir şey oluşturmaz", async () => {
+    const tenant = await makeTenant({ newLeadWelcome: { enabled: false, templateStatus: "not_submitted", templateName: null, templateMetaId: null } });
+    const context = { tenantId: tenant.id, userId: null, role: "public" };
+    const lead = createDefaultLead({ name: "Ayşe Kaya", phone: "0555 987 65 43" });
+
+    const result = await notifyNewLead(context, lead);
+
+    expect(result).toBeNull();
+    expect(await customerRepository.findAll(context)).toHaveLength(0);
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("telefon yoksa null döner", async () => {
+    const tenant = await makeTenant({ newLeadWelcome: { enabled: true, templateStatus: "not_submitted", templateName: null, templateMetaId: null } });
+    const context = { tenantId: tenant.id, userId: null, role: "public" };
+    const lead = createDefaultLead({ name: "Telefonsuz", phone: "" });
+
+    const result = await notifyNewLead(context, lead);
+
+    expect(result).toBeNull();
+    expect(await customerRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("açıkken müşteri oluşturur, içsel 'yeni lead' bildirimi + karşılama event'i (pending_manual) düşer", async () => {
+    const tenant = await makeTenant({ newLeadWelcome: { enabled: true, templateStatus: "not_submitted", templateName: null, templateMetaId: null } });
+    const context = { tenantId: tenant.id, userId: null, role: "public" };
+    const lead = createDefaultLead({ name: "Ayşe Kaya", phone: "0555 987 65 43", message: "3+1 daire arıyorum", context: "Instagram Reklam" });
+
+    const customer = await notifyNewLead(context, lead);
+
+    expect(customer).not.toBeNull();
+    expect(customer.name).toBe("Ayşe Kaya");
+    expect(customer.source).toBe("Instagram"); // resolveLeadSource: context "Instagram Reklam" içeriyor
+    expect(customer.notes).toBe("3+1 daire arıyorum");
+
+    const customers = await customerRepository.findAll(context);
+    expect(customers).toHaveLength(1);
+
+    const events = await automationEventRepository.findAll(context);
+    expect(events).toHaveLength(2);
+    const alertEvent = events.find((e) => e.type === "newLeadAlert");
+    const welcomeEvent = events.find((e) => e.type === "newLeadWelcome");
+    expect(alertEvent.status).toBe("sent");
+    expect(alertEvent.message).toContain("Ayşe Kaya");
+    expect(welcomeEvent.status).toBe("pending_manual");
+    expect(welcomeEvent.waLink).toMatch(/^https:\/\/wa\.me\//);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("funnelId doluysa kaynak 'Kampanya' olur", async () => {
+    const tenant = await makeTenant({ newLeadWelcome: { enabled: true, templateStatus: "not_submitted", templateName: null, templateMetaId: null } });
+    const context = { tenantId: tenant.id, userId: null, role: "public" };
+    const lead = createDefaultLead({ name: "Ayşe Kaya", phone: "0555 987 65 43", funnelId: "funnel-1" });
+
+    const customer = await notifyNewLead(context, lead);
+
+    expect(customer.source).toBe("Kampanya");
+  });
+
+  it("şablon onaylıysa karşılama mesajını GERÇEKTEN gönderir", async () => {
+    const tenant = await makeTenant({ newLeadWelcome: { enabled: true, templateStatus: "approved", templateName: "new_lead_welcome_v1", templateMetaId: "meta-1" } });
+    const context = { tenantId: tenant.id, userId: null, role: "public" };
+    const lead = createDefaultLead({ name: "Ayşe Kaya", phone: "0555 987 65 43" });
+
+    await notifyNewLead(context, lead);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const events = await automationEventRepository.findAll(context);
+    const welcomeEvent = events.find((e) => e.type === "newLeadWelcome");
+    expect(welcomeEvent.status).toBe("sent");
+  });
+});
+
+describe("automation.service — checkLeadResponseAlerts (Lead Yanıt Uyarısı)", () => {
+  beforeEach(() => resetMockFirestore());
+  afterEach(() => jest.restoreAllMocks());
+
+  async function makeCustomer(context, minutesAgo, overrides = {}) {
+    const customer = await customerRepository.create(context, createDefaultCustomer({ name: "Ahmet", phone: "0555 123 45 67", source: "Web Sitesi", ...overrides }));
+    const createdAt = new Date(Date.now() - minutesAgo * 60 * 1000);
+    return customerRepository.update(context, customer.id, { createdAt });
+  }
+
+  it("otomasyon kapalıyken hiç uyarı oluşturmaz", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: false, minutesThreshold: 10 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    await makeCustomer(context, 20);
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("eşiği geçmiş, hâlâ 'Yeni' durumdaki otomatik müşteri için uyarı oluşturur, responseAlertSentAt işaretler", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    const customer = await makeCustomer(context, 15);
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    const events = await automationEventRepository.findAll(context);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("leadResponseAlert");
+    expect(events[0].customerId).toBe(customer.id);
+    expect(events[0].message).toContain("Ahmet");
+
+    const updated = await customerRepository.findById(context, customer.id);
+    expect(updated.responseAlertSentAt).not.toBeNull();
+  });
+
+  it("source: Manuel olan (agent'ın elle eklediği) müşteriyi atlar", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    await makeCustomer(context, 15, { source: "Manuel" });
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("durumu 'Yeni' dışına çıkmış (agent zaten ilgilenmiş) müşteriyi atlar", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    await makeCustomer(context, 15, { status: "Arandı" });
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("zaten uyarılmış (responseAlertSentAt dolu) müşteriyi tekrar uyarmaz", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    await makeCustomer(context, 15, { responseAlertSentAt: Date.now() - 5 * 60 * 1000 });
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("eşik henüz geçmemişse (çok yeni) uyarmaz", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    await makeCustomer(context, 3);
+
+    await checkLeadResponseAlerts(context, tenant);
 
     expect(await automationEventRepository.findAll(context)).toHaveLength(0);
   });

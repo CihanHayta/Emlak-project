@@ -43,6 +43,18 @@ export const DEFAULT_AUTOMATIONS = {
   // çalışıyoruz" tanımı yeterli) — sadece mesai içindeyken uyarır, mesai
   // dışında zaten elinizden bir şey gelmez.
   windowClosingAlert: { enabled: false, hoursBefore: 2 },
+  // Yeni bir lead (web formu/kampanya/Instagram Reklam) geldiğinde: otomatik
+  // CRM müşterisi oluşturulur, size içsel bir "yeni lead" bildirimi düşer,
+  // müşteriye ilk karşılama mesajı gider. PROAKTİF (müşteri henüz size
+  // yazmadı) olduğu için listingMatch/appointmentReminder gibi Meta Template
+  // onayı gerektirir — bkz. automation.service.js#notifyNewLead. Instagram/
+  // WhatsApp DM'leri bu otomasyonun KAPSAMI DIŞINDA (onlar hiç `lead`
+  // oluşturmuyor, ayrı bir akış — bkz. Mesajlar sayfası).
+  newLeadWelcome: { enabled: false, templateStatus: "not_submitted", templateName: null, templateMetaId: null, templateBodyText: null, templateVersion: 0 },
+  // Yeni bir lead/müşteri belirlenen süre içinde "Yeni" durumundan çıkmazsa
+  // (agent aramadı/işlem yapmadı) size İÇSEL bir uyarı düşer — windowClosingAlert
+  // gibi hiç dış API çağrısı yok, hiç template gerekmez.
+  leadResponseAlert: { enabled: false, minutesThreshold: 10 },
 };
 
 /**
