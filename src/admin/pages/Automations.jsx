@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Send, CalendarClock, MessageCircleReply, Loader2, ExternalLink, AlarmClock, UserPlus, BellRing, Info } from "lucide-react";
+import { Send, CalendarClock, MessageCircleReply, Loader2, ExternalLink, AlarmClock, UserPlus, BellRing, Info, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -120,7 +120,7 @@ const INFO_GROUPS = [
       {
         icon: UserPlus,
         title: "Yeni Lead Karşılama",
-        text: "Web formu, kampanya veya Instagram Reklam'dan gelen her yeni başvuru otomatik CRM müşterisine dönüşür ve müşteriye ilk karşılama mesajı hazırlanır.",
+        text: "Web formu, kampanya veya Instagram Reklam'dan gelen her yeni başvuru otomatik CRM müşterisine dönüşür ve müşteriye WhatsApp üzerinden ilk karşılama mesajı hazırlanır.",
       },
       {
         icon: MessageCircleReply,
@@ -365,7 +365,7 @@ function NewLeadWelcomeCard({ settings }) {
               <UserPlus className="h-4 w-4 text-brand-gold" />
               Yeni Lead Karşılama
             </CardTitle>
-            <CardDescription>Web formu/kampanya/Instagram Reklam&apos;dan gelen her yeni başvuru otomatik müşteri kaydına dönüşür, size bildirim düşer ve müşteriye ilk mesaj gönderilir.</CardDescription>
+            <CardDescription>Web formu/kampanya/Instagram Reklam&apos;dan gelen her yeni başvuru otomatik müşteri kaydına dönüşür, size bildirim düşer ve müşteriye WhatsApp üzerinden ilk mesaj gönderilir.</CardDescription>
           </div>
           <Switch checked={settings.enabled} disabled={toggling} onCheckedChange={handleToggle} />
         </div>
@@ -695,8 +695,11 @@ function LeadResponseAlertCard({ settings }) {
   );
 }
 
+const EVENTS_VISIBLE_COUNT = 4;
+
 function EventsLog({ events }) {
   const [sendingId, setSendingId] = useState(null);
+  const [expanded, setExpanded] = useState(false);
 
   async function handleMarkSent(event) {
     window.open(event.waLink, "_blank", "noopener,noreferrer");
@@ -710,6 +713,9 @@ function EventsLog({ events }) {
     }
   }
 
+  const visibleEvents = expanded ? events : events.slice(0, EVENTS_VISIBLE_COUNT);
+  const hiddenCount = events.length - EVENTS_VISIBLE_COUNT;
+
   return (
     <Card>
       <CardHeader>
@@ -721,7 +727,7 @@ function EventsLog({ events }) {
           <p className="py-6 text-center text-sm text-muted-foreground">Henüz bir otomasyon etkinliği yok.</p>
         ) : (
           <div className="space-y-2">
-            {events.map((event) => {
+            {visibleEvents.map((event) => {
               const statusInfo = EVENT_STATUS_INFO[event.status] ?? EVENT_STATUS_INFO.pending_manual;
               return (
                 <div key={event.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3 text-sm">
@@ -740,6 +746,21 @@ function EventsLog({ events }) {
                 </div>
               );
             })}
+            {hiddenCount > 0 && (
+              <Button variant="ghost" size="sm" className="w-full" onClick={() => setExpanded((prev) => !prev)}>
+                {expanded ? (
+                  <>
+                    <ChevronUp className="mr-1 h-3.5 w-3.5" />
+                    Daha az göster
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="mr-1 h-3.5 w-3.5" />
+                    {hiddenCount} tane daha göster
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         )}
       </CardContent>
