@@ -3,8 +3,10 @@ import { jest } from "@jest/globals";
 import { resetMockFirestore } from "../src/firebase/mock/firestore.mock.js";
 import { createDefaultTenant } from "../src/models/tenant.model.js";
 import { createDefaultLead } from "../src/models/lead.model.js";
+import { createDefaultCustomer } from "../src/models/customer.model.js";
 import * as tenantRepo from "../src/repositories/tenant.repository.js";
 import { leadRepository } from "../src/repositories/lead.repository.js";
+import { customerRepository } from "../src/repositories/customer.repository.js";
 import { automationEventRepository } from "../src/repositories/automationEvent.repository.js";
 import { checkAllTenants } from "../src/jobs/leadResponseAlerts.job.js";
 
@@ -25,6 +27,17 @@ describe("leadResponseAlerts.job — checkAllTenants", () => {
     const context = { tenantId: tenant.id, userId: null, role: "system" };
     const lead = await leadRepository.create(context, createDefaultLead({ name: "Ahmet", phone: "0555 123 45 67" }));
     await leadRepository.update(context, lead.id, { createdAt: new Date(Date.now() - 15 * 60 * 1000) });
+
+    await checkAllTenants();
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(1);
+  });
+
+  it("otomasyonu açık olan tenant için 'Yeni'de kalmış bir müşteri kartını da yakalar", async () => {
+    const tenant = await makeTenant({ enabled: true, minutesThreshold: 10 });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    const customer = await customerRepository.create(context, createDefaultCustomer({ name: "Zeynep", phone: "0555 123 45 67" }));
+    await customerRepository.update(context, customer.id, { createdAt: new Date(Date.now() - 15 * 60 * 1000) });
 
     await checkAllTenants();
 

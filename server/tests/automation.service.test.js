@@ -67,7 +67,7 @@ describe("automation.service — notifyMatchingCustomersForListing", () => {
   it("enabled ama şablon henüz onaylı değilse pending_manual event + wa.me linki hazırlar (Business API'yi HİÇ çağırmaz)", async () => {
     const tenant = await makeTenant({ listingMatch: { enabled: true, templateStatus: "not_submitted", templateName: null, templateMetaId: null } });
     context = { tenantId: tenant.id, userId: "u1", role: "owner" };
-    await customerRepository.create(context, createDefaultCustomer({ name: "Ahmet", phone: "0555 123 45 67", interests: ["Daire"] }));
+    const customer = await customerRepository.create(context, createDefaultCustomer({ name: "Ahmet", phone: "0555 123 45 67", interests: ["Daire"] }));
     const { propertyRepository } = await import("../src/repositories/property.repository.js");
     const property = await propertyRepository.create(context, createDefaultProperty({ category: "satilik", type: "Daire", title: "Kadıköy'de 3+1", price: "1.000.000 TL", district: "Kadıköy", neighborhood: "Moda" }));
 
@@ -78,12 +78,16 @@ describe("automation.service — notifyMatchingCustomersForListing", () => {
     expect(events[0].status).toBe("pending_manual");
     expect(events[0].waLink).toMatch(/^https:\/\/wa\.me\/905551234567\?text=/);
     expect(fetchSpy).not.toHaveBeenCalled();
+
+    const updatedCustomer = await customerRepository.findById(context, customer.id);
+    const lastEntry = updatedCustomer.timeline.at(-1);
+    expect(lastEntry.label).toBe("Otomasyon: Yeni İlan Eşleşmesi hazırlandı, gönderim bekliyor.");
   });
 
   it("şablon onaylıysa GERÇEKTEN WhatsApp API'sini çağırıp 'sent' event oluşturur", async () => {
     const tenant = await makeTenant({ listingMatch: { enabled: true, templateStatus: "approved", templateName: "listing_match_notification", templateMetaId: "meta-1" } });
     context = { tenantId: tenant.id, userId: "u1", role: "owner" };
-    await customerRepository.create(context, createDefaultCustomer({ name: "Ahmet", phone: "0555 123 45 67", interests: ["Daire"] }));
+    const customer = await customerRepository.create(context, createDefaultCustomer({ name: "Ahmet", phone: "0555 123 45 67", interests: ["Daire"] }));
     const { propertyRepository } = await import("../src/repositories/property.repository.js");
     const property = await propertyRepository.create(context, createDefaultProperty({ category: "satilik", type: "Daire", title: "Kadıköy'de 3+1", price: "1.000.000 TL", district: "Kadıköy", neighborhood: "Moda" }));
 
@@ -97,6 +101,9 @@ describe("automation.service — notifyMatchingCustomersForListing", () => {
     const body = JSON.parse(options.body);
     expect(body.type).toBe("template");
     expect(body.template.name).toBe("listing_match_notification");
+
+    const updatedCustomer = await customerRepository.findById(context, customer.id);
+    expect(updatedCustomer.timeline.at(-1).label).toBe("Otomasyon: Yeni İlan Eşleşmesi gönderildi.");
 
     const events = await automationEventRepository.findAll(context);
     expect(events).toHaveLength(1);
@@ -380,9 +387,14 @@ describe("automation.service — notifyNewLead (Yeni Lead Karşılama)", () => {
     expect(customer.name).toBe("Ayşe Kaya");
     expect(customer.source).toBe("Instagram"); // resolveLeadSource: context "Instagram Reklam" içeriyor
     expect(customer.notes).toBe("3+1 daire arıyorum");
+    expect(customer.timeline[0].label).toContain("otomasyon tarafından oluşturuldu");
 
     const customers = await customerRepository.findAll(context);
     expect(customers).toHaveLength(1);
+
+    const updatedCustomer = await customerRepository.findById(context, customer.id);
+    expect(updatedCustomer.timeline).toHaveLength(2); // [0] oluşturma notu, [1] dispatchOrPrepare'in bıraktığı iz
+    expect(updatedCustomer.timeline[1].label).toBe("Otomasyon: Yeni Lead Karşılama hazırlandı, gönderim bekliyor.");
 
     const events = await automationEventRepository.findAll(context);
     expect(events).toHaveLength(2);
@@ -501,5 +513,50 @@ describe("automation.service — checkLeadResponseAlerts (Lead Yanıt Uyarısı)
     await checkLeadResponseAlerts(context, tenant);
 
     expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  async function makeCustomer(context, minutesAgo, overrides = {}) {
+    const customer = await customerRepository.create(context, createDefaultCustomer({ name: "Zeynep", phone: "0555 123 45 67" }));
+    const createdAt = new Date(Date.now() - minutesAgo * 60 * 1000);
+    return customerRepository.update(context, customer.id, { createdAt, ...overrides });
+  }
+
+  it("müşteri kartı ZATEN oluşmuş ama hâlâ 'Yeni' durumundaysa (aranmadı) da uyarır", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    const customer = await makeCustomer(context, 15);
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    const events = await automationEventRepository.findAll(context);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("leadResponseAlert");
+    expect(events[0].customerId).toBe(customer.id);
+    expect(events[0].message).toContain("Zeynep");
+
+    const updated = await customerRepository.findById(context, customer.id);
+    expect(updated.responseAlertSentAt).not.toBeNull();
+  });
+
+  it("durumu 'Yeni' dışına çıkmış (agent zaten aramış) müşteriyi atlar", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    await makeCustomer(context, 15, { status: "Arandı" });
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
+  });
+
+  it("hem bekleyen bir lead hem de 'Yeni'de kalmış bir müşteri varsa ikisi için de ayrı ayrı uyarır", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    await makeLead(context, 15);
+    await makeCustomer(context, 15);
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    const events = await automationEventRepository.findAll(context);
+    expect(events).toHaveLength(2);
   });
 });

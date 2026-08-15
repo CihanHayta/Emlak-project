@@ -84,6 +84,29 @@ function buildWaLink(phoneE164, text) {
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
 
+// dispatchOrPrepare'in bıraktığı iz, müşterinin KENDİ kartındaki Zaman
+// Çizelgesi'ne de düşsün diye (bkz. appendCustomerTimelineEntry) — sadece
+// global Otomasyonlar sayfasında değil, o müşterinin kartını açtığınızda da
+// "buna otomasyon dokundu mu" görülebilsin.
+const TIMELINE_LABELS = {
+  listingMatch: "Yeni İlan Eşleşmesi",
+  appointmentReminder: "Randevu Hatırlatması",
+  newLeadWelcome: "Yeni Lead Karşılama",
+};
+
+/** customer.service.js#addTimelineEntry'nin bire bir aynısı — bu dosya zaten
+ * customerRepository'yi doğrudan kullanıyor (bkz. appointmentReminder/notifyNewLead),
+ * ayrı bir service-layer import'u eklememek için burada da aynı yol izleniyor.
+ * Müşteri silinmiş/bulunamıyorsa (ör. test/edge-case) sessizce atlar — bir
+ * otomasyon mesajının asıl amacı olan gönderim/hazırlık ZATEN tamamlandı,
+ * timeline notu ikincil bir iz, buradaki bir hata asıl akışı bozmamalı. */
+async function appendCustomerTimelineEntry(context, customerId, label) {
+  const customer = await customerRepository.findById(context, customerId);
+  if (!customer) return;
+  const timeline = [...(customer.timeline ?? []), { id: crypto.randomUUID(), label, at: Date.now() }];
+  await customerRepository.update(context, customerId, { timeline });
+}
+
 /**
  * Bir müşteriye tek bir otomasyon mesajını "gönder ya da hazırla" —
  * template onaylıysa gerçekten gönderir, değilse pending_manual event
@@ -99,6 +122,7 @@ async function dispatchOrPrepare(context, tenant, { type, customerId, listingId 
   const bodyText = automationSettings.templateBodyText || template.defaultBodyText;
   const values = template.buildValues(customer, subject);
   const freeText = interpolate(bodyText, values);
+  const label = TIMELINE_LABELS[type] ?? type;
 
   if (!phone) {
     logger.warn(`Otomasyon atlandı — geçersiz telefon: tenant=${context.tenantId} customer=${customerId} type=${type}`);
@@ -119,12 +143,14 @@ async function dispatchOrPrepare(context, tenant, { type, customerId, listingId 
         values,
         accessToken,
       );
+      await appendCustomerTimelineEntry(context, customerId, `Otomasyon: ${label} gönderildi.`);
       return automationEventRepository.create(
         context,
         createDefaultAutomationEvent({ type, customerId, listingId, appointmentId, status: "sent", message: freeText }),
       );
     } catch (error) {
       logger.error(`Otomasyon gönderim hatası: tenant=${context.tenantId} customer=${customerId} type=${type} — ${error.message}`);
+      await appendCustomerTimelineEntry(context, customerId, `Otomasyon: ${label} gönderilemedi (hata).`);
       return automationEventRepository.create(
         context,
         createDefaultAutomationEvent({ type, customerId, listingId, appointmentId, status: "failed", message: freeText, errorMessage: error.message }),
@@ -135,6 +161,7 @@ async function dispatchOrPrepare(context, tenant, { type, customerId, listingId 
   // Şablon henüz onaylı değil (ya da WhatsApp hiç bağlı değil) — mesajı
   // hazırla, agent'ın tek tıkla kendi WhatsApp'ından göndermesi için
   // bekleyen bir event bırak.
+  await appendCustomerTimelineEntry(context, customerId, `Otomasyon: ${label} hazırlandı, gönderim bekliyor.`);
   return automationEventRepository.create(
     context,
     createDefaultAutomationEvent({ type, customerId, listingId, appointmentId, status: "pending_manual", message: freeText, waLink: buildWaLink(phone, freeText) }),
@@ -295,7 +322,15 @@ export async function notifyNewLead(context, lead) {
   const source = resolveLeadSource(lead);
   const customer = await customerRepository.create(
     context,
-    createDefaultCustomer({ name: lead.name, phone: lead.phone, source, notes: lead.message || "" }),
+    createDefaultCustomer({
+      name: lead.name,
+      phone: lead.phone,
+      source,
+      notes: lead.message || "",
+      // Varsayılan "Müşteri kartı oluşturuldu" yerine — kartı açan kişi bunun
+      // ELLE değil, otomasyon tarafından oluşturulduğunu ilk bakışta görsün.
+      timeline: [{ id: crypto.randomUUID(), label: `Müşteri kartı otomasyon tarafından oluşturuldu (Yeni Lead Karşılama, kaynak: ${source}).`, at: Date.now() }],
+    }),
   );
 
   await automationEventRepository.create(
@@ -313,17 +348,30 @@ export async function notifyNewLead(context, lead) {
   return customer;
 }
 
+function isDueForAlert(entity, nowMs, thresholdMs) {
+  if (entity.status !== "Yeni" || entity.responseAlertSentAt) return false;
+  const createdAtMs = entity.createdAt?.getTime?.() ?? entity.createdAt ?? 0;
+  return nowMs - createdAtMs >= thresholdMs;
+}
+
+function minutesSince(createdAt, nowMs) {
+  const createdAtMs = createdAt?.getTime?.() ?? createdAt ?? 0;
+  return Math.round((nowMs - createdAtMs) / 60000);
+}
+
 /**
  * jobs/leadResponseAlerts.job.js'ten çağrılır. TAMAMEN İÇSEL — checkClosingWindows
- * ile aynı prensip, hiç mesaj gitmez. BİLEREK `customers` DEĞİL `leads`
- * koleksiyonunu izler — newLeadWelcome otomasyonu KAPALI olsa bile çalışsın
- * diye (aksi halde hiç müşteri kartı otomatik oluşmadığından bu otomasyon
- * hiçbir zaman tetiklenmezdi). "Henüz müşteri kartına dönüşmedi" sayılan
- * başvuru: `status === "Yeni"` — hem manuel "Müşteriye Dönüştür" hem de
- * newLeadWelcome otomasyonu (açıksa) lead'i "Müşteri Oldu" yaptığı için,
- * bu iki yoldan biri gerçekleştiyse zaten filtre dışı kalır, ayrı bir
- * "dönüştürüldü mü" kontrolüne gerek yok — ve oluşturulalı `minutesThreshold`
- * dakikadan fazla geçmiş.
+ * ile aynı prensip, hiç mesaj gitmez. İKİ ayrı aşamayı birden izler:
+ *  1) `leads` — henüz hiç müşteri kartına dönüşmemiş başvurular. BİLEREK
+ *     `customers` değil `leads`'i izler ki newLeadWelcome otomasyonu KAPALI
+ *     olsa bile çalışsın (aksi halde hiç müşteri kartı otomatik oluşmadığından
+ *     bu kısım hiçbir zaman tetiklenmezdi).
+ *  2) `customers` — müşteri kartı ZATEN oluşmuş (elle ya da otomatik) ama
+ *     durumu hâlâ "Yeni" — yani aranıp "Arandı"/"Teklif Verildi" gibi bir
+ *     sonraki aşamaya taşınmamış. Sadece "Yeni"yi izler, ondan sonraki
+ *     aşamaların takibi kapsam dışı (bkz. tenant.model.js'in yorumu).
+ * Her ikisi de aynı `minutesThreshold`'u paylaşır, aynı "leadResponseAlert"
+ * tipiyle Otomasyonlar log'una düşer — kullanıcı için tek bir ayar, tek liste.
  */
 export async function checkLeadResponseAlerts(context, tenant) {
   const settings = tenant.automations?.leadResponseAlert;
@@ -333,21 +381,27 @@ export async function checkLeadResponseAlerts(context, tenant) {
   const thresholdMs = settings.minutesThreshold * 60 * 1000;
 
   const leads = await leadRepository.findAll(context);
-  const due = leads.filter((l) => {
-    if (l.status !== "Yeni" || l.responseAlertSentAt) return false;
-    const createdAtMs = l.createdAt?.getTime?.() ?? l.createdAt ?? 0;
-    return nowMs - createdAtMs >= thresholdMs;
-  });
-
-  for (const lead of due) {
-    const createdAtMs = lead.createdAt?.getTime?.() ?? lead.createdAt ?? 0;
-    const minutesAgo = Math.round((nowMs - createdAtMs) / 60000);
+  const dueLeads = leads.filter((l) => isDueForAlert(l, nowMs, thresholdMs));
+  for (const lead of dueLeads) {
+    const minutesAgo = minutesSince(lead.createdAt, nowMs);
     const message = `${lead.name || "Bir başvuru"} ${minutesAgo} dakika önce başvurdu, henüz müşteri kartı oluşturulmadı.`;
 
     // eslint-disable-next-line no-await-in-loop -- başvuru başına bağımsız kayıt, job zaten periyodik çalışıyor.
     await automationEventRepository.create(context, createDefaultAutomationEvent({ type: "leadResponseAlert", leadId: lead.id, status: "sent", message }));
     // eslint-disable-next-line no-await-in-loop
     await leadRepository.update(context, lead.id, { responseAlertSentAt: nowMs });
+  }
+
+  const customers = await customerRepository.findAll(context);
+  const dueCustomers = customers.filter((c) => isDueForAlert(c, nowMs, thresholdMs));
+  for (const customer of dueCustomers) {
+    const minutesAgo = minutesSince(customer.createdAt, nowMs);
+    const message = `${customer.name || "Bir müşteri"} ${minutesAgo} dakika önce müşteri kartına eklendi, hâlâ "Yeni" durumunda — arandı mı?`;
+
+    // eslint-disable-next-line no-await-in-loop
+    await automationEventRepository.create(context, createDefaultAutomationEvent({ type: "leadResponseAlert", customerId: customer.id, status: "sent", message }));
+    // eslint-disable-next-line no-await-in-loop
+    await customerRepository.update(context, customer.id, { responseAlertSentAt: nowMs });
   }
 }
 
