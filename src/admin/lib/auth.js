@@ -33,13 +33,17 @@ async function fetchMe() {
 
 // Backend'in httpOnly cookie'si tarayıcı kapansa da kalıcıdır (bkz.
 // SESSION_COOKIE_EXPIRY_DAYS) — bu yüzden gerçek kaynak her zaman
-// `/auth/me`'dir; Firebase'in kendi oturum durumu sadece "en azından bir
-// idToken üretebiliyor muyum" sinyali olarak kullanılır.
-onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
-  if (!firebaseUser) {
-    setSession(null);
-    return;
-  }
+// `/auth/me`'dir. Firebase'in kendi client-side oturum durumunu (`firebaseUser`)
+// BİLEREK yok sayıyoruz: Firebase'in kendi persistence'ı (IndexedDB) her
+// sayfa yenilemesinde güvenilir şekilde geri gelmeyebilir (ör. Safari
+// gizli sekme, bazı tarayıcı ayarları, ya da sadece zamanlama) — eskiden
+// `!firebaseUser` durumunda hiç `/auth/me` çağrılmadan direkt çıkış
+// yapılıyordu, bu da backend cookie'si hâlâ geçerliyken (1-14 gün) bile
+// her yenilemede yeniden şifre istenmesine yol açıyordu (canlıda
+// yakalandı). apiClient.js zaten HİÇBİR istekte Firebase idToken'ı
+// kullanmıyor, sadece cookie'yi (credentials: "include") — yani bu kontrol
+// gerçekten gereksizdi.
+onAuthStateChanged(firebaseAuth, async () => {
   const me = await fetchMe();
   if (!me) {
     setSession(null);
