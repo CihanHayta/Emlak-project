@@ -9,6 +9,21 @@
       content="Şahin Emlak - Satılık ve kiralık gayrimenkul ilanları, güvenilir ve profesyonel emlak danışmanlığı."
     />
     <title>Şahin Emlak | Güvenilir Gayrimenkul Danışmanlığı</title>
+    <!--
+      Admin paneli koyu (brand-navy) bir temada — ama JS henüz yüklenip React
+      hiçbir şey çizmeden önce, tarayıcı varsayılan olarak BEYAZ bir sayfa
+      gösterir (canlıda yenilemede rahatsız edici bir "beyaz an" olarak
+      fark edildi). Bu senkron script, JS bundle'ı inmeden, React hiçbir şey
+      çizmeden HEMEN (HTML parse sırasında, ilk boyamadan önce) çalışır —
+      sadece /admin yolları için arka planı koyu yapar, böylece o boşluk
+      anında da beyaz hiç görünmez. Public site (açık temalı) sayfaları
+      etkilenmez, kendi varsayılan (beyaz) arka planında kalır.
+    -->
+    <script>
+      if (location.pathname.startsWith("/admin")) {
+        document.documentElement.style.backgroundColor = "#0e1b2c";
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import Home from "./pages/Home";
@@ -53,6 +53,18 @@ function AdminLoadingFallback() {
  * AdminLayout) are two separate route trees sharing one router.
  */
 export default function App() {
+  // index.html'deki senkron script, JS henüz inmeden BEYAZ bir an
+  // görünmesin diye /admin yollarında <html>'e geçici bir satır içi koyu
+  // arka plan set ediyor (bkz. index.html'in üstündeki yorum). React ilk
+  // boyamayı yaptığı andan itibaren buna artık gerek yok — her sayfa
+  // (admin kartları, public site) zaten kendi arka planını class'larla
+  // tam ekran çiziyor. Temizlemezsek, admin'den public site'a SPA-içi
+  // (tam sayfa yenilemeden) geçişte bu koyu satır içi stil public
+  // sayfada da asılı kalırdı.
+  useEffect(() => {
+    document.documentElement.style.backgroundColor = "";
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

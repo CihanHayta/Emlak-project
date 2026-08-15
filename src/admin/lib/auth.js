@@ -73,10 +73,25 @@ export function isAuthInitialized() {
   return initialized;
 }
 
-/** callback'i hemen mevcut durumla, sonra her değişiklikte çağırır. Unsubscribe fonksiyonu döner. */
+/**
+ * callback'i hemen mevcut durumla, sonra her değişiklikte çağırır — AMA
+ * SADECE kontrol GERÇEKTEN sonuçlanmışsa (`initialized === true`) hemen
+ * çağırır. Canlıda yakalanan ciddi bir yarış durumu: `onAuthStateChanged`
+ * (yukarıda) asenkron olduğu için, bir bileşen mount olup buraya abone
+ * olduğunda kontrol HENÜZ bitmemiş olabilir — eskiden bu durumda bile
+ * `callback(currentSession)` (o an hâlâ `null`) HEMEN çağrılıyordu,
+ * RequireAuth/Login bunu "kontrol bitti, giriş yapılmamış" sanıp ANINDA
+ * login'e yönlendiriyordu. Birkaç yüz milisaniye sonra GERÇEK kontrol
+ * (fetchMe) sonuçlanıp `setSession` çağrılınca da bu sefer panele geri
+ * yönlendiriyordu — kullanıcı ekranda "login ekranı → beyaz an → panel"
+ * diye bir yanıp sönme görüyordu. Artık kontrol bitmemişse HİÇ erken
+ * çağrılmıyor, bileşen kendi `useState(isAuthInitialized())` başlangıç
+ * değeriyle (false) bekliyor, gerçek sonuç gelince TEK SEFERDE haber
+ * alıyor.
+ */
 export function subscribeToAuthState(callback) {
   listeners.add(callback);
-  callback(currentSession);
+  if (initialized) callback(currentSession);
   return () => listeners.delete(callback);
 }
 
