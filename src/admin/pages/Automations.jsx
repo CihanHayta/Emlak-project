@@ -140,7 +140,7 @@ const INFO_GROUPS = [
       {
         icon: BellRing,
         title: "Lead Yanıt Uyarısı",
-        text: "Yeni bir başvuru belirlediğiniz süre içinde \"Yeni\" durumundan çıkmazsa (aranmadı/işlem yapılmadı) size bir uyarı düşer.",
+        text: "Yeni bir başvuru (web formu/kampanya/Instagram Reklam) belirlediğiniz süre içinde bir müşteri kartına dönüşmezse size bir uyarı düşer — Yeni Lead Karşılama açık olsun olmasın çalışır.",
       },
     ],
   },
@@ -625,12 +625,11 @@ function WindowClosingAlertCard({ settings }) {
 
 /**
  * "Lead Yanıt Uyarısı" — TAMAMEN içsel, WindowClosingAlertCard ile aynı
- * desen: müşteriye hiçbir şey gönderilmez, şablon gerekmez. Yeni bir
- * başvuru (otomatik ya da elle) belirlediğiniz süre içinde "Yeni"
- * durumundan çıkmazsa (aranmadı/işlem yapılmadı) aşağıdaki listeye bir
- * uyarı düşer. Agent'ın kendi elle eklediği müşteriler (kaynak: Manuel)
- * bu otomasyona dahil değil — zaten agent bilerek eklediği için habersiz
- * kalmaz.
+ * desen: müşteriye hiçbir şey gönderilmez, şablon gerekmez. Yeni Lead
+ * Karşılama'dan BAĞIMSIZ çalışır — doğrudan başvuruları (leads) izler,
+ * o otomasyon kapalı olsa bile bir başvuru belirlediğiniz süre içinde bir
+ * müşteri kartına dönüşmezse (elle "Müşteriye Dönüştür" ya da otomatik)
+ * aşağıdaki listeye bir uyarı düşer.
  */
 function LeadResponseAlertCard({ settings }) {
   const [toggling, setToggling] = useState(false);
@@ -671,7 +670,7 @@ function LeadResponseAlertCard({ settings }) {
               <BellRing className="h-4 w-4 text-brand-gold" />
               Lead Yanıt Uyarısı
             </CardTitle>
-            <CardDescription>Yeni bir başvuru belirlediğiniz süre içinde &quot;Yeni&quot; durumundan çıkmazsa (aranmadı/işlem yapılmadı) size içsel bir uyarı düşer.</CardDescription>
+            <CardDescription>Yeni bir başvuru belirlediğiniz süre içinde bir müşteri kartına dönüşmezse size içsel bir uyarı düşer — Yeni Lead Karşılama açık olsun olmasın çalışır.</CardDescription>
           </div>
           <Switch checked={settings.enabled} disabled={toggling} onCheckedChange={handleToggle} />
         </div>

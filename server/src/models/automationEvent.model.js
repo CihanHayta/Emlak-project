@@ -22,6 +22,7 @@ export function createDefaultAutomationEvent({
   listingId = null,
   appointmentId = null,
   conversationId = null, // sadece windowClosing — hangi sohbetin penceresi kapanıyor.
+  leadId = null, // sadece leadResponseAlert — henüz bir müşteri kartına dönüşmediği için customerId yok, hangi başvurunun bekletildiğini bulmak için.
   channel = "whatsapp",
   status, // "sent" | "pending_manual" | "manual_sent" | "failed"
   message,
@@ -34,6 +35,7 @@ export function createDefaultAutomationEvent({
     listingId,
     appointmentId,
     conversationId,
+    leadId,
     channel,
     status,
     message,

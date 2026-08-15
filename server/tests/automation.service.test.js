@@ -13,6 +13,7 @@ import * as tenantRepo from "../src/repositories/tenant.repository.js";
 import { customerRepository } from "../src/repositories/customer.repository.js";
 import { conversationRepository } from "../src/repositories/conversation.repository.js";
 import { automationEventRepository } from "../src/repositories/automationEvent.repository.js";
+import { leadRepository } from "../src/repositories/lead.repository.js";
 import {
   notifyMatchingCustomersForListing,
   checkOffHoursAndReply,
@@ -422,63 +423,70 @@ describe("automation.service — checkLeadResponseAlerts (Lead Yanıt Uyarısı)
   beforeEach(() => resetMockFirestore());
   afterEach(() => jest.restoreAllMocks());
 
-  async function makeCustomer(context, minutesAgo, overrides = {}) {
-    const customer = await customerRepository.create(context, createDefaultCustomer({ name: "Ahmet", phone: "0555 123 45 67", source: "Web Sitesi", ...overrides }));
+  async function makeLead(context, minutesAgo, overrides = {}) {
+    const lead = await leadRepository.create(context, createDefaultLead({ name: "Ahmet", phone: "0555 123 45 67" }));
     const createdAt = new Date(Date.now() - minutesAgo * 60 * 1000);
-    return customerRepository.update(context, customer.id, { createdAt });
+    // createDefaultLead status/responseAlertSentAt'i SABİT ("Yeni"/null) set
+    // ediyor, bu yüzden override'lar (status, responseAlertSentAt) create'e
+    // değil, update'e veriliyor — BaseRepository.update hiçbir alanı
+    // zorlamıyor, gönderileni aynen yazıyor.
+    return leadRepository.update(context, lead.id, { createdAt, ...overrides });
   }
 
   it("otomasyon kapalıyken hiç uyarı oluşturmaz", async () => {
     const tenant = await makeTenant({ leadResponseAlert: { enabled: false, minutesThreshold: 10 } });
     const context = { tenantId: tenant.id, userId: null, role: "system" };
-    await makeCustomer(context, 20);
+    await makeLead(context, 20);
 
     await checkLeadResponseAlerts(context, tenant);
 
     expect(await automationEventRepository.findAll(context)).toHaveLength(0);
   });
 
-  it("eşiği geçmiş, hâlâ 'Yeni' durumdaki otomatik müşteri için uyarı oluşturur, responseAlertSentAt işaretler", async () => {
+  it("eşiği geçmiş, hâlâ 'Yeni' durumdaki (müşteri kartına dönüşmemiş) başvuru için uyarı oluşturur, responseAlertSentAt işaretler", async () => {
     const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
     const context = { tenantId: tenant.id, userId: null, role: "system" };
-    const customer = await makeCustomer(context, 15);
+    const lead = await makeLead(context, 15);
 
     await checkLeadResponseAlerts(context, tenant);
 
     const events = await automationEventRepository.findAll(context);
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe("leadResponseAlert");
-    expect(events[0].customerId).toBe(customer.id);
+    expect(events[0].leadId).toBe(lead.id);
     expect(events[0].message).toContain("Ahmet");
 
-    const updated = await customerRepository.findById(context, customer.id);
+    const updated = await leadRepository.findById(context, lead.id);
     expect(updated.responseAlertSentAt).not.toBeNull();
   });
 
-  it("source: Manuel olan (agent'ın elle eklediği) müşteriyi atlar", async () => {
+  it("Yeni Lead Karşılama KAPALIYKEN bile çalışır (leads'i doğrudan izler, newLeadWelcome'dan bağımsız)", async () => {
+    const tenant = await makeTenant({
+      leadResponseAlert: { enabled: true, minutesThreshold: 10 },
+      newLeadWelcome: { enabled: false, templateStatus: "not_submitted", templateName: null, templateMetaId: null },
+    });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    await makeLead(context, 15);
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    expect(await automationEventRepository.findAll(context)).toHaveLength(1);
+  });
+
+  it("zaten bir müşteri kartına dönüşmüş (status: 'Müşteri Oldu') başvuruyu atlar", async () => {
     const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
     const context = { tenantId: tenant.id, userId: null, role: "system" };
-    await makeCustomer(context, 15, { source: "Manuel" });
+    await makeLead(context, 15, { status: "Müşteri Oldu" });
 
     await checkLeadResponseAlerts(context, tenant);
 
     expect(await automationEventRepository.findAll(context)).toHaveLength(0);
   });
 
-  it("durumu 'Yeni' dışına çıkmış (agent zaten ilgilenmiş) müşteriyi atlar", async () => {
+  it("zaten uyarılmış (responseAlertSentAt dolu) başvuruyu tekrar uyarmaz", async () => {
     const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
     const context = { tenantId: tenant.id, userId: null, role: "system" };
-    await makeCustomer(context, 15, { status: "Arandı" });
-
-    await checkLeadResponseAlerts(context, tenant);
-
-    expect(await automationEventRepository.findAll(context)).toHaveLength(0);
-  });
-
-  it("zaten uyarılmış (responseAlertSentAt dolu) müşteriyi tekrar uyarmaz", async () => {
-    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
-    const context = { tenantId: tenant.id, userId: null, role: "system" };
-    await makeCustomer(context, 15, { responseAlertSentAt: Date.now() - 5 * 60 * 1000 });
+    await makeLead(context, 15, { responseAlertSentAt: Date.now() - 5 * 60 * 1000 });
 
     await checkLeadResponseAlerts(context, tenant);
 
@@ -488,7 +496,7 @@ describe("automation.service — checkLeadResponseAlerts (Lead Yanıt Uyarısı)
   it("eşik henüz geçmemişse (çok yeni) uyarmaz", async () => {
     const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
     const context = { tenantId: tenant.id, userId: null, role: "system" };
-    await makeCustomer(context, 3);
+    await makeLead(context, 3);
 
     await checkLeadResponseAlerts(context, tenant);
 

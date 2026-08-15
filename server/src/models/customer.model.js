@@ -21,10 +21,6 @@ export function createDefaultCustomer(data) {
     notes: "",
     tags: [],
     timeline: [{ id: crypto.randomUUID(), label: "Müşteri kartı oluşturuldu", at: Date.now() }],
-    // automation.service.js#checkLeadResponseAlerts'in idempotency alanı —
-    // windowAlertSentAt/reminderSentAt ile aynı desen, bir kez uyarı
-    // düşünce tekrar tekrar düşmesin diye.
-    responseAlertSentAt: null,
   };
   return withCreateFields({ ...defaults, ...data });
 }

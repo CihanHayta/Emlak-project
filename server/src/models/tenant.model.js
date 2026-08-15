@@ -51,9 +51,12 @@ export const DEFAULT_AUTOMATIONS = {
   // WhatsApp DM'leri bu otomasyonun KAPSAMI DIŞINDA (onlar hiç `lead`
   // oluşturmuyor, ayrı bir akış — bkz. Mesajlar sayfası).
   newLeadWelcome: { enabled: false, templateStatus: "not_submitted", templateName: null, templateMetaId: null, templateBodyText: null, templateVersion: 0 },
-  // Yeni bir lead/müşteri belirlenen süre içinde "Yeni" durumundan çıkmazsa
-  // (agent aramadı/işlem yapmadı) size İÇSEL bir uyarı düşer — windowClosingAlert
-  // gibi hiç dış API çağrısı yok, hiç template gerekmez.
+  // Yeni bir BAŞVURU (lead) belirlenen süre içinde bir müşteri kartına
+  // dönüşmezse (elle "Müşteriye Dönüştür" ya da newLeadWelcome otomasyonu
+  // — ikisi de lead'i "Müşteri Oldu" yapar) size İÇSEL bir uyarı düşer.
+  // BİLEREK newLeadWelcome'dan BAĞIMSIZ: o otomasyon kapalıyken de çalışır,
+  // çünkü doğrudan `leads` koleksiyonunu izler — windowClosingAlert gibi
+  // hiç dış API çağrısı yok, hiç template gerekmez.
   leadResponseAlert: { enabled: false, minutesThreshold: 10 },
 };
 

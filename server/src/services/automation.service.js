@@ -23,6 +23,7 @@ import { sendInstagramMessage } from "./instagram.service.js";
 import { automationEventRepository } from "../repositories/automationEvent.repository.js";
 import { conversationRepository } from "../repositories/conversation.repository.js";
 import { customerRepository } from "../repositories/customer.repository.js";
+import { leadRepository } from "../repositories/lead.repository.js";
 import { createDefaultAutomationEvent } from "../models/automationEvent.model.js";
 import { createDefaultCustomer } from "../models/customer.model.js";
 import { normalizeTrPhone } from "../utils/phone.js";
@@ -314,11 +315,15 @@ export async function notifyNewLead(context, lead) {
 
 /**
  * jobs/leadResponseAlerts.job.js'ten çağrılır. TAMAMEN İÇSEL — checkClosingWindows
- * ile aynı prensip, hiç mesaj gitmez. "Cevap bekliyor" sayılan müşteri:
- * `source !== "Manuel"` (agent'ın bilerek elle eklediği bir müşteri değil —
- * bir otomasyon/lead'den geldi), `status === "Yeni"` (agent arayınca/aşama
- * değiştirince zaten değişir, bu yüzden ayrı bir "cevaplandı" alanına gerek
- * yok) ve oluşturulalı `minutesThreshold` dakikadan fazla geçmiş.
+ * ile aynı prensip, hiç mesaj gitmez. BİLEREK `customers` DEĞİL `leads`
+ * koleksiyonunu izler — newLeadWelcome otomasyonu KAPALI olsa bile çalışsın
+ * diye (aksi halde hiç müşteri kartı otomatik oluşmadığından bu otomasyon
+ * hiçbir zaman tetiklenmezdi). "Henüz müşteri kartına dönüşmedi" sayılan
+ * başvuru: `status === "Yeni"` — hem manuel "Müşteriye Dönüştür" hem de
+ * newLeadWelcome otomasyonu (açıksa) lead'i "Müşteri Oldu" yaptığı için,
+ * bu iki yoldan biri gerçekleştiyse zaten filtre dışı kalır, ayrı bir
+ * "dönüştürüldü mü" kontrolüne gerek yok — ve oluşturulalı `minutesThreshold`
+ * dakikadan fazla geçmiş.
  */
 export async function checkLeadResponseAlerts(context, tenant) {
   const settings = tenant.automations?.leadResponseAlert;
@@ -327,22 +332,22 @@ export async function checkLeadResponseAlerts(context, tenant) {
   const nowMs = Date.now();
   const thresholdMs = settings.minutesThreshold * 60 * 1000;
 
-  const customers = await customerRepository.findAll(context);
-  const due = customers.filter((c) => {
-    if (c.source === "Manuel" || c.status !== "Yeni" || c.responseAlertSentAt) return false;
-    const createdAtMs = c.createdAt?.getTime?.() ?? c.createdAt ?? 0;
+  const leads = await leadRepository.findAll(context);
+  const due = leads.filter((l) => {
+    if (l.status !== "Yeni" || l.responseAlertSentAt) return false;
+    const createdAtMs = l.createdAt?.getTime?.() ?? l.createdAt ?? 0;
     return nowMs - createdAtMs >= thresholdMs;
   });
 
-  for (const customer of due) {
-    const createdAtMs = customer.createdAt?.getTime?.() ?? customer.createdAt ?? 0;
+  for (const lead of due) {
+    const createdAtMs = lead.createdAt?.getTime?.() ?? lead.createdAt ?? 0;
     const minutesAgo = Math.round((nowMs - createdAtMs) / 60000);
-    const message = `${customer.name || "Bir müşteri"} ${minutesAgo} dakika önce başvurdu, henüz iletişime geçilmedi.`;
+    const message = `${lead.name || "Bir başvuru"} ${minutesAgo} dakika önce başvurdu, henüz müşteri kartı oluşturulmadı.`;
 
-    // eslint-disable-next-line no-await-in-loop -- müşteri başına bağımsız kayıt, job zaten periyodik çalışıyor.
-    await automationEventRepository.create(context, createDefaultAutomationEvent({ type: "leadResponseAlert", customerId: customer.id, status: "sent", message }));
+    // eslint-disable-next-line no-await-in-loop -- başvuru başına bağımsız kayıt, job zaten periyodik çalışıyor.
+    await automationEventRepository.create(context, createDefaultAutomationEvent({ type: "leadResponseAlert", leadId: lead.id, status: "sent", message }));
     // eslint-disable-next-line no-await-in-loop
-    await customerRepository.update(context, customer.id, { responseAlertSentAt: nowMs });
+    await leadRepository.update(context, lead.id, { responseAlertSentAt: nowMs });
   }
 }
 
