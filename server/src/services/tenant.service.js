@@ -195,34 +195,46 @@ async function generateUniqueSlug(name) {
 
 /**
  * Otomasyonlar sayfası için: tenant'ın şu anki ayarlarını döner.
- * `{ ...DEFAULT_AUTOMATIONS, ...tenant.automations }` ŞART, sadece üst
- * seviye `??` YETMEZ: `automations` alanı hiç yoksa (2026-08-14'ten önce
- * oluşturulmuş tenant) sorun değil ama YENİ bir otomasyon türü (ör.
- * windowClosingAlert) eklendiğinde, `automations` alanı ZATEN VAR olan
- * (başka bir otomasyonu daha önce açılmış) tenant'larda o yeni anahtar
- * `undefined` kalır — `??` bunu yakalamaz çünkü tüm obje `??`'nin sol
- * tarafına düşmüyor. Canlıda yakalandı: windowClosingAlert eklendiğinde
- * bu tenant'ın automations'ı zaten vardı (offHoursReply açıktı), GET
- * windowClosingAlert'i hiç döndürmedi ilk PATCH'e kadar.
+ * İKİ SEVİYELİ birleştirme ŞART, tek seviyelik `{ ...DEFAULTS, ...stored }`
+ * YETMEZ: bu sadece automations alanı TAMAMEN yoksa ya da bir otomasyon
+ * TÜRÜ (ör. windowClosingAlert) hiç yoksa çalışır. Ama VAR OLAN bir
+ * otomasyon türüne SONRADAN yeni bir ALT ALAN eklendiğinde (ör.
+ * leadResponseAlert'e repeatMinutes) — o tenant'ın `automations.leadResponseAlert`
+ * objesi zaten depoda kayıtlı olduğu için (başka bir alanı daha önce
+ * PATCH'lenmiş), tek seviyeli birleştirme onu OLDUĞU GİBİ (repeatMinutes
+ * olmadan) bırakır. Canlıda İKİ KEZ yakalandı (önce windowClosingAlert'in
+ * kendisi, sonra leadResponseAlert.repeatMinutes) — bu yüzden her
+ * otomasyon türünün KENDİ İÇİNDE de DEFAULT_AUTOMATIONS[key] ile
+ * birleştiriliyor, tek tek alanlar da kendini onarıyor.
  */
+function mergeAutomations(stored = {}, updates = {}) {
+  const merged = {};
+  for (const type of Object.keys(DEFAULT_AUTOMATIONS)) {
+    merged[type] = { ...DEFAULT_AUTOMATIONS[type], ...stored[type], ...updates[type] };
+  }
+  return merged;
+}
+
 export async function getTenantAutomations(tenantId) {
   const tenant = await findTenantById(tenantId);
   if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
-  return { ...DEFAULT_AUTOMATIONS, ...tenant.automations };
+  return mergeAutomations(tenant.automations);
 }
 
 /**
  * Otomasyonlar sayfasından toggle/ayar değişince çağrılır. `updates`
  * kısmi olabilir (ör. sadece `listingMatch.enabled`) — mevcut ayarların
- * (yoksa DEFAULT_AUTOMATIONS'ın, bkz. getTenantAutomations yorumu) üzerine
- * SIĞ (shallow, tek seviye) birleştirilir; her alt-otomasyon kendi içinde
- * tam bir obje olarak gönderilmeli (frontend zaten formu hep tam obje
- * olarak tutuyor, bkz. Automations.jsx).
+ * (yoksa DEFAULT_AUTOMATIONS'ın, bkz. mergeAutomations) üzerine
+ * birleştirilir; her alt-otomasyon kendi içinde tam bir obje olarak
+ * gönderilmeli (frontend zaten formu hep tam obje olarak tutuyor, bkz.
+ * Automations.jsx). Her çağrı, DOKUNULMAYAN otomasyon türlerini de
+ * DEFAULT_AUTOMATIONS ile eksik alan kontrolünden geçirdiği için, zamanla
+ * (herhangi bir PATCH tetiklendiğinde) depodaki objeyi kendiliğinden onarır.
  */
 export async function setTenantAutomations(tenantId, updates) {
   const tenant = await findTenantById(tenantId);
   if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
-  const merged = { ...DEFAULT_AUTOMATIONS, ...tenant.automations, ...updates };
+  const merged = mergeAutomations(tenant.automations, updates);
   await updateTenantAutomations(tenantId, merged);
   return merged;
 }

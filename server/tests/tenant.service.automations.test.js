@@ -42,4 +42,16 @@ describe("tenant.service — getTenantAutomations/setTenantAutomations", () => {
     expect(result.appointmentReminder).toEqual(DEFAULT_AUTOMATIONS.appointmentReminder);
     expect(result.windowClosingAlert).toEqual(DEFAULT_AUTOMATIONS.windowClosingAlert);
   });
+
+  it("bir otomasyon türü VAR ama içinde SONRADAN eklenen bir alt alan eksikse (ör. leadResponseAlert.repeatMinutes), o alanı da DEFAULT'tan tamamlar", async () => {
+    const tenant = await createTenant(createDefaultTenant({ name: "Ofis", slug: `ofis-${Date.now()}`, ownerUserId: "owner1" }));
+    // repeatMinutes hiç yokmuş gibi, eski (repeatMinutes eklenmeden önceki) bir PATCH'i simüle et.
+    const { repeatMinutes: _omitted, ...eskiLeadResponseAlert } = DEFAULT_AUTOMATIONS.leadResponseAlert;
+    void _omitted;
+    await setTenantAutomations(tenant.id, { leadResponseAlert: { ...eskiLeadResponseAlert, enabled: true } });
+
+    const result = await getTenantAutomations(tenant.id);
+    expect(result.leadResponseAlert.enabled).toBe(true); // PATCH'lenen alan korunuyor
+    expect(result.leadResponseAlert.repeatMinutes).toBe(DEFAULT_AUTOMATIONS.leadResponseAlert.repeatMinutes); // eksik alan DEFAULT'tan tamamlandı
+  });
 });
