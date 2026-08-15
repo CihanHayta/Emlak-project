@@ -349,6 +349,27 @@ export async function notifyNewLead(context, lead) {
 }
 
 /**
+ * `createdAt`'i güvenilir bir epoch-ms sayısına çevirir. ÜÇ farklı şekilde
+ * gelebiliyor: gerçek Firestore'da Admin SDK bunu bir `Timestamp` nesnesine
+ * çeviriyor (`.toDate()` metodu var, `.getTime()` YOK); mock Firestore'da
+ * (testler) düz bir JS `Date` (`.getTime()` var); bazı yerlerde zaten düz
+ * bir epoch-ms sayısı. CANLIDA YAKALANAN GERÇEK BUG: eski kod
+ * `createdAt?.getTime?.() ?? createdAt` yazıyordu — Timestamp'te `getTime`
+ * olmadığı için `createdAt` (Timestamp nesnesinin KENDİSİ) sayı yerine
+ * kullanılıyordu; JS bunu çıkarma işleminde `valueOf()`'a çeviriyor, o da
+ * Firestore'un SIRALAMA için kullandığı dolgulu bir STRING döndürüyor
+ * ("063921447439.933...") — gerçek epoch-ms DEĞİL. Sonuç: "28 milyon
+ * dakika önce" gibi anlamsız mesajlar (mock testler bunu hiç yakalayamadı
+ * çünkü mock'ta createdAt hep düz Date).
+ */
+function toEpochMs(value) {
+  if (!value) return 0;
+  if (typeof value.toDate === "function") return value.toDate().getTime();
+  if (typeof value.getTime === "function") return value.getTime();
+  return value;
+}
+
+/**
  * İLK uyarı `createdAt`'ten `thresholdMs` sonra; durum hâlâ "Yeni"yse
  * (agent unuttuysa) `repeatMs`'te bir TEKRARLAR — süresiz, agent durumu
  * "Yeni" dışına çıkarana kadar (bkz. checkLeadResponseAlerts'in üst
@@ -359,14 +380,13 @@ export async function notifyNewLead(context, lead) {
 function isDueForAlert(entity, nowMs, thresholdMs, repeatMs) {
   if (entity.status !== "Yeni") return false;
   if (!entity.responseAlertSentAt) {
-    const createdAtMs = entity.createdAt?.getTime?.() ?? entity.createdAt ?? 0;
-    return nowMs - createdAtMs >= thresholdMs;
+    return nowMs - toEpochMs(entity.createdAt) >= thresholdMs;
   }
   return nowMs - entity.responseAlertSentAt >= repeatMs;
 }
 
 function minutesSince(createdAt, nowMs) {
-  const createdAtMs = createdAt?.getTime?.() ?? createdAt ?? 0;
+  const createdAtMs = toEpochMs(createdAt);
   return Math.round((nowMs - createdAtMs) / 60000);
 }
 
@@ -473,7 +493,7 @@ export async function refreshTemplateStatus(context, type) {
 
 export async function listAutomationEvents(context) {
   const events = await automationEventRepository.findAll(context, { limit: 100 });
-  return events.sort((a, b) => (b.createdAt?.getTime?.() ?? b.createdAt ?? 0) - (a.createdAt?.getTime?.() ?? a.createdAt ?? 0));
+  return events.sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt));
 }
 
 /** Agent "Gönderdim" butonuna basınca (wa.me linkini kendi WhatsApp'ından açıp elle gönderdikten sonra) çağrılır — sadece kayıt/takip amaçlı. */

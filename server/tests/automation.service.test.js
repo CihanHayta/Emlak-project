@@ -472,6 +472,26 @@ describe("automation.service — checkLeadResponseAlerts (Lead Yanıt Uyarısı)
     expect(updated.responseAlertSentAt).not.toBeNull();
   });
 
+  // Canlıda yakalanan regresyon: gerçek Firestore'da `createdAt` bir
+  // Timestamp nesnesi (`.toDate()` var, `.getTime()` YOK) — mock Firestore
+  // (yukarıdaki testler) düz bir JS Date kullandığı için bu ayrımı hiç test
+  // etmiyordu. Burada Timestamp'i BİREBİR taklit eden sahte bir nesne
+  // veriyoruz (sadece toDate() metodu var) — eski kod bunu yanlış yorumlayıp
+  // "28 milyon dakika önce" gibi anlamsız bir mesaj üretiyordu.
+  it("createdAt gerçek bir Firestore Timestamp'i (toDate() metodu, getTime() YOK) olsa bile doğru dakika hesaplar", async () => {
+    const tenant = await makeTenant({ leadResponseAlert: { enabled: true, minutesThreshold: 10 } });
+    const context = { tenantId: tenant.id, userId: null, role: "system" };
+    const lead = await leadRepository.create(context, createDefaultLead({ name: "Ahmet", phone: "0555 123 45 67" }));
+    const fakeTimestamp = { toDate: () => new Date(Date.now() - 15 * 60 * 1000) }; // .getTime() BİLEREK yok
+    await leadRepository.update(context, lead.id, { createdAt: fakeTimestamp });
+
+    await checkLeadResponseAlerts(context, tenant);
+
+    const events = await automationEventRepository.findAll(context);
+    expect(events).toHaveLength(1);
+    expect(events[0].message).toMatch(/^Ahmet 1[4-6] dakika önce/); // ~15dk, KESİNLİKLE milyonlarca değil
+  });
+
   it("Yeni Lead Karşılama KAPALIYKEN bile çalışır (leads'i doğrudan izler, newLeadWelcome'dan bağımsız)", async () => {
     const tenant = await makeTenant({
       leadResponseAlert: { enabled: true, minutesThreshold: 10 },
