@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Home as HomeIcon, Lock, Mail, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { login, logout } from "../lib/auth";
+import { login, logout, isAuthInitialized, isLoggedIn, subscribeToAuthState } from "../lib/auth";
 
 // Giriş ekranındaki rol sekmesi <-> backend'in gerçek rol string'i. Seçim
 // sadece bir UX doğrulaması — gerçek yetkilendirme her zaman backend'in
@@ -35,6 +35,24 @@ export default function Login() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // RequireAuth.jsx ile AYNI desen: oturum kontrolü asenkron, o yüzden
+  // "zaten giriş yapılmış mı" bilgisi ilk render'da kesin değil. Canlıda
+  // yakalandı: kullanıcı /admin/login'e (ör. bir yönlendirmeden sonra)
+  // düşüp sayfayı yenilediğinde, backend cookie'si hâlâ tamamen geçerli
+  // olsa bile bu sayfa bunu HİÇ kontrol etmeden direkt formu gösteriyordu
+  // — sanki oturum kaybolmuş gibi görünüyordu, oysa geçerliydi.
+  const [authReady, setAuthReady] = useState(isAuthInitialized());
+  const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(isLoggedIn());
+
+  useEffect(
+    () =>
+      subscribeToAuthState((session) => {
+        setAuthReady(true);
+        setAlreadyLoggedIn(session !== null);
+      }),
+    [],
+  );
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
@@ -59,6 +77,21 @@ export default function Login() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  // Oturum kontrolü sonuçlanana kadar (RequireAuth.jsx ile AYNI görsel) bekle.
+  if (!authReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-navy">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-gold border-t-transparent" />
+      </div>
+    );
+  }
+
+  // Zaten geçerli bir oturum varsa (ör. bu sayfaya bir yönlendirmeyle ya da
+  // eski bir sekme/bookmark ile düşülmüşse) formu hiç göstermeden panele yolla.
+  if (alreadyLoggedIn) {
+    return <Navigate to={location.state?.from ?? "/admin"} replace />;
   }
 
   return (
