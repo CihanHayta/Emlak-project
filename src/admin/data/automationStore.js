@@ -12,6 +12,27 @@ let eventsCache = [];
 let eventsLoadPromise = null;
 const listeners = new Set();
 
+// Otomasyon olayları (job'ların sunucu tarafında ürettiği uyarılar) kullanıcı
+// hiçbir şey yapmadan, arka planda oluşur — sayfa açık kalsa bile kendiliğinden
+// yenilenmezse kullanıcı "hiç çalışmıyor" sanır (canlıda yaşandı: backend
+// aslında düzgün çalışıyordu, sadece liste F5 atılmadan güncellenmiyordu).
+// Bu yüzden sayfada en az bir dinleyici (Automations.jsx) VARKEN periyodik
+// olarak yeniden çekiyoruz; sayfadan ayrılınca (dinleyici kalmayınca) durup
+// gereksiz istek atmıyoruz.
+const EVENTS_POLL_INTERVAL_MS = 15_000;
+let pollTimer = null;
+
+function startEventsPolling() {
+  if (pollTimer) return;
+  pollTimer = setInterval(refreshEvents, EVENTS_POLL_INTERVAL_MS);
+}
+
+function stopEventsPolling() {
+  if (!pollTimer) return;
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
 function notify() {
   listeners.forEach((callback) => callback());
 }
@@ -73,5 +94,9 @@ export async function markAutomationEventSent(id) {
 
 export function subscribeToAutomations(callback) {
   listeners.add(callback);
-  return () => listeners.delete(callback);
+  startEventsPolling();
+  return () => {
+    listeners.delete(callback);
+    if (listeners.size === 0) stopEventsPolling();
+  };
 }
