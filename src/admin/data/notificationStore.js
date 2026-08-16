@@ -55,6 +55,65 @@ function writeAll(notifications) {
   window.dispatchEvent(new CustomEvent("notificationstore:change"));
 }
 
+// Gerçek masaüstü bildirimi (tarayıcının Notification API'si) — sekme açık
+// kaldığı sürece (odakta olmasa, başka bir sekmede olsan bile) yeni bir
+// bildirimde OS seviyesinde bir bildirim balonu çıkar, tıklanınca ilgili
+// kayda (ör. müşteri kartına) götürür. Sekme/tarayıcı TAMAMEN kapalıyken
+// çalışmaz — bunun için Service Worker tabanlı gerçek push altyapısı
+// gerekir, bilerek kapsam dışı (ayrı, çok daha büyük bir iş). İzin tercihi
+// localStorage'da tutuluyor ki bir kere izin verilince her sekme
+// açılışında tekrar sorulmasın.
+const DESKTOP_PREF_KEY = "sahin-admin-desktop-notifications";
+let desktopNotificationsEnabled = typeof localStorage !== "undefined" && localStorage.getItem(DESKTOP_PREF_KEY) === "1";
+
+export function getNotificationSupport() {
+  return typeof Notification !== "undefined";
+}
+
+export function getNotificationPermission() {
+  return getNotificationSupport() ? Notification.permission : "unsupported";
+}
+
+export function areDesktopNotificationsEnabled() {
+  return desktopNotificationsEnabled && getNotificationPermission() === "granted";
+}
+
+/** "Bildirimleri Aç" butonuyla çağrılır — tarayıcının izin diyaloğunu açar. */
+export async function enableDesktopNotifications() {
+  if (!getNotificationSupport()) return false;
+  const permission = await Notification.requestPermission();
+  desktopNotificationsEnabled = permission === "granted";
+  if (desktopNotificationsEnabled) localStorage.setItem(DESKTOP_PREF_KEY, "1");
+  return desktopNotificationsEnabled;
+}
+
+export function disableDesktopNotifications() {
+  desktopNotificationsEnabled = false;
+  localStorage.removeItem(DESKTOP_PREF_KEY);
+}
+
+function showDesktopNotification(notification) {
+  if (!areDesktopNotificationsEnabled()) return;
+  try {
+    const osNotification = new Notification(notification.title, { body: notification.description, tag: notification.id });
+    if (notification.link) {
+      // Bildirime tıklayınca sekmeyi öne getirip ilgili kayda (ör. müşteri
+      // kartına) git — tam sayfa navigasyonu BİLEREK kullanılıyor
+      // (window.location), çünkü bu kod React ağacının dışında çalışıyor,
+      // router'ın history nesnesine erişimi yok; hedef sayfa (ör.
+      // Customers.jsx) zaten `?id=` parametresini okuyup doğru kartı açacak
+      // şekilde kurulu.
+      osNotification.onclick = () => {
+        window.focus();
+        window.location.href = notification.link;
+        osNotification.close();
+      };
+    }
+  } catch {
+    // Sessizce yut — bildirim tarayıcı/ortam kısıtı yüzünden çıkmazsa akışı bozmasın.
+  }
+}
+
 /** All notifications, newest first. */
 export function getNotifications() {
   return readAll().sort((a, b) => b.at - a.at);
@@ -64,10 +123,12 @@ export function getUnreadCount() {
   return readAll().filter((n) => !n.read).length;
 }
 
-export function addNotification({ title, description, type = "genel" }) {
-  const notification = { id: crypto.randomUUID(), title, description, type, read: false, at: Date.now() };
+/** `link`: tıklanınca (bildirim listesinde ya da masaüstü bildiriminde) gidilecek yol — ör. `/admin/musteriler?id=<id>`. Yoksa TYPE_ROUTE'daki genel liste sayfasına düşülür (bkz. Notifications.jsx). */
+export function addNotification({ title, description, type = "genel", link = null }) {
+  const notification = { id: crypto.randomUUID(), title, description, type, link, read: false, at: Date.now() };
   writeAll([...readAll(), notification]);
   playNotificationSound();
+  showDesktopNotification(notification);
   return notification;
 }
 

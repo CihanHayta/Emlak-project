@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, CalendarClock, FileText, Building2, CheckCheck, Trash2 } from "lucide-react";
+import { Bell, CalendarClock, FileText, Building2, MessageCircle, Phone, CheckCheck, Trash2, BellRing, BellOff } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -11,11 +12,69 @@ import {
   deleteNotification,
   deleteNotifications,
   subscribeToNotifications,
+  getNotificationSupport,
+  getNotificationPermission,
+  areDesktopNotificationsEnabled,
+  enableDesktopNotifications,
+  disableDesktopNotifications,
 } from "../data/notificationStore";
 import ConfirmDeleteDialog from "../components/ConfirmDeleteDialog";
 
-const TYPE_ICON = { randevu: CalendarClock, form: FileText, ilan: Building2 };
-const TYPE_ROUTE = { randevu: "/admin/randevular", form: "/admin/basvurular", ilan: "/admin/ilanlar" };
+const TYPE_ICON = { randevu: CalendarClock, form: FileText, ilan: Building2, message: MessageCircle, musteri_takip: Phone };
+const TYPE_ROUTE = { randevu: "/admin/randevular", form: "/admin/basvurular", ilan: "/admin/ilanlar", message: "/admin/mesajlar", musteri_takip: "/admin/musteriler" };
+
+/** Sekme açıkken (odakta olmasa bile) gerçek bir masaüstü bildirimi açıp kapatan küçük kart — bkz. notificationStore.js'in üst yorumu. */
+function DesktopNotificationToggle() {
+  const [permission, setPermission] = useState(getNotificationPermission());
+  const [enabled, setEnabled] = useState(areDesktopNotificationsEnabled());
+  const [requesting, setRequesting] = useState(false);
+
+  if (!getNotificationSupport()) return null;
+
+  async function handleEnable() {
+    setRequesting(true);
+    try {
+      const granted = await enableDesktopNotifications();
+      setPermission(getNotificationPermission());
+      setEnabled(granted);
+      if (granted) toast.success("Masaüstü bildirimleri açıldı.");
+      else toast.error("İzin verilmedi — tarayıcının adres çubuğundaki site ayarlarından izin verebilirsin.");
+    } finally {
+      setRequesting(false);
+    }
+  }
+
+  function handleDisable() {
+    disableDesktopNotifications();
+    setEnabled(false);
+    toast.success("Masaüstü bildirimleri kapatıldı.");
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
+      <div className="flex items-center gap-2.5">
+        {enabled ? <BellRing className="h-4 w-4 text-brand-gold" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
+        <div>
+          <p className="text-sm font-medium">Masaüstü Bildirimleri</p>
+          <p className="text-xs text-muted-foreground">
+            {permission === "denied"
+              ? "Tarayıcı izni reddetmiş — site ayarlarından açman gerekiyor."
+              : "Sekme açık kaldığı sürece (başka bir sekmede olsan bile) gerçek bir bildirim balonu çıkar."}
+          </p>
+        </div>
+      </div>
+      {enabled ? (
+        <Button size="sm" variant="outline" onClick={handleDisable}>
+          Kapat
+        </Button>
+      ) : (
+        <Button size="sm" disabled={requesting || permission === "denied"} onClick={handleEnable}>
+          {requesting ? "İsteniyor…" : "Aç"}
+        </Button>
+      )}
+    </div>
+  );
+}
 
 /** "/admin/bildirimler" — the persistent notification center behind the topbar's bell. */
 export default function Notifications() {
@@ -51,14 +110,16 @@ export default function Notifications() {
 
   function openNotification(n) {
     markAsRead(n.id);
-    const route = TYPE_ROUTE[n.type];
-    if (route) navigate(route);
+    const target = n.link ?? TYPE_ROUTE[n.type];
+    if (target) navigate(target);
   }
 
   const allSelected = notifications.length > 0 && selected.size === notifications.length;
 
   return (
     <div className="mx-auto max-w-2xl space-y-3">
+      <DesktopNotificationToggle />
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           {notifications.length > 0 && (

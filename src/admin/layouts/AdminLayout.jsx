@@ -9,6 +9,7 @@ import CommandPalette from "../components/CommandPalette";
 import { useUpcomingAppointmentReminders } from "../lib/useUpcomingAppointmentReminders";
 import { useIncomingLeadAlerts } from "../lib/useIncomingLeadAlerts";
 import { useIncomingMessageAlerts } from "../lib/useIncomingMessageAlerts";
+import { useStaleFollowUpAlerts } from "../lib/useStaleFollowUpAlerts";
 
 // Longest-prefix match from pathname -> page title/subtitle, so the Topbar
 // always shows something sensible even for nested routes (e.g. an ilan's
@@ -46,6 +47,7 @@ export default function AdminLayout() {
   useUpcomingAppointmentReminders();
   useIncomingLeadAlerts();
   useIncomingMessageAlerts();
+  useStaleFollowUpAlerts();
 
   // `h-dvh` + `min-h-0` kutuyu ekran yüksekliğine sabitliyor ama html/body'nin
   // KENDİSİ hâlâ kayabiliyordu (hiçbir yerde `overflow: hidden` yoktu) — bu

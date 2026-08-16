@@ -45,8 +45,11 @@ export default function Customers() {
   // Sidebar'daki "Yeni" rozeti bu sayfa ziyaret edilince sıfırlanır (bkz. lib/lastSeen.js).
   useEffect(() => markSeen("musteriler"), []);
 
-  // Deep-link support from the ⌘K command palette: ?yeni=1 opens the create
-  // sheet, ?id=<customerId> opens that customer directly.
+  // Deep-link support from the ⌘K command palette / Bildirimler: ?yeni=1
+  // opens the create sheet, ?id=<customerId> opens that customer directly.
+  // Dep on `searchParams` (not `[]`) ON PURPOSE: a notification click while
+  // ALREADY sitting on this page only changes the query string, doesn't
+  // remount the component — an empty deps array would silently no-op then.
   useEffect(() => {
     if (searchParams.get("yeni")) {
       openCreate();
@@ -60,7 +63,7 @@ export default function Customers() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   function openCreate(withPrefill = {}) {
     setEditingCustomer(null);

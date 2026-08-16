@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, CalendarClock, FileText, Building2 } from "lucide-react";
+import { Bell, CalendarClock, FileText, Building2, MessageCircle, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -11,11 +11,12 @@ import {
   subscribeToNotifications,
 } from "../data/notificationStore";
 
-const TYPE_ICON = { randevu: CalendarClock, form: FileText, ilan: Building2 };
-// Notifications don't point at one specific record — just navigate to the
-// list page where that kind of thing lives, so clicking one actually takes
-// you somewhere useful instead of just marking it read in place.
-const TYPE_ROUTE = { randevu: "/admin/randevular", form: "/admin/basvurular", ilan: "/admin/ilanlar" };
+const TYPE_ICON = { randevu: CalendarClock, form: FileText, ilan: Building2, message: MessageCircle, musteri_takip: Phone };
+// Bazı bildirimlerin kendi `link`i var (ör. belirli bir müşteri kartı,
+// bkz. notificationStore.js#addNotification) — o zaman doğrudan oraya
+// gidilir. Yoksa (link: null) bu liste, o TÜRDEN şeylerin genel liste
+// sayfasına düşer, en azından bir yere gitmiş olur.
+const TYPE_ROUTE = { randevu: "/admin/randevular", form: "/admin/basvurular", ilan: "/admin/ilanlar", message: "/admin/mesajlar", musteri_takip: "/admin/musteriler" };
 const PREVIEW_COUNT = 6;
 
 /**
@@ -72,8 +73,8 @@ export default function NotificationBell() {
                   onClick={() => {
                     markAsRead(n.id);
                     setOpen(false);
-                    const route = TYPE_ROUTE[n.type];
-                    if (route) navigate(route);
+                    const target = n.link ?? TYPE_ROUTE[n.type];
+                    if (target) navigate(target);
                   }}
                   className="flex w-full items-start gap-2.5 border-b border-border px-4 py-3 text-left last:border-0 hover:bg-muted/50"
                 >
