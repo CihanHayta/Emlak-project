@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { addLead } from "../lib/leadStore";
 import { formatPhoneInput } from "../lib/formatPhoneInput";
+import { isValidTrPhone } from "../lib/isValidTrPhone";
 
 const EMPTY_FORM = { name: "", phone: "", message: "" };
 
@@ -29,6 +30,21 @@ export function useInquiryForm(context) {
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+
+    // HTML'in `required` özelliği sadece "boş değil" der — "0555" gibi
+    // eksik bir numarayı da geçerli sayar, tarayıcıya göre de tutarsız
+    // davranabilir. Backend zaten reddediyordu ama kullanıcı bunu net bir
+    // hata olarak görmüyordu; artık ağ isteğine hiç çıkmadan burada
+    // yakalanıp anında, açık bir mesajla gösteriliyor.
+    if (!form.name.trim()) {
+      setError("Lütfen boşlukları doğru şekilde doldurunuz — Ad Soyad alanı boş bırakılamaz.");
+      return;
+    }
+    if (!isValidTrPhone(form.phone)) {
+      setError("Lütfen boşlukları doğru şekilde doldurunuz — telefon numaranızı eksiksiz girin (örn. 0539 941 71 05).");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await addLead({ ...form, context });

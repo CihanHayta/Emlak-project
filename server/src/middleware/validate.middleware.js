@@ -15,5 +15,5 @@ export function validate(req, _res, next) {
     field: err.type === "field" ? err.path : err.type,
     message: err.msg,
   }));
-  next(ApiError.validation("Girdi doğrulama hatası.", details));
+  next(ApiError.validation("Lütfen tüm alanları eksiksiz ve doğru şekilde doldurunuz.", details));
 }
