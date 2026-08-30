@@ -3,12 +3,12 @@
 > ⚠️ **Bu bir taslak/şablondur, hukuki tavsiye değildir.** Gerçek bir
 > müşteriyle imzalamadan önce bir avukata gösterin — özellikle "Sorumluluk
 > ve Tazminat" ve "Yurt Dışına Aktarım" bölümleri işinizin büyüklüğüne ve
-> Firebase projenizin veri merkezi bölgesine göre değişebilir.
+> Postgres/R2 sağlayıcınızın veri merkezi bölgesine göre değişebilir.
 >
 > **Ne işe yarar:** Bu, sizin (yazılımı/altyapıyı işleten taraf) ile size
 > CRM'i satın alan **her emlak ofisi müşterisi** arasında imzalanır. Amaç:
 > o ofisin kendi müşterilerinin (ad/telefon/mesaj gibi) verisini sizin
-> Firebase/Railway/Vercel altyapınızda tuttuğunuzu, KVKK'nın "veri sorumlusu
+> Railway/Cloudflare R2/Vercel altyapınızda tuttuğunuzu, KVKK'nın "veri sorumlusu
 > – veri işleyen" ilişkisine göre resmileştirmek. `src/pages/Gizlilik.jsx`
 > (public sitedeki Gizlilik Politikası) bununla **karıştırılmamalı** — o,
 > emlak ofisinin KENDİ ziyaretçilerine karşı yükümlülüğü; bu belge ise
