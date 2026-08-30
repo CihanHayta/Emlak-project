@@ -1,52 +1,80 @@
 # BACKUP.md — Yedekleme ve Kurtarma
 
-## Backup Nasıl Alınır
+> Bu doküman daha önce (Firestore döneminde) tamamen Firebase Console'a
+> dayanıyordu. Firestore artık projede yok — aşağıdaki iki bölüm birbirinden
+> BAĞIMSIZ: veritabanı (Postgres) ve dosya depolama (R2) tamamen farklı
+> ürünler, farklı yedekleme mekanizmaları var. Birini yedeklemek diğerini
+> yedeklemez.
 
-**Otomatik** — elle bir şey yapmanız gerekmiyor, bir kere kurulduktan
-sonra kendi kendine çalışır.
+## PostgreSQL (iş verisi + kullanıcı hesapları)
 
-- **Nereden kurulur/değiştirilir:** Firebase Console → Firestore Database
-  → sol menüden **Backups** (URL: `console.firebase.google.com/project/{proje-id}/firestore/backups`).
-- **Ne seçilir:** "Scheduled backups" altında **Daily** ve **Weekly**
-  kutucukları işaretlenir. Her biri için "Days until backups expire"
-  (kaç gün saklansın) girilir.
-- **Bu projedeki mevcut ayar:** Daily → 7 gün, Weekly → Monday, 7 gün.
-- **Neden yapılır:** Firestore'da yanlışlıkla silinen/bozulan veriyi
-  geri getirebilmenin **tek** yolu bu. Varsayılan olarak Firestore
-  **hiçbir otomatik yedek almaz** — bu adım atlanırsa bir veri
-  kaybı/bozulma durumunda geri dönecek hiçbir nokta olmaz.
-- **Değiştirmek isterseniz:** Aynı sayfada mevcut programın yanındaki
-  düzenle ikonu → gün sayısını değiştir → Save.
+Kalıcı, geri dönüşü olmayan TÜM iş verisi (properties/customers/leads/
+appointments/vehicles/conversations/messages/funnels/automation_events/
+users/sessions/tenants — bkz. `DATA-MODEL.md`) burada. `sessions` hariç
+hepsi kayıp durumunda telafisi imkansız veri.
 
-**Önerilen minimum:** Daily en az 7 gün (yakın zamanda fark edilecek
-hatalar için), Weekly en az 30-90 gün (geç fark edilen sorunlar için).
-Sadece Daily açıkken Weekly kapalıysa (ya da tam tersi), koruma
-penceresi daralır — ikisi birlikte, farklı sürelerle en iyi sonucu verir.
+**Nereden kurulur/değiştirilir:** `DATABASE_URL`'in işaret ettiği Postgres
+sağlayıcısının kendi konsolundan (ör. Railway → Postgres servisi →
+Settings/Backups sekmesi, ya da başka bir yönetilen sağlayıcı kullanıyorsanız
+onun kendi backup arayüzü). **Bu proje bu adımı sizin için otomatik
+kurmuyor** — kullandığınız sağlayıcıya göre elle etkinleştirilmesi gerekir.
 
-## Restore Nasıl Yapılır
+**Önerilen minimum:** Günlük otomatik snapshot, en az 7 gün saklama; mümkünse
+haftalık snapshot'ları 30+ gün saklayın (geç fark edilen sorunlar için).
 
-> ⚠️ Bu adımlar Firebase'in resmi arayüz akışına göre yazıldı, bu proje
-> sürecinde **fiilen denenmedi** — sadece backup'ların "Active" göründüğü
-> doğrulandı. Gerçek bir restore öncesi mutlaka önce test ortamında
-> (ayrı bir Firebase projesinde) denenmesi önerilir.
+**Elle yedek almak isterseniz** (sağlayıcı yönetimli backup'a ek olarak, ya
+da onun yerine):
+```bash
+pg_dump "$DATABASE_URL" -F c -f yedek-$(date +%Y%m%d-%H%M).dump
+```
+Geri yüklemek için:
+```bash
+pg_restore -d "$DATABASE_URL" --clean --if-exists yedek-TARIH.dump
+```
+`--clean --if-exists` var olan tabloları önce düşürüp yeniden kurar — BOŞ
+bir veritabanına ya da tamamen üzerine yazmayı göze aldığınız bir ortama
+karşı çalıştırın, canlı bir veritabanına doğrudan restore etmeden önce
+mutlaka önce ayrı bir (test) veritabanında deneyin.
 
-1. Console → Firestore → **Backups** sekmesi → geri yüklemek istediğiniz
-   tarihli yedeği bulun.
-2. Yedeğin yanındaki "Restore" seçeneğine tıklayın.
-3. Firestore, bir yedeği **var olan bir veritabanının üzerine değil, YENİ
-   bir veritabanına** geri yükler (`(default)`'ın üzerine yazmaz) — bu
-   yüzden restore sonrası ya uygulamayı o yeni veritabanına
-   yönlendirmeniz ya da manuel bir veri taşıma yapmanız gerekebilir.
-4. Restore süresi veri boyutuna göre dakikalar sürebilir.
+**Migration güvenliği:** `npm run db:migrate` (server/) her zaman
+`server/migrations/`'daki şemayı SIRAYLA, zaten uygulanmışları atlayarak
+çalıştırır (bkz. `node-pg-migrate`) — production'da yeni bir migration
+uygulamadan önce güncel bir yedek almak, migration'ın yanlış çıkması
+ihtimaline karşı standart pratiktir.
 
-## Storage Yedekleme
+## Cloudflare R2 (fotoğraf/video/belge dosyaları)
 
-Firebase Storage'ın Firestore'daki gibi bir "Scheduled backups" özelliği
-**yok**. Storage'daki dosyalar (ilan fotoğraf/videoları) için ayrı bir
-yedekleme kurulmadı bu proje sürecinde. İsterseniz Google Cloud Storage'ın
-kendi "Object Versioning" ya da bir bucket'tan diğerine periyodik
-`gsutil rsync` gibi bir çözüm eklenebilir — bu proje kapsamında **yapılmadı**,
-bilinen bir eksik olarak not düşülüyor.
+Postgres'teki satırlar (ör. `property_media.object_key`) sadece R2'deki
+dosyalara birer İŞARETÇİdir — asıl dosyanın kendisi burada değil, R2'de
+durur. Postgres'i yedeklemek R2'deki dosyaları YEDEKLEMEZ, ikisi TAMAMEN
+ayrı sistemlerdir.
+
+R2'nin Firestore'daki gibi bir "Scheduled backups" özelliği yok. Öneriler
+(bu proje kapsamında HENÜZ kurulmadı, bilinen bir eksik olarak not
+düşülüyor):
+- **Object Versioning** — Cloudflare Dashboard → R2 → bucket → Settings →
+  "Object Versioning" açılırsa, üzerine yazılan/silinen bir dosyanın önceki
+  sürümü belirli bir süre saklanır (yanlışlıkla silme/üzerine yazmaya karşı).
+- **Bucket-to-bucket replikasyon/sync** — periyodik olarak (ör. bir cron
+  job'unda) `rclone sync` gibi bir araçla asıl bucket'tan ayrı bir yedek
+  bucket'a (mümkünse farklı bir Cloudflare hesabında ya da en azından
+  farklı bir bucket'ta) senkronize edilebilir.
+
+**Kritik olan tek bilgi:** dosyanın kendisi sadece R2'de var — Postgres'teki
+satır silinirse ama R2'deki dosya kalırsa, o dosya artık hiçbir yerden
+referans edilmeyen "yetim" bir obje olarak R2 faturanızda kalmaya devam
+eder (zararsız ama gereksiz maliyet); tersi durumda (R2'deki dosya
+kaybolur ama Postgres satırı kalırsa) uygulama o fotoğrafı/videoyu
+göstermeye çalışıp 404 alır. İkisi ayrı yedeklenmediği sürece bu tutarsızlık
+riski hep var.
+
+## Kullanıcı hesapları ve şifreler
+
+`users.password_hash` (bcrypt) Postgres yedeğinin doğal bir parçası —
+ayrı bir adım gerekmez. Owner kendi şifresini unutursa (ya da tüm veritabanı
+bir restore'dan sonra eski bir duruma dönerse), `DATABASE_URL`'e erişimi
+olan biri `node scripts/bootstrap-owner.js <email> <yeni-şifre>` ile owner
+şifresini sıfırlayabilir (bkz. `server/README.md`).
 
 ## Production'a Çıkmadan Önce
 
