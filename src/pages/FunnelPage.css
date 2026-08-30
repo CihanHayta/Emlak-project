@@ -1,0 +1,502 @@
+.funnel-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  font-family: var(--font-sans);
+}
+
+.funnel-page--loading {
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--gray-500);
+  text-align: center;
+}
+
+.funnel-page__spinner {
+  animation: funnel-page-spin 1s linear infinite;
+  color: var(--brand-gold);
+}
+@keyframes funnel-page-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.funnel-page__back-link {
+  color: var(--brand-gold-dark);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Small, non-navigational, centered brand mark — trust signal only, no
+   site nav/wordmark (reference sayfadaki gibi minimal). */
+.funnel-page__brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.75rem 1.5rem 0.5rem;
+  background: var(--brand-navy);
+}
+
+.funnel-page__brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  border: 2px solid #fff;
+  color: #fff;
+}
+
+.funnel-page__hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34rem;
+  padding: 3rem 1.5rem;
+  background-color: var(--brand-navy);
+  background-size: cover;
+  background-position: center;
+  text-align: center;
+}
+
+/* İnce noktalı ızgara — reference sayfadaki dokuya benzer, saf CSS. */
+.funnel-page__hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(232, 163, 61, 0.18) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 40%, transparent 100%);
+}
+
+.funnel-page__hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(14, 27, 44, 0.6) 0%, rgba(10, 20, 32, 0.92) 100%);
+}
+
+.funnel-page__hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 44rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  animation: funnel-page-fade-up 0.7s ease both;
+}
+@keyframes funnel-page-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.funnel-page__headline {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #fff;
+  white-space: pre-line;
+}
+@media (min-width: 768px) {
+  .funnel-page__headline {
+    font-size: 2.75rem;
+  }
+}
+
+.funnel-page__highlight {
+  background: linear-gradient(90deg, var(--brand-gold), var(--brand-gold-light));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.funnel-page__subheadline {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--gray-200);
+  max-width: 34rem;
+  white-space: pre-line;
+}
+
+.funnel-page__video-pointer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  animation: funnel-page-bounce 1.6s ease-in-out infinite;
+}
+.funnel-page__video-pointer span {
+  font-size: 1.1rem;
+}
+@keyframes funnel-page-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+
+.funnel-page__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand-gold-dark), var(--brand-gold));
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.05rem;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 10px 24px -8px rgba(232, 163, 61, 0.55);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.funnel-page__cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px -8px rgba(232, 163, 61, 0.65);
+}
+
+.funnel-page__video-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
+  padding: 3.5rem 1.5rem;
+  background: var(--brand-navy-dark);
+  scroll-margin-top: 1rem;
+}
+
+.funnel-page__video-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 48rem;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.25);
+}
+.funnel-page__video-wrap iframe,
+.funnel-page__video-wrap video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+/* YouTube embed'i her zaman tam 16:9 olduğu için kutuyu doldurur (cover).
+   Yüklenen video ise 16:9'a yakın ama tam tutmayabilir (telefon kaydı) —
+   "contain" ile hiçbir zaman kırpılmaz/gerilmez, sadece gerekirse ince
+   siyah şeritlerle (letterbox) tam görünür. Kullanıcıdan yatay (16:9'a
+   yakın) video yüklemesi bekleniyor; dikey video da kırpılmadan görünür
+   ama üstte/altta büyük boşluk kalır. */
+.funnel-page__video-wrap video {
+  object-fit: contain;
+}
+
+/* Video'nun altında, testimonial'lardan önce gelen kısa "harekete geçir"
+   ara başlığı — reference sayfadaki "Programa katılmak için..." bloğu. */
+.funnel-page__mid-cta {
+  padding: 3rem 1.5rem 1rem;
+  text-align: center;
+  background: #fff;
+}
+.funnel-page__mid-cta h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--brand-navy);
+}
+.funnel-page__mid-cta p {
+  margin: 0;
+  color: var(--gray-600);
+  font-size: 0.95rem;
+}
+
+.funnel-page__testimonials-section {
+  padding: 2.5rem 1.5rem 1rem;
+  background: #fff;
+}
+
+.funnel-page__section-title {
+  margin: 0 0 2rem;
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--brand-navy);
+}
+
+.funnel-page__testimonials {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2.5rem 1.5rem;
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 0 0 2.5rem;
+}
+@media (min-width: 768px) {
+  .funnel-page__testimonials {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.funnel-page__testimonial-card {
+  position: relative;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 1rem;
+  padding: 2.25rem 1.5rem 1.5rem;
+}
+
+.funnel-page__testimonial-avatar-wrap {
+  position: absolute;
+  top: -1.25rem;
+  left: 1.25rem;
+  display: flex;
+  align-items: center;
+}
+
+.funnel-page__testimonial-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: var(--brand-navy);
+  color: var(--brand-gold-light);
+  font-weight: 700;
+  font-size: 0.8rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  z-index: 1;
+}
+
+.funnel-page__testimonial-ribbon {
+  margin-left: -0.5rem;
+  padding: 0.3rem 0.75rem 0.3rem 1.1rem;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, var(--brand-gold-dark), var(--brand-gold));
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.funnel-page__testimonial-text {
+  margin: 0.5rem 0 0;
+  color: var(--gray-700);
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.funnel-page__final-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 3.5rem 1.5rem 4rem;
+  background: var(--brand-navy);
+  text-align: center;
+}
+
+.funnel-page__final-cta-title {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.funnel-page__trust-line {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gray-400);
+}
+
+.funnel-page__footer {
+  padding: 2rem 1.5rem 2.5rem;
+  text-align: center;
+  background: var(--brand-navy-dark);
+}
+
+.funnel-page__footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+.funnel-page__footer-links a {
+  color: var(--gray-300);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+.funnel-page__footer-links a:hover {
+  color: var(--brand-gold-light);
+}
+
+.funnel-page__disclaimer {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--gray-500);
+  max-width: 36rem;
+  margin-inline: auto;
+}
+
+/* CTA popup (randevu formu) — public site vanilla CSS'e uygun, admin
+   Tailwind bileşenlerinden bağımsız, sıfırdan yazılmış minimal modal. */
+.funnel-page__modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(10, 20, 32, 0.65);
+  backdrop-filter: blur(2px);
+}
+
+.funnel-page__modal {
+  position: relative;
+  width: 100%;
+  max-width: 26rem;
+  background: #fff;
+  border-radius: 1.25rem;
+  padding: 2rem 1.75rem 1.75rem;
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.35);
+}
+
+.funnel-page__modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  cursor: pointer;
+}
+.funnel-page__modal-close:hover {
+  background: var(--gray-200);
+}
+
+.funnel-page__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.funnel-page__form-title {
+  margin: 0;
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--brand-navy);
+}
+
+.funnel-page__form-subtitle {
+  margin: -0.5rem 0 0.25rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+}
+
+.funnel-page__form input,
+.funnel-page__form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 0.75rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: none;
+}
+.funnel-page__form input:focus,
+.funnel-page__form textarea:focus {
+  outline: none;
+  border-color: var(--brand-gold);
+}
+
+.funnel-page__form button {
+  padding: 0.875rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: var(--brand-gold);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.funnel-page__form button:hover {
+  background: var(--brand-gold-dark);
+}
+.funnel-page__form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Hero ekrandan kayboldukça beliren, mobilde CTA'yı hep elin altında
+   tutan sabit alt bar — masaüstünde gerek yok, hero zaten hep yakın. */
+.funnel-page__sticky-cta {
+  position: fixed;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 40;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.9rem 1.5rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand-gold-dark), var(--brand-gold));
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(1rem);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+@media (max-width: 767px) {
+  .funnel-page__sticky-cta {
+    display: flex;
+  }
+  .funnel-page__sticky-cta--visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+}
+
+.funnel-page__success {
+  margin: 0.5rem 0 0;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--emerald-600);
+}

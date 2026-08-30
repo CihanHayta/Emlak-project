@@ -1,0 +1,11 @@
+.listing-page__filter-section {
+  margin: 0 auto;
+  max-width: 80rem;
+  padding: 0 1.5rem;
+}
+
+.listing-page__grid-section {
+  margin: 0 auto;
+  max-width: 80rem;
+  padding: 3rem 1.5rem;
+}

@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// Aynı gerekçe firestore.rules'taki gibi: dosya yükleme/silme her zaman
+// backend'in /api/v1/uploads/* uçları üzerinden, Admin SDK ile yapılıyor
+// (bkz. server/src/services/upload.service.js, server/src/firebase/
+// storage.client.js). Tarayıcı Storage'a hiçbir zaman doğrudan
+// bağlanmıyor. Bu kural da ikinci savunma hattı — doğrudan bir Storage
+// Client SDK bağlantısını reddeder.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

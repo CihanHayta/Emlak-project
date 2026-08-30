@@ -1,0 +1,89 @@
+.car-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.car-diagram__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  width: 100%;
+  max-width: 20rem;
+  border-radius: 1.5rem;
+  background-color: var(--gray-50);
+  padding: 1rem;
+  border: 1px solid var(--gray-100);
+}
+
+.car-diagram__row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.375rem;
+}
+
+.car-diagram__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+  text-align: center;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.car-diagram__cell-label {
+  font-size: 0.5625rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--gray-700);
+}
+
+.car-diagram__cell--spacer {
+  border: none;
+  background: transparent;
+}
+
+.car-diagram__cell--unknown {
+  background-color: var(--gray-100);
+}
+
+.car-diagram__cell--original {
+  background-color: #e5e7eb;
+}
+
+.car-diagram__cell--painted {
+  background-color: rgba(16, 185, 129, 0.35);
+}
+
+.car-diagram__cell--local-painted {
+  background-color: rgba(59, 130, 246, 0.35);
+}
+
+.car-diagram__cell--changed {
+  background-color: rgba(220, 38, 38, 0.35);
+}
+
+.car-diagram__legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.car-diagram__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--gray-600);
+}
+
+.car-diagram__legend-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 9999px;
+  display: inline-block;
+}

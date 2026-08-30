@@ -1,0 +1,33 @@
+.hero-search {
+  position: relative;
+  z-index: 10;
+  margin: -1.5rem auto 0;
+  width: 100%;
+  max-width: 64rem;
+  padding: 0 1.5rem;
+}
+
+.hero-search__tabs {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.hero-search__tab {
+  border: none;
+  cursor: pointer;
+  border-radius: 0.5rem 0.5rem 0 0;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  transition: background-color 0.2s;
+}
+.hero-search__tab:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+.hero-search__tab--active,
+.hero-search__tab--active:hover {
+  background-color: #fff;
+  color: var(--brand-navy);
+}

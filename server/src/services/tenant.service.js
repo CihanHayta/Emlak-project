@@ -1,0 +1,225 @@
+// server/src/services/tenant.service.js
+// AŞAMA (File Store kaldırma): tenants artık Postgres'te — bkz.
+// tenant.postgres.repository.js. Per-tenant Firebase projesi bağlama
+// konsepti (connectTenantFirebaseProject/findTenantsWithFirebaseConnected)
+// tek-kiracılı + paylaşılan gerçek Firebase Auth pivotundan sonra ölü kod,
+// BİLEREK taşınmadı — bkz. o dosyanın başındaki not.
+import {
+  findTenantById,
+  findTenantBySlug,
+  createTenant,
+  incrementTenantUsage,
+  updateTenantInstagram,
+  findTenantByInstagramAccountId,
+  findTenantsWithExpiringInstagramToken,
+  updateTenantWhatsapp,
+  findTenantByWhatsappWabaId,
+  findTenantsWithExpiringWhatsappToken,
+  updateTenantFacebookPage,
+  findTenantByFacebookPageId,
+  updateTenantRolePermissions,
+  updateTenantAutomations,
+  findActiveTenants,
+} from "../repositories/tenant.postgres.repository.js";
+import { createDefaultTenant, DEFAULT_AUTOMATIONS } from "../models/tenant.model.js";
+import { slugify } from "../utils/slugify.js";
+import { ApiError } from "../utils/ApiError.js";
+import { CUSTOMIZABLE_ROLES, BASE_PERMISSIONS, PERMISSION_CATALOG } from "../config/permissions.js";
+
+export async function getTenantById(id) {
+  return findTenantById(id);
+}
+
+/** Instagram webhook'u, kimliksiz gelen olayın hangi tenant'a ait olduğunu `entry.id` (IG hesap id'si) üzerinden bulmak için kullanır. */
+export async function getTenantByInstagramAccountId(igAccountId) {
+  return findTenantByInstagramAccountId(igAccountId);
+}
+
+export async function connectTenantInstagram(tenantId, data) {
+  await updateTenantInstagram(tenantId, data);
+}
+
+export async function disconnectTenantInstagram(tenantId) {
+  await updateTenantInstagram(tenantId, null);
+}
+
+/** Token yenileme işi (bkz. jobs/instagramTokenRefresh.job.js) için. */
+export async function getTenantsWithExpiringInstagramToken(beforeTimestamp) {
+  return findTenantsWithExpiringInstagramToken(beforeTimestamp);
+}
+
+/** WhatsApp webhook'u, kimliksiz gelen olayın hangi tenant'a ait olduğunu `entry.id` (WABA id'si) üzerinden bulmak için kullanır. */
+export async function getTenantByWhatsappWabaId(wabaId) {
+  return findTenantByWhatsappWabaId(wabaId);
+}
+
+export async function connectTenantWhatsapp(tenantId, data) {
+  await updateTenantWhatsapp(tenantId, data);
+}
+
+export async function disconnectTenantWhatsapp(tenantId) {
+  await updateTenantWhatsapp(tenantId, null);
+}
+
+/** Token yenileme işi (bkz. jobs/whatsappTokenRefresh.job.js) için. */
+export async function getTenantsWithExpiringWhatsappToken(beforeTimestamp) {
+  return findTenantsWithExpiringWhatsappToken(beforeTimestamp);
+}
+
+/** Meta Lead Ads webhook'u, kimliksiz gelen olayın hangi tenant'a ait olduğunu `entry.id` (Facebook Sayfa id'si) üzerinden bulmak için kullanır. */
+export async function getTenantByFacebookPageId(pageId) {
+  return findTenantByFacebookPageId(pageId);
+}
+
+export async function connectTenantFacebookPage(tenantId, data) {
+  await updateTenantFacebookPage(tenantId, data);
+}
+
+export async function disconnectTenantFacebookPage(tenantId) {
+  await updateTenantFacebookPage(tenantId, null);
+}
+
+/**
+ * Job'ların ("her tenant için otomasyon kontrolü yap") tenant enumerate etme
+ * ihtiyacı için — eski `getTenantsWithFirebaseConnected`'ın yerine geçti.
+ * Tek-kiracılı + paylaşılan gerçek Firebase Auth pivotundan sonra "Firebase
+ * bağlı mı" filtresi anlamsızlaştı (per-tenant Firebase projesi konsepti
+ * yok artık); `cancelled` hariç tüm tenant'lar döner.
+ */
+export async function getActiveTenants() {
+  return findActiveTenants();
+}
+
+/**
+ * Ayarlar > Yetkiler sayfası için: her özelleştirilebilir rolün ŞU ANKİ
+ * etkin izin listesini döner (tenant override'ı varsa o, yoksa
+ * BASE_PERMISSIONS'taki varsayılan) — sayfa hep "gerçek, o an uygulanan"
+ * durumu göstersin diye, ayrı bir "henüz kaydedilmemiş taslak" kavramı yok.
+ */
+export async function getTenantRolePermissions(tenantId) {
+  const tenant = await findTenantById(tenantId);
+  if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
+  const overrides = tenant.rolePermissions ?? {};
+  const effective = {};
+  for (const role of CUSTOMIZABLE_ROLES) {
+    effective[role] = overrides[role] ?? BASE_PERMISSIONS[role] ?? [];
+  }
+  return effective;
+}
+
+/**
+ * Ayarlar > Yetkiler sayfasından kaydedilince çağrılır. Sadece
+ * CUSTOMIZABLE_ROLES'taki roller ve PERMISSION_CATALOG'daki izinler kabul
+ * edilir — owner/admin'i kısıtlamaya ya da entegrasyon/kullanıcı yönetimi
+ * gibi hassas izinleri (tenant:manage, users:*) bu yoldan açmaya karşı
+ * (bkz. config/permissions.js).
+ */
+export async function setTenantRolePermissions(tenantId, rolePermissions) {
+  if (!rolePermissions || typeof rolePermissions !== "object" || Array.isArray(rolePermissions)) {
+    throw ApiError.validation("Geçersiz izin verisi.");
+  }
+
+  const sanitized = {};
+  for (const [role, perms] of Object.entries(rolePermissions)) {
+    if (!CUSTOMIZABLE_ROLES.includes(role)) {
+      throw ApiError.validation(`"${role}" rolünün izinleri buradan değiştirilemez.`);
+    }
+    if (!Array.isArray(perms) || perms.some((p) => !PERMISSION_CATALOG.includes(p))) {
+      throw ApiError.validation(`"${role}" için geçersiz izin listesi.`);
+    }
+    sanitized[role] = perms;
+  }
+
+  await updateTenantRolePermissions(tenantId, sanitized);
+}
+
+/**
+ * Bir dosya yüklemeden ÖNCE çağrılır: tenant'ın `plan.limits.storageMb`'ını
+ * aşıp aşmayacağını kontrol eder, aşıyorsa `TENANT_QUOTA_EXCEEDED` fırlatır.
+ * Diğer limitler (users/properties) bugün henüz hiçbir yerden çağrılmıyor
+ * çünkü onları tetikleyecek akışlar (Personel daveti, İlan oluşturma
+ * backend'i) henüz yok — bu fonksiyon o akışlar eklendiğinde aynı desenle
+ * (`assertUsersWithinLimit`, `assertPropertiesWithinLimit`) genişletilebilir.
+ */
+export async function assertStorageWithinLimit(tenantId, additionalBytes) {
+  const tenant = await findTenantById(tenantId);
+  if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
+
+  const limitBytes = (tenant.plan?.limits?.storageMb ?? Infinity) * 1024 * 1024;
+  const usedBytes = tenant.usage?.storageBytes ?? 0;
+
+  if (usedBytes + additionalBytes > limitBytes) {
+    throw ApiError.quotaExceeded(
+      `Depolama limitinize ulaştınız (${tenant.plan?.limits?.storageMb} MB). Daha fazla dosya yüklemek için planınızı yükseltin.`,
+    );
+  }
+}
+
+export async function recordStorageUsage(tenantId, deltaBytes) {
+  await incrementTenantUsage(tenantId, "storageBytes", deltaBytes);
+}
+
+/** Aynı isimden birden fazla ofis kaydolursa slug çakışmasını "-2", "-3" ekleyerek çözer. */
+async function generateUniqueSlug(name) {
+  const base = slugify(name);
+  let slug = base;
+  let suffix = 1;
+  // eslint-disable-next-line no-await-in-loop -- sıralı çalışması gereken bir çakışma kontrolü, paralelleştirilemez.
+  while (await findTenantBySlug(slug)) {
+    suffix += 1;
+    slug = `${base}-${suffix}`;
+  }
+  return slug;
+}
+
+/**
+ * Otomasyonlar sayfası için: tenant'ın şu anki ayarlarını döner.
+ * İKİ SEVİYELİ birleştirme ŞART, tek seviyelik `{ ...DEFAULTS, ...stored }`
+ * YETMEZ: bu sadece automations alanı TAMAMEN yoksa ya da bir otomasyon
+ * TÜRÜ (ör. windowClosingAlert) hiç yoksa çalışır. Ama VAR OLAN bir
+ * otomasyon türüne SONRADAN yeni bir ALT ALAN eklendiğinde (ör.
+ * leadResponseAlert'e repeatMinutes) — o tenant'ın `automations.leadResponseAlert`
+ * objesi zaten depoda kayıtlı olduğu için (başka bir alanı daha önce
+ * PATCH'lenmiş), tek seviyeli birleştirme onu OLDUĞU GİBİ (repeatMinutes
+ * olmadan) bırakır. Canlıda İKİ KEZ yakalandı (önce windowClosingAlert'in
+ * kendisi, sonra leadResponseAlert.repeatMinutes) — bu yüzden her
+ * otomasyon türünün KENDİ İÇİNDE de DEFAULT_AUTOMATIONS[key] ile
+ * birleştiriliyor, tek tek alanlar da kendini onarıyor.
+ */
+function mergeAutomations(stored = {}, updates = {}) {
+  const merged = {};
+  for (const type of Object.keys(DEFAULT_AUTOMATIONS)) {
+    merged[type] = { ...DEFAULT_AUTOMATIONS[type], ...stored[type], ...updates[type] };
+  }
+  return merged;
+}
+
+export async function getTenantAutomations(tenantId) {
+  const tenant = await findTenantById(tenantId);
+  if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
+  return mergeAutomations(tenant.automations);
+}
+
+/**
+ * Otomasyonlar sayfasından toggle/ayar değişince çağrılır. `updates`
+ * kısmi olabilir (ör. sadece `listingMatch.enabled`) — mevcut ayarların
+ * (yoksa DEFAULT_AUTOMATIONS'ın, bkz. mergeAutomations) üzerine
+ * birleştirilir; her alt-otomasyon kendi içinde tam bir obje olarak
+ * gönderilmeli (frontend zaten formu hep tam obje olarak tutuyor, bkz.
+ * Automations.jsx). Her çağrı, DOKUNULMAYAN otomasyon türlerini de
+ * DEFAULT_AUTOMATIONS ile eksik alan kontrolünden geçirdiği için, zamanla
+ * (herhangi bir PATCH tetiklendiğinde) depodaki objeyi kendiliğinden onarır.
+ */
+export async function setTenantAutomations(tenantId, updates) {
+  const tenant = await findTenantById(tenantId);
+  if (!tenant) throw ApiError.forbidden("Ofis bulunamadı.");
+  const merged = mergeAutomations(tenant.automations, updates);
+  await updateTenantAutomations(tenantId, merged);
+  return merged;
+}
+
+export async function createTenantForOwner({ name, ownerUserId, phone }) {
+  const slug = await generateUniqueSlug(name);
+  const data = createDefaultTenant({ name, slug, ownerUserId, phone });
+  return createTenant(data);
+}

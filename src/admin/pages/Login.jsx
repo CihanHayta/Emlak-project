@@ -1,0 +1,198 @@
+import { useEffect, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { Home as HomeIcon, Lock, Mail, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { login, logout, isAuthInitialized, isLoggedIn, subscribeToAuthState } from "../lib/auth";
+
+// Giriş ekranındaki rol sekmesi <-> backend'in gerçek rol string'i. Seçim
+// sadece bir UX doğrulaması — gerçek yetkilendirme her zaman backend'in
+// custom claims'inden gelir (bkz. authorize.middleware.js); burada sadece
+// "yanlış sekmeden girdiniz" gibi net bir hata verebilmek için kullanılır.
+const ROLE_TABS = [
+  { value: "owner", label: "Admin" },
+  { value: "agent", label: "Danışman" },
+  { value: "assistant", label: "Personel" },
+  { value: "viewer", label: "Kısıtlı" },
+];
+
+/**
+ * "/admin/login" — the only unguarded admin route (see RequireAuth.jsx).
+ * Real Firebase Authentication (email/password) + the backend's session
+ * cookie — see lib/auth.js. Tek firma için kurulan bir SaaS: kayıt olma
+ * yok, hesaplar sadece admin tarafından Ayarlar'dan açılır.
+ */
+export default function Login() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [selectedRole, setSelectedRole] = useState("owner");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // RequireAuth.jsx ile AYNI desen: oturum kontrolü asenkron, o yüzden
+  // "zaten giriş yapılmış mı" bilgisi ilk render'da kesin değil. Canlıda
+  // yakalandı: kullanıcı /admin/login'e (ör. bir yönlendirmeden sonra)
+  // düşüp sayfayı yenilediğinde, backend cookie'si hâlâ tamamen geçerli
+  // olsa bile bu sayfa bunu HİÇ kontrol etmeden direkt formu gösteriyordu
+  // — sanki oturum kaybolmuş gibi görünüyordu, oysa geçerliydi.
+  const [authReady, setAuthReady] = useState(isAuthInitialized());
+  const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(isLoggedIn());
+
+  useEffect(
+    () =>
+      subscribeToAuthState((session) => {
+        setAuthReady(true);
+        setAlreadyLoggedIn(session !== null);
+      }),
+    [],
+  );
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+    try {
+      const session = await login(email, password, rememberMe);
+      if (session.role !== selectedRole) {
+        await logout();
+        const expected = ROLE_TABS.find((r) => r.value === selectedRole)?.label ?? selectedRole;
+        setError(`Bu hesap "${expected}" rolüne sahip değil. Doğru sekmeyi seçip tekrar deneyin.`);
+        return;
+      }
+      toast.success(`Hoş geldiniz, ${session.name}!`);
+      const redirectTo = location.state?.from ?? "/admin";
+      navigate(redirectTo, { replace: true });
+    } catch (err) {
+      setError(
+        err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found"
+          ? "E-posta veya şifre hatalı."
+          : err.message || "Giriş yapılamadı, lütfen tekrar deneyin.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // Oturum kontrolü sonuçlanana kadar (RequireAuth.jsx ile AYNI görsel) bekle.
+  if (!authReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-brand-navy">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-gold border-t-transparent" />
+      </div>
+    );
+  }
+
+  // Zaten geçerli bir oturum varsa (ör. bu sayfaya bir yönlendirmeyle ya da
+  // eski bir sekme/bookmark ile düşülmüşse) formu hiç göstermeden panele yolla.
+  if (alreadyLoggedIn) {
+    return <Navigate to={location.state?.from ?? "/admin"} replace />;
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-brand-navy px-6">
+      {/* Soft ambient glow behind the card for a bit of depth */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-gold/20 blur-3xl" />
+      </div>
+
+      <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-white/[0.07] p-8 shadow-2xl backdrop-blur-xl">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl border-2 border-brand-gold text-brand-gold">
+            <HomeIcon className="h-6 w-6" />
+          </span>
+          <h1 className="text-lg font-extrabold tracking-wide text-white">ŞAHİN EMLAK</h1>
+          <p className="mt-1 text-sm text-gray-400">Yönetim Paneline Giriş</p>
+        </div>
+
+        <div className="mb-6 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+          {ROLE_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setSelectedRole(tab.value)}
+              className={
+                selectedRole === tab.value
+                  ? "rounded-lg bg-brand-gold px-2 py-1.5 text-xs font-semibold text-white transition"
+                  : "rounded-lg px-2 py-1.5 text-xs font-medium text-gray-400 transition hover:text-gray-200"
+              }
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="email" className="text-gray-300">
+              E-posta
+            </Label>
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="ornek@sahinemlak.com"
+                autoComplete="username"
+                required
+                className="h-10 border-white/15 bg-white/5 pl-9 text-white placeholder:text-gray-500 focus-visible:ring-brand-gold/40"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="password" className="text-gray-300">
+              Şifre
+            </Label>
+            <div className="relative">
+              <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••"
+                autoComplete="current-password"
+                required
+                className="h-10 border-white/15 bg-white/5 pl-9 text-white placeholder:text-gray-500 focus-visible:ring-brand-gold/40"
+              />
+            </div>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-300">
+            <Checkbox
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked === true)}
+              className="border-white/25 data-checked:border-brand-gold data-checked:bg-brand-gold"
+            />
+            Beni hatırla
+          </label>
+
+          {error && <p className="text-sm text-red-400">{error}</p>}
+
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="h-10 w-full bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60"
+          >
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Giriş Yap"}
+          </Button>
+        </form>
+
+        <Link
+          to="/"
+          className="mt-6 block text-center text-xs text-gray-500 transition hover:text-gray-300"
+        >
+          ← Siteye dön
+        </Link>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,434 @@
+.property-detail__not-found {
+  margin: 0 auto;
+  display: flex;
+  max-width: 80rem;
+  flex-direction: column;
+  align-items: center;
+  padding: 6rem 1.5rem;
+  text-align: center;
+}
+.property-detail__not-found-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+.property-detail__not-found-text {
+  margin: 0.5rem 0 0;
+  color: var(--gray-500);
+}
+.property-detail__not-found-cta {
+  margin-top: 2rem;
+  border-radius: 0.5rem;
+  background-color: var(--brand-gold);
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+.property-detail__not-found-cta:hover {
+  background-color: var(--brand-gold-dark);
+}
+
+.property-detail__back-section {
+  margin: 0 auto;
+  max-width: 80rem;
+  padding: 2rem 1.5rem 0;
+}
+
+.property-detail__back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gray-500);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.property-detail__back-link:hover {
+  color: var(--brand-gold-dark);
+}
+
+.property-detail__grid {
+  margin: 0 auto;
+  display: grid;
+  max-width: 80rem;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  padding: 1rem 1.5rem 4rem;
+}
+
+/* Order on mobile: main content -> lead form -> similar listings.
+   On desktop (lg+): main content + sidebar side by side (row 1), the form
+   as a full-width band below (row 2) — done via explicit grid placement
+   so all three items share the same `order` at that breakpoint and fall
+   back to column/row placement instead. */
+.property-detail__main {
+  order: 1;
+  /* Grid items default to min-width: auto, which lets a replaced element
+     like the gallery's <video> force this track to grow to the video's
+     intrinsic size instead of shrinking to fit — min-width: 0 lets it
+     size down to the column's actual width like a normal block element. */
+  min-width: 0;
+}
+.property-detail__form-wrap {
+  order: 2;
+  min-width: 0;
+}
+.property-detail__sidebar {
+  order: 3;
+  min-width: 0;
+}
+
+.property-detail__header {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.property-detail__listing-no {
+  margin: 0 0 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--gray-500);
+}
+
+.property-detail__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--brand-navy);
+}
+
+.property-detail__location {
+  margin: 0.25rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--gray-500);
+}
+
+.property-detail__price {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--brand-gold-dark);
+}
+
+.property-detail__specs {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 0.625rem;
+  border-radius: 1rem;
+  border: 1px solid var(--gray-100);
+  padding: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+.property-detail__specs--cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.property-detail__specs--cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.property-detail__spec-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.property-detail__spec-text {
+  min-width: 0;
+}
+
+.property-detail__spec-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--brand-gold);
+}
+
+.property-detail__spec-label {
+  margin: 0;
+  font-size: 0.6875rem;
+  color: var(--gray-500);
+}
+
+.property-detail__spec-value {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--brand-navy);
+}
+
+.property-detail__section {
+  margin-top: 2rem;
+}
+
+.property-detail__section-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.property-detail__description {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--gray-600);
+}
+
+.property-detail__amenities-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.property-detail__amenity-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--gray-600);
+}
+
+.property-detail__amenity-icon {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--emerald-500);
+}
+
+/* Inquiry / lead-capture section */
+.inquiry-section {
+  border-radius: 1rem;
+  background-color: var(--gray-50);
+  padding: 2rem 1rem;
+}
+
+.inquiry-card {
+  margin: 0 auto;
+  max-width: 42rem;
+  border-radius: 1rem;
+  border: 1px solid var(--gray-100);
+  background-color: #fff;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.inquiry-thankyou {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 0;
+}
+
+.inquiry-thankyou__icon {
+  margin-bottom: 1rem;
+  height: 3.5rem;
+  width: 3.5rem;
+  color: var(--emerald-500);
+}
+
+.inquiry-thankyou__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.inquiry-thankyou__text {
+  margin: 0;
+  color: var(--gray-600);
+}
+
+.inquiry-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--brand-navy);
+}
+
+.inquiry-subtitle {
+  margin: 0.5rem auto 0;
+  max-width: 28rem;
+  color: var(--gray-500);
+}
+
+.inquiry-form {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+
+.inquiry-form__label {
+  margin-bottom: 0.25rem;
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.inquiry-form__input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--gray-300);
+  padding: 0.625rem 0.875rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.inquiry-form__input:focus {
+  border-color: var(--brand-gold);
+  box-shadow: 0 0 0 2px rgba(232, 163, 61, 0.3);
+}
+.inquiry-form__input--textarea {
+  resize: none;
+}
+
+.inquiry-form__submit {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  background-color: var(--brand-gold);
+  padding: 0.625rem 1rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.inquiry-form__submit:hover {
+  background-color: var(--brand-gold-dark);
+}
+.inquiry-form__submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.inquiry-form__error {
+  margin: 0;
+  border-radius: 0.5rem;
+  background-color: #fef2f2;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  color: #b91c1c;
+}
+
+.inquiry-divider {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--gray-400);
+}
+
+.inquiry-divider__line {
+  height: 1px;
+  flex: 1 1 0%;
+  background-color: var(--gray-200);
+}
+
+.inquiry-whatsapp {
+  margin-top: 1rem;
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.5rem;
+  background-color: var(--whatsapp-green);
+  padding: 0.625rem 1.25rem;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  transition: filter 0.2s;
+}
+.inquiry-whatsapp:hover {
+  filter: brightness(0.95);
+}
+
+@media (min-width: 640px) {
+  .property-detail__title {
+    font-size: 1.875rem;
+  }
+  .property-detail__price {
+    font-size: 1.875rem;
+  }
+  .property-detail__specs {
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+  .property-detail__spec-item {
+    gap: 0.625rem;
+  }
+  .property-detail__spec-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+  .property-detail__spec-label {
+    font-size: 0.75rem;
+  }
+  .property-detail__spec-value {
+    font-size: 1rem;
+  }
+  .inquiry-section {
+    padding: 3rem 1.5rem;
+  }
+  .inquiry-card {
+    padding: 2.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .property-detail__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2.5rem;
+  }
+  .property-detail__main {
+    order: 0;
+    grid-column: span 2 / span 2;
+    grid-row-start: 1;
+  }
+  .property-detail__form-wrap {
+    order: 0;
+    grid-column: span 3 / span 3;
+    grid-row-start: 2;
+  }
+  .property-detail__sidebar {
+    order: 0;
+    grid-column: span 1 / span 1;
+    grid-row-start: 1;
+    /* Deliberately NOT position:sticky. The sidebar shares row 1 with
+       .property-detail__main (which is almost always taller — gallery +
+       specs + description), while the lead-capture form sits directly below
+       in row 2. A sticky sidebar keeps "stuck" for as long as row 1's grid
+       track is tall, then detaches right at the row 1/row 2 boundary — i.e.
+       exactly where the form begins — and since it comes after the form in
+       DOM order, it paints on top of it. That showed up as the sidebar
+       visually overlapping/floating over the inquiry form on real listings.
+       Plain static flow can never leave row 1's bounds, so it can't overlap
+       row 2 no matter how the two columns' content heights compare. */
+    align-self: start;
+  }
+}
