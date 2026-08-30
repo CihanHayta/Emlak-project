@@ -214,10 +214,12 @@ Kullanıcının yüklediği orijinal dosya adı (örn. `IMG_2024.jpg`) **hiç
 kullanılmaz** — hem çakışmayı önlemek hem de dosya adı üzerinden bir
 tahmin/numaralandırma saldırısını engellemek için her zaman rastgele UUID.
 
-## Upload Sistemi — Presigned URL Akışı (uçtan uca)
+## Upload Sistemi — İKİ AYRI mekanizma var, karıştırmayın
 
-Eski (Firebase Storage) akışının aksine dosya HİÇBİR ZAMAN backend'in
-kendi belleğinden/diskinden geçmez — tarayıcı R2'ye DOĞRUDAN yazar:
+**1) Presigned URL akışı (vehicles — `VehicleForm.jsx` → `VehicleMediaSection`,
+gerçekten çalışıyor, uçtan uca test edilmiş — bkz. `scripts/test-upload-flow.js`).**
+Dosya HİÇBİR ZAMAN backend'in kendi belleğinden/diskinden geçmez — tarayıcı
+R2'ye DOĞRUDAN yazar:
 
 ```
 1. Admin panel → dosya seçilir
@@ -243,6 +245,29 @@ resim 10MB (jpeg/png/webp), video 200MB (mp4/mov), belge 20MB (pdf/docx).
 **Silme:** Bir medya kaydı silindiğinde, ilgili `object_key` R2'den de
 gerçekten silinir (`storage.client.js#deleteFile`) — DB satırı ile R2'deki
 dosya birlikte yönetilir.
+
+**2) Genel, backend-proxied yükleme (`POST /uploads/:kind` — `funnels.hero_image`/
+`video_url` gibi tabloda DÜZ BİR METİN SÜTUNU olan alanlar için; ayrıca
+`PdfUploadField`/`MediaUploadField` üzerinden).** Dosya `multer` ile
+backend'in belleğine (`memoryStorage`, diske asla yazılmaz) alınır,
+`upload.service.js` R2'ye yazar, tek bir URL döner — presigned akıştan
+farklı olarak buradaki tablonun kendi ayrı bir `*_media` alt tablosu yok,
+tek bir URL sütununa yazılıyor. `funnels` için bu doğru ve tek mekanizma.
+
+> ⚠️ **Bilinen tutarsızlık — `properties` için:** `ListingForm.jsx`
+> (`/admin/ilanlar/yeni`, gerçekten routed) hâlâ bu 2. mekanizmayı
+> (`MediaUploadField`) kullanıp sonucu `image`/`images`/`videoUrl` alanları
+> olarak property payload'ına koyuyor — ama `property.postgres.service.js`
+> bu alanları artık **BİLEREK sessizce yok sayıyor** (`MEDIA_ONLY_FIELDS`,
+> bkz. o dosyanın başındaki yorum), çünkü fotoğraf/video artık 1. mekanizma
+> (`property_media` tablosu) ile yönetilmesi gerekiyor. Sonuç: bugün admin
+> panelinden yeni bir ilan oluşturup fotoğraf eklerseniz, dosya R2'ye
+> gerçekten yüklenir ama ilan kaydına HİÇ bağlanmaz (URL sessizce
+> düşer) — bu, Firebase/Auth geçişinden bağımsız, ÖNCEDEN VAR OLAN bir
+> eksik (property_media backend'i `VehicleMediaSection`'ın eşdeğeri bir
+> frontend bileşeni hiç almadı). Düzeltmek için `ListingForm.jsx`'in
+> `VehicleForm.jsx`/`VehicleMediaSection` deseniyle aynı presigned akışa
+> taşınması gerekiyor — kapsamlı bir frontend işi, ayrı ele alınmalı.
 
 ## Erişim kontrolü
 

@@ -2,9 +2,9 @@
  * Client-side file storage for uploaded listing photos/videos.
  *
  * `uploadMediaFile` (the one MediaUploadField.jsx actually calls now) POSTs
- * the file to the backend (server/, see src/routes/upload.routes.js), which
- * stores it in Firebase Storage — or, until that's configured
- * (FIREBASE_MODE=mock), on the backend's own disk — and returns a real,
+ * the file to the backend (server/, see server/src/routes/upload.routes.js),
+ * which stores it in Cloudflare R2 — or, until that's configured
+ * (STORAGE_MODE=mock), on the backend's own disk — and returns a real,
  * publicly-loadable URL. That URL is what gets saved on the listing
  * directly, no indirection needed.
  *

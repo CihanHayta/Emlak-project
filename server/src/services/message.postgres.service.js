@@ -1,14 +1,12 @@
 // server/src/services/message.postgres.service.js
 // message.service.js'in (Firestore) PostgreSQL karşılığı.
 //
-// *** BİLEREK HÂLÂ FIREBASE'E BAĞLI OLAN KISIM ***: `getTenantById`
-// (tenant.service.js) VE `sendInstagramMessage`/`sendWhatsappMessage`
-// (instagram/whatsapp.service.js) BİLEREK DEĞİŞTİRİLMEDİ — bunlar Meta'nın
-// GERÇEK API'sine giden dış entegrasyon çağrıları, bu migrasyonun kapsamı
-// (Firestore/Storage → Postgres/R2 KALICILIK katmanı) DIŞINDA. tenant.service.js
-// kendisi de henüz Postgres'e geçmedi (tenants iş verisi, ayrı bir adım —
-// bkz. Aşama 3 raporu). `decryptToken` zaten Firebase'e bağımlı değil
-// (crypto.util.js, saf Node crypto).
+// `getTenantById` (tenant.service.js, artık kendisi de Postgres'te) VE
+// `sendInstagramMessage`/`sendWhatsappMessage` (instagram/whatsapp.service.js)
+// buradan değişmeden import edilir — bunlar Meta'nın GERÇEK API'sine giden
+// dış entegrasyon çağrıları, bu dosyanın işi (mesaj/konuşma KALICILIK
+// katmanı) DIŞINDA, değiştirilmelerine hiç gerek yok. `decryptToken` zaten
+// Firebase'e hiç bağımlı olmadı (crypto.util.js, saf Node crypto).
 import { messagePostgresRepository } from "../repositories/message.postgres.repository.js";
 import { conversationPostgresRepository } from "../repositories/conversation.postgres.repository.js";
 import { createDefaultMessage } from "../models/message.model.js";
