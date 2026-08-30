@@ -50,25 +50,66 @@ function isHiddenFromPublic(vehicle) {
   return vehicle.status === "unpublished";
 }
 
+const EXPERTISE_CATEGORY = "ekspertiz"; // VehicleMediaSection.jsx#EXPERTISE_CATEGORY ile AYNI sabit.
+
+/**
+ * BUG DÜZELTMESİ (property.postgres.service.js#withGalleryFields ile AYNI
+ * kök sebep/çözüm — bkz. o dosyanın yorumu): `image`/`images`/`videoUrl`/
+ * `expertiseReportUrl`/`expertiseReportName` artık `vehicles` tablosunda
+ * YOK (vehicle_media'ya ayrıştırıldı), ama VehicleDetail.jsx/PropertyCard.jsx/
+ * Listings sayfaları hâlâ bu düz alanları bekliyor. Okuma anında iki tabloyu
+ * birleştiren KÜÇÜK bir katman — vehicle_media TEK doğruluk kaynağı olmaya
+ * devam ediyor, burada hiçbir şey YAZILMIYOR.
+ */
+function toGalleryFields(mediaList) {
+  const images = mediaList.filter((m) => m.kind === "image").map((m) => m.url); // listByVehicle zaten position ASC sıralı döner
+  const cover = mediaList.find((m) => m.isCover && m.kind === "image");
+  const video = mediaList.find((m) => m.kind === "video");
+  const expertiseDoc = mediaList.find((m) => m.kind === "document" && m.category === EXPERTISE_CATEGORY);
+  return {
+    images,
+    image: cover?.url ?? images[0] ?? "",
+    videoUrl: video?.url ?? null,
+    expertiseReportUrl: expertiseDoc?.url ?? null,
+    expertiseReportName: expertiseDoc?.documentLabel ?? null,
+  };
+}
+
+async function withGalleryFields(context, vehicle) {
+  const media = await vehicleMediaPostgresRepository.listByVehicle(context.tenantId, vehicle.id, {
+    includeAdminOnly: context.role !== "public",
+  });
+  return { ...vehicle, ...toGalleryFields(media) };
+}
+
 export async function listVehicles(context) {
   const vehicles = await vehiclePostgresRepository.findAll(context);
   const visible = context.role === "public" ? vehicles.filter((v) => !isHiddenFromPublic(v)) : vehicles;
-  return visible.map((vehicle) => sanitizeForContext(context, vehicle));
+  // Liste görünümü için de galeri alanları gerekiyor (kapak fotoğrafı) —
+  // property.postgres.service.js#listProperties'teki AYNI basitlik/performans
+  // kararı (N ayrı sorgu, bu ölçekte kabul edilebilir).
+  const withMedia = await Promise.all(visible.map((vehicle) => withGalleryFields(context, vehicle)));
+  return withMedia.map((vehicle) => sanitizeForContext(context, vehicle));
 }
 
 export async function getVehicle(context, id) {
   const vehicle = await vehiclePostgresRepository.findById(context, id);
   if (!vehicle) throw ApiError.notFound("Araç bulunamadı.");
   if (context.role === "public" && isHiddenFromPublic(vehicle)) throw ApiError.notFound("Araç bulunamadı.");
-  return sanitizeForContext(context, vehicle);
+  return sanitizeForContext(context, await withGalleryFields(context, vehicle));
 }
 
 export async function createVehicle(context, data) {
-  return vehiclePostgresRepository.create(context, stripMediaOnlyFields(createDefaultVehicle(data)));
+  const created = await vehiclePostgresRepository.create(context, stripMediaOnlyFields(createDefaultVehicle(data)));
+  // Yeni oluşturulan bir aracın henüz medyası yoktur ama tutarlılık için
+  // (frontend cache'i — admin/data/vehicleStore.js) burada da galeri
+  // alanları (boş) ekleniyor.
+  return withGalleryFields(context, created);
 }
 
 export async function updateVehicle(context, id, updates) {
-  return vehiclePostgresRepository.update(context, id, withUpdateFields(stripMediaOnlyFields(updates), { actorUserId: context.userId }));
+  const updated = await vehiclePostgresRepository.update(context, id, withUpdateFields(stripMediaOnlyFields(updates), { actorUserId: context.userId }));
+  return withGalleryFields(context, updated);
 }
 
 /** property.postgres.service.js#deleteProperty ile birebir aynı sıralama/risk kabulü. */

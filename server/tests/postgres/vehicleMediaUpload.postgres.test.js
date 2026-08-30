@@ -11,7 +11,9 @@ import { getTestPool, truncateAll, closeTestPool } from "./pgTestDb.js";
 
 jest.unstable_mockModule("../../src/db/pool.js", () => ({ getPool: async () => getTestPool() }));
 
-const { createVehicle, listVehicleMedia } = await import("../../src/services/vehicle.postgres.service.js");
+const { createVehicle, getVehicle, listVehicles, listVehicleMedia, deleteVehicleMedia } = await import(
+  "../../src/services/vehicle.postgres.service.js"
+);
 const { createVehicleMediaUploadIntent, confirmVehicleMediaUpload } = await import(
   "../../src/services/vehicle.postgres.service.js"
 );
@@ -125,5 +127,51 @@ describe("vehicle.postgres.service — presigned upload akışı (mock R2)", () 
     const publicContext = { tenantId: "test-tenant", userId: null, role: "public" };
     const publicMedia = await listVehicleMedia(publicContext, vehicle.id);
     expect(publicMedia.some((m) => m.kind === "document" && m.documentLabel === "ekspertiz.pdf")).toBe(true);
+  });
+
+  // Regresyon testi: property.postgres.service.js#withGalleryFields'in aynı
+  // kök sebep/çözümü — VehicleDetail.jsx da (PropertyGallery.jsx üzerinden)
+  // image/images/videoUrl/expertiseReportUrl bekliyor, bunlar artık
+  // vehicle_media'dan okuma anında hesaplanıyor.
+  it("fotoğraf+video+ekspertiz PDF'i getVehicle/listVehicles yanıtında image/images/videoUrl/expertiseReportUrl alanlarına yansır, silinince kaybolur", async () => {
+    const empty = await getVehicle(context, vehicle.id);
+    expect(empty.images).toEqual([]);
+    expect(empty.image).toBe("");
+    expect(empty.videoUrl).toBeNull();
+    expect(empty.expertiseReportUrl).toBeNull();
+
+    const photoIntent = await createVehicleMediaUploadIntent(context, vehicle.id, { kind: "image", mimeType: "image/jpeg" });
+    await putToMockR2(photoIntent.uploadUrl, Buffer.from("sahte-foto"), "image/jpeg");
+    const photo = await confirmVehicleMediaUpload(context, vehicle.id, { objectKey: photoIntent.objectKey, kind: "image" });
+
+    const videoIntent = await createVehicleMediaUploadIntent(context, vehicle.id, { kind: "video", mimeType: "video/mp4" });
+    await putToMockR2(videoIntent.uploadUrl, Buffer.from("sahte-video"), "video/mp4");
+    const video = await confirmVehicleMediaUpload(context, vehicle.id, { objectKey: videoIntent.objectKey, kind: "video" });
+
+    const docIntent = await createVehicleMediaUploadIntent(context, vehicle.id, { kind: "document", mimeType: "application/pdf" });
+    await putToMockR2(docIntent.uploadUrl, Buffer.from("%PDF-1.4 sahte"), "application/pdf");
+    await confirmVehicleMediaUpload(context, vehicle.id, {
+      objectKey: docIntent.objectKey,
+      kind: "document",
+      category: "ekspertiz",
+      visibility: "public",
+      documentLabel: "ekspertiz-raporu.pdf",
+    });
+
+    const withMedia = await getVehicle(context, vehicle.id);
+    expect(withMedia.images).toEqual([photo.url]);
+    expect(withMedia.image).toBe(photo.url);
+    expect(withMedia.videoUrl).toBe(video.url);
+    expect(withMedia.expertiseReportUrl).toContain(docIntent.objectKey.split("/").pop());
+    expect(withMedia.expertiseReportName).toBe("ekspertiz-raporu.pdf");
+
+    // Liste görünümü (admin panel grid'i / public site kartları) da aynı kapak fotoğrafını görmeli.
+    const inList = (await listVehicles(context)).find((v) => v.id === vehicle.id);
+    expect(inList.image).toBe(photo.url);
+
+    await deleteVehicleMedia(context, vehicle.id, photo.id);
+    const afterDelete = await getVehicle(context, vehicle.id);
+    expect(afterDelete.images).toEqual([]);
+    expect(afterDelete.image).toBe("");
   });
 });
