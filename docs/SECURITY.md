@@ -2,90 +2,53 @@
 
 ## Genel İlke
 
-Frontend **hiçbir zaman** Firestore/Storage'a doğrudan bağlanmaz — sadece
-giriş yaparken Firebase Auth'un client SDK'sını kullanır (idToken almak
-için). Tüm veri erişimi (okuma dahil) kimlik doğrulanmış Express API
-(`server/`) üzerinden, Admin SDK ile geçer. Bu, güvenlik modelinin
-merkezindeki karardır — aşağıdaki her önlem bunun üzerine kurulu.
-
-## Firestore Rules / Storage Rules
-
-İkisi de **`deny-all`**:
-
-```
-# firestore.rules
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-}
-```
-
-```
-# storage.rules
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if false;
-    }
-  }
-}
-```
-
-**Neden `false`?** Admin SDK (backend'in kullandığı) bu kuralları zaten
-bypass eder — günlük kullanımı hiç etkilemez. Kuralın TEK amacı: sitenin
-JavaScript'inde duran (gizli olmayan, olamayan — bkz. aşağıki "API Key
-Neden Gizli Değil") Firebase config değerlerini ele geçiren birinin,
-backend'i hiç kullanmadan doğrudan Firestore/Storage'a bağlanmasını
-engellemek. Kilit kapıda, anahtarda değil.
-
-**Nasıl deploy edilir:** Firebase Console → Firestore/Storage → Rules
-sekmesi → yapıştır → Publish. (Bu proje sürecinde Firestore rules'ı
-Firebase Rules REST API'sine servis hesabı OAuth token'ıyla doğrudan
-istek atarak deploy ettik, çünkü `firebase-tools` CLI'sinin `deploy`
-komutu servis hesabının sahip olmadığı bir "Service Usage" iznini
-önkontrol olarak istiyordu. Storage rules'ta "ruleset oluşturma" API
-üzerinden başarılı oldu ama "release/yayına alma" adımı ayrı bir izin
-istediği için Console'dan elle yapıldı. Yeni bir müşteri kurulumunda en
-basit yol doğrudan Console'dur.)
-
-**Doğrulama:** Tarayıcı konsolundan (ya da bir Node script'iyle) doğrudan
-`getDocs(collection(db, "customers"))` çağırmayı deneyin — `permission-denied`
-almalısınız. Bu proje sürecinde bu test gerçekten yapıldı ve doğrulandı.
-
-## API Key Neden "Gizli" Değil (sık sorulan bir soru)
-
-Firebase'in client-side "API key"i, geleneksel bir gizli API key
-(örn. bir ödeme sistemi key'i) gibi değildir — o tür key'ler "bu key'i
-bilen her şeyi yapabilir" mantığındadır ve mutlaka gizlenir. Firebase'in
-key'i sadece "bu istek hangi projeden geliyor" diyen bir **etiket**.
-Kimin ne yapabileceğine asıl karar veren: (1) kimlik doğrulama, (2)
-yukarıdaki Security Rules. Bu yüzden bu değerler `.env`'de "gizli" olarak
-işaretlenmez ve frontend build'ine gömülmesi normaldir — Google'ın kendi
-resmi dokümantasyonu da bunu açıkça belirtir.
-
-**Ekstra, isteğe bağlı bir sertleştirme:** Google Cloud Console'da bu
-API key'i "sadece belirli domain'lerden gelen isteklerde çalışsın" diye
-kısıtlamak (HTTP referrer restriction) mümkündür — key'i gizlemez ama
-biri kopyalayıp kendi sitesinde kullanmaya çalışırsa işe yaramaz hale
-getirir.
+Frontend **hiçbir zaman** Postgres'e ya da R2'ye doğrudan bağlanmaz — tüm
+veri erişimi (okuma dahil), giriş dahil, kimlik doğrulanmış Express API
+(`server/`) üzerinden geçer. Tarayıcıda sadece bir httpOnly oturum çerezi
+tutulur, hiçbir credential (şifre, DB bağlantı dizesi, R2 anahtarı)
+JavaScript'e hiç ulaşmaz. Bu, güvenlik modelinin merkezindeki karardır —
+aşağıdaki her önlem bunun üzerine kurulu.
 
 ## Authentication
 
-- Firebase Authentication (email/password) + backend'in ürettiği
-  **httpOnly session cookie** (`createSessionCookie`/`verifySessionCookie`
-  — Firebase Admin SDK, ayrı bir JWT kütüphanesi kullanılmadı).
-- Cookie özellikleri:
+- E-posta + şifre, doğrudan backend'e (`POST /auth/login`) gider —
+  Firebase Authentication (ya da başka bir üçüncü taraf kimlik servisi)
+  YOK. Şifre `bcryptjs` ile hash'lenip `users.password_hash`'te tutulur
+  (10 salt round) — düz metin şifre hiçbir zaman diskte/DB'de durmaz.
+- Doğru şifre → 32 bayt (256 bit) rastgele bir oturum token'ı üretilir
+  (`crypto.randomBytes`), SHA-256 hash'i `sessions` tablosuna yazılır, HAM
+  token bir httpOnly çereze konur. Çerez tarayıcıdan asla JavaScript ile
+  okunamaz; DB'de de sadece hash'i durur — DB'ye salt-okunur erişimi olan
+  biri (ör. bir yedek dosyası sızarsa) tek başına hiçbir oturumu ele
+  geçiremez, hash'ten ham token'a geri dönülemez.
+- Token 256 bit entropiye sahip — tahmin/brute-force ihtimali pratikte
+  sıfır, bu yüzden ayrı bir HMAC imzalama/`SESSION_SECRET` gibi bir env
+  değişkenine gerek YOK (token'ın kendisi zaten yeterince rastgele).
+- Cookie özellikleri (`server/src/controllers/auth.controller.js`):
   - `httpOnly: true` — JavaScript ile okunamaz, XSS'e karşı.
   - `secure: true` — sadece production/HTTPS'te (`NODE_ENV=production`).
   - `sameSite: "none"` (production) / `"lax"` (development) — bkz.
     aşağıdaki "Cross-Origin Cookie" bölümü.
-- Custom claims (`tenantId`, `role`) idToken'a gömülür, `auth.middleware.js`
-  bunu her istekte doğrular — **asla** request body'sinden güvenilmez.
+- Her istekte `tenantId`/`role` **request body/query'den asla okunmaz** —
+  `authMiddleware` çerezdeki token'ı `sessions` tablosunda doğrular, sonra
+  `users` tablosundan CANLI satırı (role/status/tenantId) çeker. Bu son
+  nokta önemli: bir rol değişikliği ya da hesabı pasife alma, açık
+  oturumlarda bile bir SONRAKİ istekte ANINDA etkili olur — token
+  içine gömülü, bayatlayabilecek bir "claim" yok.
+- Şifre değiştiğinde/hesap pasife alındığında/hesap silindiğinde, o
+  kullanıcının TÜM oturumları (her cihazda) hemen iptal edilir (bkz.
+  `user.postgres.service.js`). Logout ise SADECE o tarayıcının oturumunu
+  iptal eder (diğer cihazlara dokunmaz).
+- İlk hesap (owner) `node scripts/bootstrap-owner.js <email> <şifre>` ile
+  oluşturulur — kendi kendine kayıt yok. **Self-servis, e-posta tabanlı
+  "şifremi unuttum" akışı bilinçli olarak kurulmadı**: tek bir owner var,
+  `DATABASE_URL`'e erişimi olan (yani deployment'ın gerçek sahibi olan)
+  kişi zaten `bootstrap-owner.js`'i yeniden çalıştırarak şifresini
+  sıfırlayabiliyor. Ayrı bir SMTP/e-posta gönderme altyapısı kurmak,
+  bu tehdit modelinde gerçek bir güvenlik kazancı sağlamadan (saldırı
+  yüzeyini büyüten) bir bakım yükü ekler. Danışman/Personel/Kısıtlı
+  hesaplarının şifresi zaten owner tarafından Ayarlar sayfasından
+  sıfırlanabiliyor.
 
 ## Cross-Origin Cookie (önemli, canlıda gerçekten yaşandı)
 
@@ -112,18 +75,23 @@ orada `Lax` zaten yeterli çünkü gerçek anlamda same-site.
 
 ## Yetkilendirme (RBAC)
 
-`server/src/middleware/authorize.middleware.js` — 3 rol:
+`server/src/middleware/authorize.middleware.js` + `server/src/config/permissions.js`
+— 5 rol:
 
 | Rol | Frontend etiketi | İzinler |
 |---|---|---|
-| `owner` | Admin | Her şey (`*`) |
-| `agent` | Danışman | properties (read+write), customers, appointments, conversations, leads (read+write), uploads |
-| `assistant` | Personel | agent ile aynı, sadece `properties:write` yok |
+| `owner` | Admin | Her şey (`*`) — sadece `bootstrap-owner.js` ile oluşur |
+| `admin` | — | Her şey (`*`) — Ayarlar'dan atanamaz, sadece owner'a eşdeğer bir rol tanımı |
+| `agent` | Danışman | properties (read+write), vehicles (read+write), customers, appointments, conversations, leads (read+write), uploads |
+| `assistant` | Personel | agent ile aynı, sadece `properties:write`/`vehicles:write` yok |
+| `viewer` | Kısıtlı | Sadece okuma (properties/vehicles/customers/appointments/leads) |
 
-`users:*` (Ayarlar → Kullanıcı yönetimi) **sadece** `owner`'ın taban
-izninde (`*`) var, diğer rollere hiç eklenmedi — yani "admin-only" olması,
-ayrı bir kontrol değil, **o iznin başka hiçbir role hiç verilmemiş
-olması**yla sağlanıyor.
+`users:*` (Ayarlar → Kullanıcı yönetimi) **sadece** `owner`/`admin`'in
+taban izninde (`*`) var, diğer rollere hiç eklenmedi — yani "sadece
+admin" olması, ayrı bir kontrol değil, **o iznin başka hiçbir role hiç
+verilmemiş olması**yla sağlanıyor. `agent`/`assistant` izinleri owner
+tarafından tenant bazında özelleştirilebilir (`CUSTOMIZABLE_ROLES`),
+`owner`/`admin`/`viewer` özelleştirilemez.
 
 Kullanım: her route dosyasında `authorize("customers:write")` gibi bir
 middleware zincire eklenir; `tenantMiddleware`'den SONRA bağlanmalı
@@ -136,75 +104,41 @@ bellek-içi (`MemoryStore`, tek instance için yeterli, yatay ölçeklenirse
 Redis gibi paylaşımlı bir depo gerekir).
 
 - **Global**: 300 istek / 15 dakika, tüm `/api/v1/*`.
-- **Auth**: 20 istek / 15 dakika, **sadece** `POST /auth/session` (gerçek
+- **Auth**: 20 istek / 15 dakika, **sadece** `POST /auth/login` (gerçek
   giriş denemesi — brute-force koruması burada anlamlı).
 - `/auth/me` ve `/auth/logout` **genel** limite tabi, auth limitine değil
   — çünkü `/auth/me` neredeyse her sayfa yüklemesinde çağrılıyor ve
   geçerli bir session cookie zaten şart olduğu için brute-force riski
-  taşımıyor. Bu ayrım sonradan eklendi çünkü başta ikisi aynı bütçeyi
-  paylaşıyordu ve normal kullanımda bile "çok fazla istek" hatası
-  çıkabiliyordu.
+  taşımıyor.
 
 ## Yapılan Güvenlik Önlemleri (bulunup kapatılan gerçek açıklar, kronolojik)
 
 1. **Upload uçları açıktı.** `/api/v1/uploads/*` başta kimlik doğrulaması
-   istemiyordu (kod içinde "Faz 3'te eklenecek" yorumu unutulmuştu) —
-   herkes internetten dosya yükleyebiliyordu. → `authMiddleware` +
-   `tenantMiddleware` eklendi, dosya yolu tenant'a bağlandı
-   (`tenants/{tenantId}/...`).
+   istemiyordu — herkes internetten dosya yükleyebiliyordu. →
+   `authMiddleware` + `tenantMiddleware` eklendi.
 2. **RBAC yazılmış ama bağlanmamıştı.** `authorize()` middleware'i
    tamamen hazırdı ama hiçbir route'a eklenmemişti — herhangi bir role
    sahip biri (viewer dahil) her şeyi silebiliyordu. → Tüm route
-   dosyalarına bağlandı, gerçek testle (viewer'ın yazamadığı, owner'ın
-   yapabildiği) doğrulandı.
-3. **Backend git'e hiç commit edilmemişti.** `server/` diskte tek
-   kopyaydı. → Commit edildi.
-4. **Depolama kotası kontrol edilmiyordu.** `plan.limits.storageMb`
-   hiçbir yerde okunmuyordu. → `assertStorageWithinLimit` her
-   yüklemeden önce kontrol ediyor.
+   dosyalarına bağlandı, gerçek testle doğrulandı.
+3. **Backend git'e hiç commit edilmemişti.** → Commit edildi.
+4. **Depolama kotası kontrol edilmiyordu.** → `assertStorageWithinLimit`
+   her yüklemeden önce kontrol ediyor.
 5. **Rate limit paylaşımı** — yukarıda anlatıldı.
-6. **Firestore/Storage'a doğrudan istemci erişimi hiç engellenmemişti.**
-   → `deny-all` rules deploy edildi.
-7. **Cross-origin cookie sorunu** — yukarıda anlatıldı.
-
-## IAM (Servis Hesabı Yetkileri)
-
-- **Nereden görülür/değiştirilir:** Google Cloud Console → **IAM & Admin
-  → IAM** (Firebase Console'da değil, ayrı bir GCP Console ekranı).
-- **Bugünkü durum:** Admin SDK'nın kullandığı servis hesabı
-  (`firebase-adminsdk-fbsvc@{proje}.iam.gserviceaccount.com`),
-  Firestore/Storage/Auth üzerinde **veri okuma-yazma** için yeterli role
-  sahip (proje oluşturulurken Firebase'in kendisi atıyor). **Ama** bu
-  hesabın "Service Usage" (API etkin mi kontrolü) ve "yeni bir Firebase
-  Rules release'i oluşturma" gibi proje-altyapısı yönetimi izinleri
-  **yok** — bu proje sürecinde bizzat karşılaşıldı (rules deploy ederken
-  `firebase-tools` CLI'si 403 verdi, doğrudan REST API'ye geçilerek
-  aşıldı).
-- **Neden önemli:** İleride CI/CD'den otomatik `firebase deploy`
-  çalıştırmak isterseniz, ya bu servis hesabına **Editor** ya da en
-  azından **Firebase Rules Admin** + **Service Usage Consumer**
-  rollerini GCP Console'dan eklemeniz gerekir, ya da kendi Google
-  hesabınızla `firebase login` yapıp CLI'yi öyle çalıştırmanız gerekir.
-- **Yapılmazsa ne olur:** Günlük kullanımda hiçbir şey (uygulama zaten
-  çalışıyor) — sadece CLI ile rules/index/backup gibi altyapı
-  işlemlerini otomatikleştirmek isterseniz aynı 403 duvarına çarparsınız.
-
-## Billing
-
-- **Nereden görülür:** Firebase Console → sol altta çark ikonu →
-  **Usage and billing**, ya da GCP Console → Billing.
-- **Bu proje için gereken:** **Blaze (kullandıkça öde) plan.** Storage
-  ürünü Spark (ücretsiz) planda hiç açılamıyor — yeni bir müşteri
-  kurulumunda bu, ilk yapılacak işlerden biri (bkz. `INSTALL.md` Adım 1).
-- **Yapılmazsa ne olur:** Storage hiç açılamaz; Firestore'un ücretsiz
-  kotasını (günde ~50K okuma, ~20K yazma gibi) aşan istekler reddedilmeye
-  başlar — küçük bir CRM'de bile bu kota gerçek kullanımda beklenenden
-  hızlı dolabilir.
+6. **Cross-origin cookie sorunu** — yukarıda anlatıldı.
+7. **Firestore/Firebase Storage/Firebase Authentication tamamen
+   kaldırıldı** (bkz. `HISTORY.md`) — üçüncü taraf bir kimlik/veri
+   servisine olan bağımlılık sıfırlandı, tüm erişim kontrolü artık
+   tek bir yerde (bu backend'de) yaşıyor. Bu geçişte API yanıtına şifre
+   hash'i sızmasını önlemek özel bir dikkat konusuydu — bkz.
+   `user.postgres.repository.js`'in `password_hash`'i asla dışarı
+   vermeyen `#omitPasswordHash` deseni.
 
 ## Kod İçinde Sabit Yazılı Gizli Bilgi Var mı?
 
 Hayır — proje kaynak kodu (`src/`, `server/src/`) tarandı, hiçbir yerde
-sabit bir Firebase proje id'si, API key ya da servis hesabı bilgisi
-bulunmadı. Hepsi `.env`'den okunuyor. `.env` ve servis hesabı JSON'ları
-hem kök hem `server/` `.gitignore`'unda — `git ls-files | grep -i env`
-boş dönmeli (sadece `.env.example` dosyaları görünür, onlar placeholder).
+sabit bir şifre, API key, DB bağlantı dizesi ya da R2 credential'ı
+bulunmadı. Hepsi `.env`'den okunuyor (`DATABASE_URL`, `R2_*`,
+`TOKEN_ENCRYPTION_KEY`, ...). `.env` dosyaları hem kök hem `server/`
+`.gitignore`'unda — `git ls-files | grep -i env` sadece `.env.example`
+dosyalarını göstermeli (onlar gerçek bir secret İÇERMEZ, sadece hangi
+değişkenlerin gerektiğini dokümante eden şablonlardır).

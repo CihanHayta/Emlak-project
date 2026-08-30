@@ -6,92 +6,99 @@
 
 ## Mimari Özet
 
-- **Backend (Railway) ve Meta App (Instagram/WhatsApp) her zaman paylaşımlı/sizin** —
-  yeni bir Railway servisi, yeni bir Meta App **açılmaz**. Meta bir App'e tek bir
-  webhook adresi tanımlamaya izin verdiği için bu zaten zorunlu — aksi halde her
-  müşteri kendi Meta App Review'unu yapmak zorunda kalır.
-- **Her müşterinin Firestore/Storage'ı KENDİ Firebase projesinde, kendi Google
-  faturasında** — siz kurulumu yapıyorsunuz ama proje/fatura müşteriye ait,
-  kullanım masrafını siz ödemiyorsunuz.
-- **Firebase Authentication merkezi kalır** (sizin projenizde) — frontend zaten
-  Firestore/Storage'a hiç doğrudan bağlanmıyor, sadece giriş için Auth kullanıyor
-  (bkz. `SECURITY.md`), bu yüzden `VITE_FIREBASE_*` değerleri **her müşteride
-  aynı** kalır (merkezi projenin config'i) — değişen tek şey `VITE_TENANT_ID`.
+Bu proje **TEK-KİRACILI** — her müşteri kendi TAMAMEN AYRI, bağımsız
+deployment'ına sahip:
 
-## Adım 1 — Müşterinin Kendi Firebase Projesi
+- Kendi Railway backend servisi (kendi `DATABASE_URL`'i, kendi `R2_*`
+  credential'ları, kendi kimlik doğrulama tablosu).
+- Kendi Postgres veritabanı (başka hiçbir müşteriyle paylaşılmaz).
+- Kendi Cloudflare R2 bucket'ı.
+- Kendi Vercel frontend deployment'ı (kendi domaini/markası).
 
-Müşteri (ya da siz, onun Google hesabıyla) kendi tarafında:
+**Paylaşılan hiçbir şey yok** — her satış tam anlamıyla sıfırdan bir
+kurulum. (Meta App/webhook konusu da her müşteride ayrı: kendi Instagram/
+WhatsApp Business hesabını kendi admin panelinden, Ayarlar → Entegrasyonlar
+üzerinden OAuth ile bağlar — bkz. Adım 6.)
 
-1. [Firebase Console](https://console.firebase.google.com) → **Add project** →
-   proje adı (örn. `kartal-emlak`).
-2. **Blaze plana geçin** — Storage için zorunlu, Spark (ücretsiz) planda
-   Storage hiç açılamaz. Bu adımdan sonra kullanım masrafı **müşterinin**
-   Google faturasına gider.
-3. **Firestore** → Build → Firestore Database → "Create database" →
-   **Native mode** → bir bölge seçin (sonradan değiştirilemez).
-4. **Storage** → Build → Storage → "Get started" → varsayılan bucket'ı kabul edin.
-5. **Rules** — Firestore Database → Rules ve Storage → Rules sekmelerine, bu
-   repodaki `firestore.rules` / `storage.rules` içeriğini **birebir**
-   yapıştırıp **Publish** deyin (her müşteri projesinde ayrı ayrı tekrarlanır
-   — `SECURITY.md`'deki gerekçe için bkz. "Firestore Rules / Storage Rules").
-6. **Backups** (opsiyonel ama önerilir) — Firestore Database → Backups →
-   Daily + Weekly açın (bkz. `BACKUP.md`).
-7. **Servis Hesabı Anahtarı** — Proje Ayarları → Hizmet Hesapları → Firebase
-   Admin SDK → **"Yeni özel anahtar oluştur"** → JSON dosyasını indirin.
+## Adım 1 — Postgres Veritabanı
 
-> ⚠️ Bu JSON dosyasını git'e eklemeyin, kimseyle (bir sohbet dahil)
-> paylaşmayın — içindeki `private_key` o projenin tam yönetici yetkisidir.
-> Kurulumdan sonra sadece şifreli haliyle merkezi `tenants/{id}.firebase`
-> dokümanında saklanır (bkz. `ARCHITECTURE.md`).
+Yeni bir Postgres veritabanı açın (Railway'in kendi Postgres eklentisi en
+basiti — "New" → "Database" → "Add PostgreSQL"). Bağlantı dizesini
+(`DATABASE_URL`) not edin.
 
-Storage bucket adını da not edin (Proje Ayarları → Genel → "Your apps"
-altında ya da Storage sekmesinin üstünde görünür, genelde
-`{proje-id}.appspot.com` veya `{proje-id}.firebasestorage.app`).
+## Adım 2 — Cloudflare R2 Bucket'ı
 
-## Adım 2 — Tenant + Owner Hesabını Oluşturun
+1. Cloudflare Dashboard → R2 → **Create bucket** (bucket adını not edin).
+2. Bucket → Settings → "S3 API" → endpoint URL'ini not edin
+   (`https://<accountId>.r2.cloudflarestorage.com`).
+3. R2 → "Manage R2 API Tokens" → **Create API Token** — Object Read &
+   Write, **sadece bu bucket'a** kapsamlı (least privilege). Access Key
+   ID + Secret Access Key'i not edin (Secret SADECE burada gösterilir).
+4. (Opsiyonel ama önerilir) Bucket → Settings → Public access → bir
+   `r2.dev` public URL'i ya da kendi custom domaininizi bağlayın — bunu
+   `R2_PUBLIC_URL` olarak kullanacaksınız (boş bırakılırsa uygulama
+   `getSignedUrl` ile geçici imzalı linkler üretir, daha yavaş ama çalışır).
 
-Merkezi backend'in ortam değişkenlerine erişiminiz olan bir yerden (örn.
-kendi makinenizden, `server/.env` ile):
+## Adım 3 — Backend'i Deploy Edin (Railway)
+
+Yeni bir Railway projesi/servisi açın, bu repodaki `server/` klasörünü
+deploy edin, `server/.env.example`'daki TÜM değişkenleri Railway'in
+environment variable panelinden doldurun:
+
+- `NODE_ENV=production`, `PORT` (Railway kendi atar, genelde dokunmaya
+  gerek yok), `INTEGRATIONS_MODE`, `CORS_ORIGINS` (henüz frontend domaini
+  yoksa geçici bir değer, Adım 5'te güncellenecek).
+- `DATABASE_URL` (Adım 1), `STORAGE_MODE=live`, `R2_*` (Adım 2).
+- `INTEGRATIONS_MODE=live` olacaksa: `INSTAGRAM_*`/`WHATSAPP_*`/
+  `TOKEN_ENCRYPTION_KEY` (`openssl rand -hex 32` ile üretin)/
+  `PUBLIC_BACKEND_URL`/`FRONTEND_URL`.
+
+Deploy sonrası şemayı uygulayın:
+```bash
+DATABASE_URL=<Adım 1'deki bağlantı dizesi> npm run db:migrate
+```
+(Railway'in "Run command" özelliğinden ya da yerel makinenizden
+`DATABASE_URL`'i geçici olarak export edip çalıştırabilirsiniz.)
+
+## Adım 4 — Owner Hesabını Oluşturun
 
 ```bash
-cd server
-node scripts/bootstrap-owner.js sahibi@kartalemlak.com GucluBirSifre123 ~/Downloads/kartal-emlak-firebase-adminsdk.json kartal-emlak.appspot.com "Kartal Emlak" "Sahibinin Adı Soyadı"
+DATABASE_URL=<Adım 1'deki bağlantı dizesi> \
+  node scripts/bootstrap-owner.js sahibi@kartalemlak.com GucluBirSifre123 "Kartal Emlak" "Sahibinin Adı Soyadı"
 ```
 
 Bu script:
-1. Merkezi projede yeni bir `tenants` dokümanı açar.
-2. Verdiğiniz service-account JSON'unu doğrulayıp (`project_id`/`client_email`/
-   `private_key` var mı) şifreli şekilde o tenant dokümanına kaydeder.
-3. Bağlantıyı küçük bir yaz+sil testiyle doğrular — bozuk key/kapalı API/
-   olmayan bucket gibi sorunlar burada, müşterinin ilk gerçek işleminde değil,
-   hemen ortaya çıkar.
-4. Owner'ın `users/{uid}` dokümanını **müşterinin kendi projesine** yazar.
-5. Merkezi Firebase Authentication'da hesabı açar/custom claims'i ayarlar.
+1. Yeni bir `tenants` satırı açar (ekrana basılan **tenant id**'yi not
+   edin — Adım 5'te `VITE_TENANT_ID`'ye yazılacak).
+2. Şifreyi bcrypt ile hash'leyip owner'ın `users` satırını oluşturur.
 
-Ekrana basılan **tenant id**'yi not edin — Adım 3'te `VITE_TENANT_ID`'ye yazılacak.
+> Not: aynı e-postayla **tekrar** çalıştırırsanız yeni bir hesap AÇMAZ —
+> mevcut hesabın şifresini SIFIRLAR (owner kendi şifresini unutursa
+> kullanılacak yol budur, bkz. `SECURITY.md`).
 
-## Adım 3 — Yeni Vercel Projesi (Müşterinin Kendi Domaini/Markası)
+## Adım 5 — Yeni Vercel Projesi (Müşterinin Kendi Domaini/Markası)
 
 Kök dizinden yeni bir Vercel projesi açın (Vite otomatik algılanır):
 
 | Değişken | Değer |
 |---|---|
-| `VITE_API_URL` | **Mevcut** (paylaşımlı) backend'in adresi — her müşteride aynı |
-| `VITE_TENANT_ID` | Adım 2'de üretilen tenant id |
-| `VITE_FIREBASE_*` | **Merkezi** projenin `firebaseConfig`'i — her müşteride aynı (sadece Auth için kullanılır, bkz. yukarıdaki "Mimari Özet") |
+| `VITE_API_URL` | `/api/v1` (production'da — `vercel.json` bunu Railway backend'ine proxy'ler, bkz. `.env.example`'daki cross-origin-cookie notu) |
+| `VITE_TENANT_ID` | Adım 4'te üretilen tenant id |
+| `VITE_WHATSAPP_APP_ID`/`VITE_WHATSAPP_CONFIG_ID` | Sadece WhatsApp Embedded Signup kullanılacaksa |
 
-`vercel.json` (SPA rewrite) zaten repoda, dokunmanıza gerek yok.
+`vercel.json` (SPA rewrite + backend proxy) zaten repoda, dokunmanıza
+gerek yok — ama proxy'nin hedef Railway adresini bu yeni backend'e
+işaret edecek şekilde güncelleyin.
 
-## Adım 4 — Backend'de CORS
+## Adım 6 — Backend'de CORS
 
 Backend'in `CORS_ORIGINS`'ine yeni Vercel domainini ekleyip (virgülle
-ayırarak — zaten çoklu domain destekliyor, bkz. `ARCHITECTURE.md`) backend'i
-yeniden deploy edin.
+ayırarak) backend'i yeniden deploy edin.
 
-## Adım 5 — Marka/Görsel Özelleştirme
+## Adım 7 — Marka/Görsel Özelleştirme
 
 Bunlar `.env`'den DEĞİL kod içinden okunur, yeni müşterinin markasına göre
-elle değiştirip **bu Vercel projesine özel** commit/deploy edilmesi gerekir:
+elle değiştirip **bu deployment'a özel** commit/deploy edilmesi gerekir:
 
 | Dosya | Ne değişir |
 |---|---|
@@ -100,25 +107,16 @@ elle değiştirip **bu Vercel projesine özel** commit/deploy edilmesi gerekir:
 | `public/favicon.svg` | Favicon |
 | `src/styles/tokens.css` | `--brand-navy`/`--brand-gold` marka renkleri |
 
-## Adım 6 — Instagram/WhatsApp
+## Adım 8 — Instagram/WhatsApp
 
 Müşteri kendi admin panelinden giriş yapıp Ayarlar → Entegrasyonlar →
-**"Instagram Hesabını Bağla"** der — Meta App Review onaylıysa bu anında
-çalışır, sizin hiçbir ek işleminize gerek kalmaz (bkz.
-`project_meta_app_review_needed`).
+**"Instagram Hesabını Bağla"** / **"WhatsApp Hattını Bağla"** der — kendi
+Meta hesabıyla OAuth akışını tamamlar, sizin hiçbir ek işleminize gerek
+kalmaz.
 
-## Adım 7 — (Opsiyonel) Örnek İlanlarla Başlatın
-
-Kendi örnek/başlangıç ilanlarınız varsa, `server/scripts/migrate-properties.js`'i
-referans alıp benzer bir script yazabilirsiniz — **not:** bu script eski
-(tek-merkezi-proje) varsayımıyla yazıldı, tenant-scoped bir projeye karşı
-kullanmadan önce güncellenmesi gerekir. **Zorunlu değil** — boş başlayıp ilk
-ilanı admin panelinden de ekleyebilirler.
-
-## Adım 8 — Doğrulama
+## Adım 9 — Doğrulama
 
 `CHECKLIST.md`'deki tüm maddeleri işaretleyin. En azından: gerçek bir
-tarayıcıdan anasayfa, ilan detay sayfası, admin girişi ve bir CRUD işlemi
-(örn. müşteri oluşturma) test edilmeden "kurulum tamam" denmemeli — ve o
-CRUD işleminin gerçekten **müşterinin kendi Firebase projesinde** oluştuğunu
-(Şahin Emlak'ın projesinde DEĞİL) Firebase Console'dan doğrulayın.
+tarayıcıdan anasayfa, ilan detay sayfası, admin girişi (owner şifresiyle)
+ve bir CRUD işlemi (örn. müşteri oluşturma, fotoğraf yükleme) test
+edilmeden "kurulum tamam" denmemeli.

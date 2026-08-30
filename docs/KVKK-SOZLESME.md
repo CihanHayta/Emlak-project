@@ -35,9 +35,12 @@ arasında, [TARİH] tarihinde, aşağıdaki şartlarla akdedilmiştir.
 Sağlayıcı, Müşteri'ye bir emlak ofisi yönetim yazılımı ("Yazılım") barındırma
 (hosting) ve işletme hizmeti sunar. Müşteri, kendi müşterilerine/potansiyel
 müşterilerine (lead) ait kişisel verileri Yazılım üzerinden toplar,
-saklar ve işler; bu veriler Sağlayıcı'nın işlettiği Firebase (Google Cloud),
-Railway ve Vercel altyapısında barınır. Bu Sözleşme, bu veri işleme
-faaliyetinin KVKK m.8-9 kapsamındaki şartlarını düzenler.
+saklar ve işler; bu veriler Sağlayıcı'nın işlettiği PostgreSQL (Railway
+üzerinde), Cloudflare R2 (dosya depolama), Railway (backend) ve Vercel
+(frontend) altyapısında barınır — Müşteri'nin kimlik doğrulama bilgileri
+(şifre hash'i) dahil hiçbir veri üçüncü bir kimlik/veritabanı servisine
+(ör. Firebase) gönderilmez. Bu Sözleşme, bu veri işleme faaliyetinin
+KVKK m.8-9 kapsamındaki şartlarını düzenler.
 
 ### 2. Taraf Sıfatları
 
@@ -61,10 +64,11 @@ toplamaz.
   işler, kendi pazarlama/başka bir amaç için kullanmaz.
 - Yazılım'a erişimi olan personelini gizlilik yükümlülüğü altına alır.
 - Alınan teknik/idari tedbirler (özet, güncel durum için bkz. `SECURITY.md`):
-  - Frontend hiçbir zaman veritabanına doğrudan bağlanmaz, tüm erişim
-    kimlik doğrulamalı bir API üzerinden geçer.
-  - Firestore/Storage güvenlik kuralları istemci tarafı erişimi tamamen
-    kapalıdır (`deny-all`).
+  - Frontend hiçbir zaman veritabanına ya da dosya depolamaya doğrudan
+    bağlanmaz, tüm erişim kimlik doğrulamalı bir API üzerinden geçer.
+  - Şifreler bcrypt ile hash'lenir, düz metin hiçbir zaman saklanmaz;
+    oturumlar sunucu tarafında geri alınabilir (revocable) rastgele
+    token'larla yönetilir.
   - Oturum bilgisi `httpOnly`/`secure` çerezle taşınır.
   - Rol bazlı yetkilendirme (RBAC) ile her kullanıcı sadece yetkili
     olduğu veriye erişir.
@@ -90,10 +94,13 @@ işleyenlerin kullanımını kabul eder:
 
 | Alt İşleyen | Rolü |
 |---|---|
-| Google Firebase / Google Cloud | Veritabanı (Firestore), dosya depolama (Storage), kimlik doğrulama |
-| Railway | Backend (API) barındırma |
+| Railway | Backend (API) + PostgreSQL veritabanı barındırma |
+| Cloudflare (R2) | Dosya (fotoğraf/video/belge) depolama |
 | Vercel | Frontend (web sitesi) barındırma |
 | Meta (Instagram/WhatsApp) | Mesajlaşma entegrasyonu — sadece Müşteri kendi hesabını bağlarsa |
+
+Kimlik doğrulama (şifre hash'i, oturum) için ayrı bir üçüncü taraf servis
+kullanılmaz — bu veri de yukarıdaki PostgreSQL veritabanında tutulur.
 
 ### 7. Verilerin Silinmesi/İadesi
 
@@ -104,11 +111,13 @@ teslim eder. Yasal saklama yükümlülüğü olan veriler bu süreden istisnadı
 
 ### 8. Yurt Dışına Aktarım
 
-Firebase/Google Cloud altyapısı [FIREBASE PROJENİZİN BÖLGESİNİ YAZIN, örn.
-"europe-west1 (Belçika)" ya da "us-central1 (ABD)"] bölgesinde barınmaktadır.
-[Bölge Türkiye/AB dışındaysa:] Bu, KVKK m.9 kapsamında yurt dışına veri
-aktarımı sayılabilir — Müşteri'nin kendi aydınlatma metninde buna açıkça
-yer vermesi ve gerekiyorsa ilgili kişilerden ayrıca rıza alması önerilir.
+Railway (Postgres + backend) ve Cloudflare (R2) altyapısı [SAĞLAYICI
+BÖLGESİNİ YAZIN, örn. "us-west (ABD)" ya da "eu-west (AB)" — Railway proje
+ayarlarından, R2 bucket'ının Cloudflare Dashboard'daki bölgesinden kontrol
+edilir] bölgesinde barınmaktadır. [Bölge Türkiye/AB dışındaysa:] Bu, KVKK
+m.9 kapsamında yurt dışına veri aktarımı sayılabilir — Müşteri'nin kendi
+aydınlatma metninde buna açıkça yer vermesi ve gerekiyorsa ilgili
+kişilerden ayrıca rıza alması önerilir.
 
 ### 9. Sorumluluk
 
