@@ -1,7 +1,6 @@
 // server/src/routes/index.js
 import { Router } from "express";
 import { healthRouter } from "./health.routes.js";
-import { uploadRouter } from "./upload.routes.js";
 import { authRouter } from "./auth.routes.js";
 import { customerRouter } from "./customer.routes.js";
 import { leadRouter } from "./lead.routes.js";
@@ -29,7 +28,6 @@ import { automationRouter } from "./automation.routes.js";
 export const apiRouter = Router();
 
 apiRouter.use("/health", healthRouter);
-apiRouter.use("/uploads", uploadRouter);
 apiRouter.use("/auth", authRouter);
 apiRouter.use("/customers", customerRouter);
 apiRouter.use("/leads", leadRouter);

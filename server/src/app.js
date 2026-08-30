@@ -17,7 +17,6 @@ import { apiRouter } from "./routes/index.js";
 import { instagramWebhookRouter } from "./webhook/instagram.webhook.js";
 import { whatsappWebhookRouter } from "./webhook/whatsapp.webhook.js";
 import { metaLeadAdsWebhookRouter } from "./webhook/metaLeadAds.webhook.js";
-import { MOCK_UPLOADS_ROOT } from "./firebase/mock/storage.mock.js";
 import { MOCK_R2_ROOT, mockR2Storage } from "./db/mock/storage.mock.js";
 
 export const app = express();
@@ -45,23 +44,6 @@ app.use(cookieParser());
 app.use("/webhooks/instagram", webhookRateLimit, instagramWebhookRouter);
 app.use("/webhooks/whatsapp", webhookRateLimit, whatsappWebhookRouter);
 app.use("/webhooks/meta-leads", webhookRateLimit, metaLeadAdsWebhookRouter);
-
-// FIREBASE_MODE=mock iken yüklenen dosyalar buradan servis edilir (bkz.
-// firebase/mock/storage.mock.js). Rate limit'ten ÖNCE bağlanır — bir video
-// oynatılırken tarayıcının attığı çok sayıda "range" isteği limite takılmasın.
-// Helmet'in varsayılan Cross-Origin-Resource-Policy: same-origin'i burada
-// gevşetiyoruz, yoksa frontend (farklı origin, localhost:5173) bu
-// görselleri/videoları <img>/<video> ile yükleyemez.
-if (env.firebaseMode === "mock") {
-  app.use(
-    "/mock-uploads",
-    (_req, res, next) => {
-      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-      next();
-    },
-    express.static(MOCK_UPLOADS_ROOT),
-  );
-}
 
 // STORAGE_MODE=mock iken R2'nin karşılığı — Aşama 6'nın presigned-PUT akışını
 // (frontend'in `uploadUrl`e doğrudan PUT ile dosya göndermesi) gerçek R2

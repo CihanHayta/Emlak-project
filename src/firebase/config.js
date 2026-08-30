@@ -4,10 +4,10 @@
  * `VITE_FIREBASE_*` değerleri). Hiçbir başka dosyada Firebase proje kimliği,
  * API key'i vb. sabit yazılmaz; hepsi buradan (`firebaseApp`) türetilir.
  *
- * auth.js / firestore.js / storage.js bu dosyadaki `firebaseApp`'i alıp
- * kendi servislerini döndürür — uygulamanın geri kalanı SADECE o üç dosyayı
- * import eder, bu dosyayı ya da `firebase/app`'i doğrudan hiçbir yerde
- * import etmez.
+ * auth.js bu dosyadaki `firebaseApp`'i alıp Auth servisini döndürür —
+ * uygulama SADECE Firebase Authentication için Firebase kullanıyor
+ * (Firestore ve Firebase Storage kaldırıldı, bkz. docs/ARCHITECTURE.md);
+ * geri kalan kod bu dosyayı ya da `firebase/app`'i doğrudan import etmez.
  */
 import { initializeApp } from "firebase/app";
 
@@ -27,7 +27,6 @@ export const firebaseConfig = isMockAuth
       apiKey: "mock-api-key-not-a-real-firebase-project",
       authDomain: "mock.firebaseapp.com",
       projectId: "mock-project",
-      storageBucket: "mock-project.appspot.com",
       messagingSenderId: "000000000000",
       appId: "1:000000000000:web:0000000000000000000000",
     }
@@ -35,7 +34,6 @@ export const firebaseConfig = isMockAuth
       apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
       authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
       projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
       messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
       appId: import.meta.env.VITE_FIREBASE_APP_ID,
     };

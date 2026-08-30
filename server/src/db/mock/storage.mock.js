@@ -1,11 +1,9 @@
 // server/src/db/mock/storage.mock.js
 //
-// server/src/firebase/mock/storage.mock.js'in R2 karşılığı — aynı felsefe:
-// dosyayı GERÇEKTEN diske yazar, gerçek bir dosya yükleme akışını R2
-// kurulmadan da uçtan uca test edilebilir kılar. Tek fark: `tenants/{id}/`
-// öneki yok — R2'ye geçişte her tenant KENDİ bucket'ına sahip olacağı için
-// (bkz. docs/DATA-MODEL.md'nin R2 karşılığı, henüz yazılmadı) bucket içi bir
-// tenant önekine artık gerek yok, anahtar doğrudan `{kind}/{uuid}.{ext}`.
+// STORAGE_MODE=mock iken kullanılan sahte R2 — dosyayı GERÇEKTEN diske
+// yazar, gerçek bir dosya yükleme akışını R2 kurulmadan da uçtan uca test
+// edilebilir kılar. Bu deployment TEK-KİRACILI (kendi bucket'ına sahip) —
+// bucket içi bir tenant önekine gerek yok, anahtar doğrudan `{kind}/{uuid}.{ext}`.
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

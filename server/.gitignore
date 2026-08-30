@@ -3,7 +3,5 @@ node_modules/
 *.log
 coverage/
 serviceAccountKey.json
-.mock-uploads/
 .mock-r2/
 .mock-auth/
-.mock-firestore/

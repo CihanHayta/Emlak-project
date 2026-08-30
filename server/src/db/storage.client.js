@@ -1,15 +1,15 @@
 // server/src/db/storage.client.js
 //
-// server/src/firebase/storage.client.js'in R2 karşılığı — TEK seçim noktası:
-// hangi Storage implementasyonunun (mock disk / gerçek R2) aktif olduğuna
-// sadece burada karar verilir. Üst katmanlar sadece `getStorageClient()`
-// çağırır, hangisinin aktif olduğunu hiç bilmez — aynı arayüz
-// (`upload/deleteFile/getSignedUrl`) korunuyor.
+// TEK seçim noktası: hangi Storage implementasyonunun (mock disk / gerçek
+// R2) aktif olduğuna sadece burada karar verilir. Üst katmanlar sadece
+// `getStorageClient()` çağırır, hangisinin aktif olduğunu hiç bilmez —
+// aynı arayüz (`upload/deleteFile/getSignedUrl`) korunuyor. Firestore/
+// Firebase Storage kaldırıldı (bkz. docs/ARCHITECTURE.md) — tüm dosya
+// depolama artık burada, R2'de.
 //
 // TEK-KİRACILI mimari: bu deployment sadece BİR müşteriye ait, sadece BİR
-// R2 bucket'ına bağlanır — credential'lar tenant-başına şifreli DB
-// kaydından DEĞİL, doğrudan env değişkenlerinden okunuyor (Firebase Storage
-// bugün de zaten böyle, bkz. FIREBASE_STORAGE_BUCKET). Lazy singleton.
+// R2 bucket'ına bağlanır — credential'lar doğrudan env değişkenlerinden
+// okunuyor. Lazy singleton.
 //
 // R2, S3 API'siyle uyumlu olduğu için Cloudflare'in kendi dokümantasyonunun
 // önerdiği gibi `@aws-sdk/client-s3` kullanılıyor — R2'ye özel bir SDK yok,

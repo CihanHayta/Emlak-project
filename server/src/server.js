@@ -10,7 +10,9 @@ import { startLeadResponseAlertsJob } from "./jobs/leadResponseAlerts.job.js";
 import { notifyTelegramServerStarted, notifyTelegramFatalError } from "./utils/notifyTelegram.js";
 
 const server = app.listen(env.port, () => {
-  logger.info(`Sunucu ayakta: http://localhost:${env.port} (FIREBASE_MODE=${env.firebaseMode}, INTEGRATIONS_MODE=${env.integrationsMode})`);
+  logger.info(
+    `Sunucu ayakta: http://localhost:${env.port} (FIREBASE_MODE=${env.firebaseMode}, STORAGE_MODE=${process.env.STORAGE_MODE || "mock"}, INTEGRATIONS_MODE=${env.integrationsMode})`,
+  );
   notifyTelegramServerStarted();
 });
 
@@ -37,31 +39,34 @@ if (env.integrationsMode === "live") {
   startWhatsappTokenRefreshJob();
 }
 
-// backupTenants.job.js DEVRE DIŞI BIRAKILDI (File Store kaldırma pası,
-// bkz. plan): tamamen eski "her tenant kendi Firebase projesinde yaşar"
-// mimarisine göre yazılmıştı (getTenantFirestore/getTenantStorageBucket ile
-// PER-TENANT bir proje/bucket'tan okuyordu) — artık iş verisi Postgres'te,
-// dosyalar R2'de, tek paylaşılan bir kaynak var; bu job'un mantığı
-// tamamen geçersiz. Postgres+R2 için gerçek bir yedekleme job'u AYRI bir
-// iş — kapsam dışı, dosya silinmedi (server/src/jobs/backupTenants.job.js),
-// sadece başlatılmıyor.
+// Firestore/Firebase Storage kaldırıldı (bkz. docs/ARCHITECTURE.md) — iş
+// verisi artık her zaman Postgres'te, dosyalar her zaman R2'de yaşıyor
+// (mock/live ayrımı olan tek şey FIREBASE_MODE üzerinden Auth ve
+// STORAGE_MODE üzerinden R2). Eski `backupTenants.job.js` tamamen geçersiz
+// "her tenant kendi Firebase projesinde yaşar" mimarisine göre yazılmıştı
+// (getTenantFirestore/getTenantStorageBucket ile PER-TENANT bir
+// proje/bucket'tan okuyordu) — silindi. Postgres+R2 için gerçek bir
+// yedekleme job'u AYRI bir iş, henüz yok.
 
-// Randevu Hatırlatması otomasyonu hem gerçek Firestore (randevuları okumak)
-// hem gerçek WhatsApp API'si (mesaj göndermek) gerektiriyor.
-if (env.firebaseMode === "live" && env.integrationsMode === "live") {
+// Randevu Hatırlatması otomasyonu hem Postgres'ten (randevuları okumak)
+// hem gerçek WhatsApp API'sinden (mesaj göndermek) besleniyor — bu yüzden
+// sadece integrationsMode'a bağlı, ama üretim dışında (yerel geliştirme)
+// arka plan job'larının sessizce çalışmaya başlamaması için isProduction
+// da aranıyor.
+if (env.isProduction && env.integrationsMode === "live") {
   startAppointmentRemindersJob();
 }
 
-// 24 Saat Penceresi Uyarısı hiç dış API çağırmaz (sadece Firestore okur/
-// yazar) — bu yüzden sadece gerçek Firestore'a bağlı olmak yeterli,
-// integrationsMode'dan bağımsız.
-if (env.firebaseMode === "live") {
+// 24 Saat Penceresi Uyarısı hiç dış API çağırmaz (sadece Postgres okur/
+// yazar) — integrationsMode'dan bağımsız, sadece production'da çalışır.
+if (env.isProduction) {
   startWindowClosingAlertsJob();
 }
 
 // Lead Yanıt Uyarısı da windowClosingAlert gibi hiç dış API çağırmaz
-// (sadece Firestore okur/yazar) — integrationsMode'dan bağımsız.
-if (env.firebaseMode === "live") {
+// (sadece Postgres okur/yazar) — integrationsMode'dan bağımsız, sadece
+// production'da çalışır.
+if (env.isProduction) {
   startLeadResponseAlertsJob();
 }
 

@@ -16,13 +16,11 @@
 // API'yi hiç kullanmadan) elle gönderilebilir. Asla onaysız otomatik
 // gönderim denenmez (Meta hesabın askıya alınması riski).
 // AŞAMA 11 CUTOVER: customers/leads/conversations/automation_events artık
-// Postgres'te yaşıyor (bkz. Aşama 3) — bu dosya hâlâ Firestore repository'lerini
-// import etseydi, otomasyon Postgres'teki GERÇEK veriyi hiç görmeden sessizce
-// boş/yanlış çalışırdı (bkz. plan dosyası). `as` ile eski isimlerin
-// KORUNMASI bilinçli — dosyanın geri kalanındaki hiçbir çağrı satırı
-// değişmedi, sadece hangi veritabanına gittikleri değişti. `tenant.service.js`
-// (getTenantById/setTenantAutomations) BİLEREK Firestore'da kalıyor — tenant
-// domain'i bu pass'in kapsamı dışında.
+// Postgres'te yaşıyor (bkz. Aşama 3) — `as` ile eski isimlerin KORUNMASI
+// bilinçli, dosyanın geri kalanındaki hiçbir çağrı satırı değişmedi, sadece
+// hangi veritabanına gittikleri değişti. `tenant.service.js`
+// (getTenantById/setTenantAutomations) de zaten Postgres'te (bkz.
+// tenant.postgres.repository.js) — Firestore artık projede yok.
 import { getTenantById, setTenantAutomations } from "./tenant.service.js";
 import { DEFAULT_AUTOMATIONS } from "../models/tenant.model.js";
 import { getMatchingCustomers } from "./matching.service.js";
@@ -357,18 +355,13 @@ export async function notifyNewLead(context, lead) {
 }
 
 /**
- * `createdAt`'i güvenilir bir epoch-ms sayısına çevirir. ÜÇ farklı şekilde
- * gelebiliyor: gerçek Firestore'da Admin SDK bunu bir `Timestamp` nesnesine
- * çeviriyor (`.toDate()` metodu var, `.getTime()` YOK); mock Firestore'da
- * (testler) düz bir JS `Date` (`.getTime()` var); bazı yerlerde zaten düz
- * bir epoch-ms sayısı. CANLIDA YAKALANAN GERÇEK BUG: eski kod
- * `createdAt?.getTime?.() ?? createdAt` yazıyordu — Timestamp'te `getTime`
- * olmadığı için `createdAt` (Timestamp nesnesinin KENDİSİ) sayı yerine
- * kullanılıyordu; JS bunu çıkarma işleminde `valueOf()`'a çeviriyor, o da
- * Firestore'un SIRALAMA için kullandığı dolgulu bir STRING döndürüyor
- * ("063921447439.933...") — gerçek epoch-ms DEĞİL. Sonuç: "28 milyon
- * dakika önce" gibi anlamsız mesajlar (mock testler bunu hiç yakalayamadı
- * çünkü mock'ta createdAt hep düz Date).
+ * `createdAt`'i güvenilir bir epoch-ms sayısına çevirir. Postgres'ten
+ * (`timestamptz`) pg driver'ı bunu bir JS `Date` nesnesi olarak döndürür
+ * (`.getTime()` var); bazı yerlerde (örn. taze üretilmiş, henüz DB'ye
+ * gitmemiş bir alan) zaten düz bir epoch-ms sayısı geliyor — ikisini de
+ * tek bir tipe indirger. `.toDate` dalı, projenin eski Firestore
+ * döneminden kalma (Admin SDK'nın Timestamp sınıfı) — Firestore
+ * kaldırıldı ama zararsız bir savunma katmanı olarak bilerek bırakıldı.
  */
 function toEpochMs(value) {
   if (!value) return 0;

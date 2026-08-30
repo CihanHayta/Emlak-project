@@ -5,12 +5,9 @@ dotenv.config();
 
 const ALWAYS_REQUIRED = ["NODE_ENV", "PORT", "FIREBASE_MODE", "INTEGRATIONS_MODE", "CORS_ORIGINS"];
 
-const REQUIRED_WHEN_FIREBASE_LIVE = [
-  "FIREBASE_PROJECT_ID",
-  "FIREBASE_CLIENT_EMAIL",
-  "FIREBASE_PRIVATE_KEY",
-  "FIREBASE_STORAGE_BUCKET",
-];
+// Sadece Authentication için — Firestore/Storage kaldırıldığından
+// FIREBASE_STORAGE_BUCKET artık gerekmiyor (bkz. firebase/admin.js).
+const REQUIRED_WHEN_FIREBASE_LIVE = ["FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY"];
 
 // INSTAGRAM_ACCESS_TOKEN/WHATSAPP_ACCESS_TOKEN/WHATSAPP_PHONE_NUMBER_ID
 // ARTIK YOK (bilerek) — tek/global bir token değil, her tenant kendi
@@ -109,7 +106,6 @@ export const env = {
     // .env dosyasında \n olarak yazılan satır sonlarını gerçek satır sonuna çeviriyoruz —
     // Firebase servis hesabı private key'i PEM formatında çok satırlı gelir.
     privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n") : null,
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || null,
   },
 
   whatsapp: {
