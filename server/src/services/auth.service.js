@@ -1,76 +1,85 @@
 // server/src/services/auth.service.js
-import { getAuthClient } from "../firebase/auth.client.js";
-// AŞAMA 11 CUTOVER: users artık Postgres'te (bkz. user.controller.js) —
-// getMe() de aynı kayıtları okumalı, yoksa cutover sonrası oluşturulan bir
-// kullanıcı (Postgres'te var) burada (eskiden Firestore'da arıyordu)
-// "Kullanıcı kaydı bulunamadı" hatası alırdı.
-import { userPostgresRepository as userRepository } from "../repositories/user.postgres.repository.js";
+//
+// AŞAMA (Firebase Auth kaldırma): Firebase Authentication'ın YERİNE geçen
+// Postgres-native kimlik doğrulama — şifre `bcryptjs` ile hash'lenip
+// `users.password_hash`'te, oturumlar `sessions` tablosunda tutulur (bkz.
+// migrations/1700000000014, 1700000000015). Çağıran katmanların (auth.
+// controller.js, auth.middleware.js) gördüğü sözleşme BİLEREK aynı kaldı —
+// `req.user = {uid, tenantId, role}` şekli değişmedi, bu yüzden
+// customer/property/vb. hiçbir controller'a dokunulmadı.
+//
+// Firebase'in idToken/session-cookie ikilisi tek bir kavrama indirgendi:
+// `login()` doğrudan bir oturum token'ı üretir (artık ayrı bir "idToken"
+// adımı yok — o adım zaten sadece Firebase'in kendi iç mimarisinin bir
+// gereğiydi, bu uygulamaya özgü bir ihtiyaç değildi).
+import { userPostgresRepository } from "../repositories/user.postgres.repository.js";
+import { sessionRepository } from "../repositories/session.postgres.repository.js";
 import { getTenantById } from "./tenant.service.js";
+import { verifyPassword } from "../utils/password.util.js";
+import { generateSessionToken, hashSessionToken } from "../utils/session.util.js";
+import { normalizeEmail } from "../utils/email.util.js";
 import { ApiError } from "../utils/ApiError.js";
 import { env } from "../config/env.js";
 
 /**
- * `idToken`: istemcinin Firebase client SDK ile giriş yaptıktan sonra elde
- * ettiği kısa ömürlü token. Bunu doğrulayıp custom claims'i (tenantId, role)
- * kontrol eder, sonra bir httpOnly session cookie üretir.
+ * E-posta + şifreyi doğrular, yeni bir sunucu-taraflı oturum açar. Dönen
+ * `token` HAM token'dır — çağıran (auth.controller.js) bunu çereze aynen
+ * yazar; DB'de sadece hash'i durur (bkz. session.util.js).
  *
- * Bu proje TEK bir emlak ofisi için kurulur (bkz. scripts/bootstrap-owner.js)
- * — kendi kendine kayıt akışı yok, tüm kullanıcılar (Danışman/Personel)
- * sadece admin tarafından (bkz. user.service.js) oluşturulur.
- *
- * `rememberMe`: Firebase session cookie'sinin kendi geçerlilik süresini
- * belirler (işaretliyse tavan olan 14 gün, değilse 1 gün) — cookie'nin
- * tarayıcıda KALICI olup olmaması ayrı bir konu, ona auth.controller.js
- * cookie'ye `maxAge` verip vermeyerek karar verir (bkz. persistent alanı).
+ * `rememberMe`: false ise `env.session.defaultExpiryDays` (varsayılan 1
+ * gün), true ise `env.session.rememberExpiryDays` (varsayılan 14 gün) —
+ * bu iki değişken Firebase döneminden kalma ama artık Firebase'in
+ * dayattığı bir tavan değil, tamamen bizim seçtiğimiz bir süre.
  */
-export async function createSession(idToken, { rememberMe = false } = {}) {
-  const auth = await getAuthClient();
-  const decoded = await auth.verifyIdToken(idToken);
+export async function login(email, password, { rememberMe = false } = {}) {
+  const normalizedEmail = normalizeEmail(email);
+  const user = await userPostgresRepository.findByEmailWithPasswordHash(normalizedEmail);
 
-  if (!decoded.tenantId || !decoded.role) {
-    throw ApiError.forbidden("Hesabınız henüz bir emlak ofisine bağlanmamış.");
+  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    throw ApiError.unauthenticated("E-posta veya şifre hatalı.");
+  }
+  if (user.status === "passive") {
+    throw ApiError.unauthenticated("Bu hesap devre dışı bırakılmış.");
   }
 
+  const token = generateSessionToken();
+  const tokenHash = hashSessionToken(token);
   const expiryDays = rememberMe ? env.session.rememberExpiryDays : env.session.defaultExpiryDays;
-  const expiresInMs = expiryDays * 24 * 60 * 60 * 1000;
-  const cookie = await auth.createSessionCookie(idToken, { expiresIn: expiresInMs });
-  return { cookie, maxAgeMs: expiresInMs, uid: decoded.uid, persistent: rememberMe };
-}
+  const expiresAt = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000);
 
-export async function verifySessionCookie(cookie) {
-  const auth = await getAuthClient();
-  const decoded = await auth.verifySessionCookie(cookie, true /* checkRevoked */);
-  return { uid: decoded.uid, tenantId: decoded.tenantId ?? null, role: decoded.role ?? null };
-}
+  await sessionRepository.create({ userId: user.id, tenantId: user.tenantId, tokenHash, expiresAt });
 
-export async function revokeSessions(uid) {
-  const auth = await getAuthClient();
-  await auth.revokeRefreshTokens(uid);
+  return { token, maxAgeMs: expiryDays * 24 * 60 * 60 * 1000, uid: user.id, persistent: rememberMe };
 }
 
 /**
- * SADECE FIREBASE_MODE=mock iken anlamlı — controller katmanı `firebase/*`'e
- * doğrudan erişemediği için (bkz. eslint no-restricted-imports) bu sarmalayıcı
- * burada duruyor. Frontend'in normalde Firebase client SDK'sından
- * (`signInWithEmailAndPassword`) aldığı idToken'ın YERİNİ tutar — bkz.
- * admin/lib/auth.js#login, VITE_AUTH_MODE=mock dalı ve
- * auth.controller.js#createMockTokenController.
+ * `authMiddleware`'in tek girişi. Session tablosundan sonra HER SEFERİNDE
+ * `users` tablosundan CANLI satırı çeker (role/status/tenant) — Firebase
+ * custom claims'in aksine, bir rol değişikliği ya da hesabı pasife alma artık
+ * o an açık olan oturumlarda bile ANINDA etkili olur (idToken/claim'in
+ * bayatlamasını beklemeye gerek yok, bu eski sistemden daha güvenli).
  */
-export async function createMockLoginToken(email, password) {
-  if (env.firebaseMode !== "mock") {
-    throw ApiError.forbidden("Bu uç nokta sadece FIREBASE_MODE=mock iken kullanılabilir.");
-  }
-  const auth = await getAuthClient();
-  try {
-    return await auth.verifyPassword(email, password);
-  } catch (error) {
-    throw ApiError.unauthenticated(error.message || "E-posta veya şifre hatalı.");
-  }
+export async function verifySessionToken(token) {
+  if (!token) throw ApiError.unauthenticated();
+  const tokenHash = hashSessionToken(token);
+  const session = await sessionRepository.findValidByTokenHash(tokenHash);
+  if (!session) throw ApiError.unauthenticated("Oturum geçersiz veya süresi dolmuş.");
+
+  const user = await userPostgresRepository.findByIdUnscoped(session.userId);
+  if (!user || user.status === "passive") throw ApiError.unauthenticated("Oturum geçersiz veya süresi dolmuş.");
+
+  return { uid: user.id, tenantId: user.tenantId, role: user.role };
+}
+
+/** Logout: SADECE mevcut tarayıcının oturumunu iptal eder (diğer cihazlar etkilenmez, bkz. session.postgres.repository.js). */
+export async function logout(token) {
+  if (!token) return;
+  await sessionRepository.revokeByTokenHash(hashSessionToken(token));
 }
 
 export async function getMe(context) {
   const [user, tenant] = await Promise.all([
-    userRepository.findByUid(context, context.userId),
+    userPostgresRepository.findByUid(context, context.userId),
     getTenantById(context.tenantId),
   ]);
   if (!user) throw ApiError.notFound("Kullanıcı kaydı bulunamadı.");

@@ -5,8 +5,9 @@
 // docs/backend/faz0-frontend-envanteri.md — CUSTOMER_STATUSES, LEAD_SOURCES vb.
 // zaten frontend'de var, burada tekrar edip iki yerden yönetmeyeceğiz).
 
-// Her ofis içindeki kullanıcı rolü. tenantId+role Firebase custom claims'te
-// tutulur (bkz. middleware/auth.middleware.js, middleware/tenant.middleware.js).
+// Her ofis içindeki kullanıcı rolü. tenantId+role, oturum tablosundan
+// (sessions → users) her istekte canlı okunur (bkz. auth.service.js#verifySessionToken,
+// middleware/auth.middleware.js, middleware/tenant.middleware.js).
 export const ROLES = ["owner", "admin", "agent", "assistant", "viewer"];
 
 // API hata sözleşmesi: { success:false, error:{ code, message, details, requestId } }

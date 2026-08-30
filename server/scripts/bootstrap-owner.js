@@ -2,90 +2,84 @@
 //
 // Kendi kendine kayıt akışı YOK — bu proje tek-kiracılı olarak paketlenip
 // her müşteriye AYRI bir deployment (kendi sunucusu, kendi bu veritabanı,
-// kendi R2 bucket'ı, kendi Firebase Auth projesi) olarak satılıyor. Bu
-// betik o deployment'ın TEK admin (owner) hesabını + tenant satırını
-// oluşturur. Danışman/Personel hesapları sonra owner'ın kendisi, admin
-// panelindeki Ayarlar sayfasından açar (bkz. src/services/user.postgres.service.js)
-// — bu betiğe ihtiyaç duymadan.
+// kendi R2 bucket'ı) olarak satılıyor. Bu betik o deployment'ın TEK admin
+// (owner) hesabını + tenant satırını oluşturur. Danışman/Personel/Kısıtlı
+// hesapları sonra owner'ın kendisi, admin panelindeki Ayarlar sayfasından
+// açar (bkz. src/services/user.postgres.service.js) — bu betiğe ihtiyaç
+// duymadan.
 //
-// FIREBASE_MODE=mock VEYA live, İKİSİNDE DE ÇALIŞIR — `getAuthClient()`
-// (bkz. firebase/auth.client.js) zaten mod-farkında, bu betiğin kendisinin
-// hangi modda olduğunu bilmesine gerek yok. Eskiden (per-tenant federe
-// Firebase-projesi mimarisinde) müşterinin KENDİ service-account JSON'unu
-// isteyen ayrı bir akış vardı — o mimari tek-kiracılı + paylaşılan gerçek
-// Firebase Auth pivotuyla öldü (bkz. tenant.postgres.repository.js'in başı);
-// artık TEK bir (bu deployment'ın .env'indeki) Firebase Auth projesi var,
-// tenant verisi de zaten Postgres'te — bu yüzden ayrı bir
-// "bootstrap-owner-mock.js" gerekmiyor, bu TEK betik ikisini de kapsıyor.
+// AŞAMA (Firebase Auth kaldırma): kimlik doğrulama artık tamamen Postgres —
+// bu betik artık hem "owner'ı ilk kez oluştur" HEM DE "owner şifresini
+// unuttu, sıfırla" işini görüyor (EMAIL zaten varsa PASSWORD'ü günceller).
+// Bilinçli tercih: self-servis "şifremi unuttum" (e-posta ile sıfırlama
+// linki) akışı KURULMADI — bu uygulamada kendi kendine kayıt yok, tek bir
+// owner hesabı var, ve `DATABASE_URL`'e erişimi olan (bu betiği
+// çalıştırabilecek) kişi zaten deployment'ın sahibi. Ayrı bir SMTP/e-posta
+// gönderme altyapısı kurmak burada gerçek bir güvenlik ya da kullanılabilirlik
+// kazancı sağlamadan sadece bakım yükü ekler (bkz. docs/SECURITY.md,
+// "en az bağımlılık" ilkesi). Danışman/Personel/Kısıtlı hesaplarının şifresi
+// zaten owner tarafından Ayarlar sayfasından (bkz. user.postgres.service.js
+// #updateTeamMember) sıfırlanabiliyor — eksik olan TEK senaryo owner'ın
+// kendi şifresini unutması, o da bu betikle çözülüyor.
 //
 // Kullanım:
 //   node scripts/bootstrap-owner.js <email> <şifre> ["Şirket Adı"] ["Yetkili Ad Soyad"]
 import "../src/config/env.js";
-import { env } from "../src/config/env.js";
-import { getAuthClient } from "../src/firebase/auth.client.js";
+import { randomUUID } from "node:crypto";
 import { createTenantForOwner } from "../src/services/tenant.service.js";
 import { userPostgresRepository } from "../src/repositories/user.postgres.repository.js";
+import { sessionRepository } from "../src/repositories/session.postgres.repository.js";
 import { createDefaultUser } from "../src/models/user.model.js";
+import { withUpdateFields } from "../src/models/base.model.js";
+import { hashPassword } from "../src/utils/password.util.js";
+import { normalizeEmail } from "../src/utils/email.util.js";
 
-const [, , EMAIL, PASSWORD, COMPANY_NAME = "Yeni Emlak Ofisi", OWNER_DISPLAY_NAME = COMPANY_NAME] = process.argv;
+const [, , RAW_EMAIL, PASSWORD, COMPANY_NAME = "Yeni Emlak Ofisi", OWNER_DISPLAY_NAME = COMPANY_NAME] = process.argv;
 
 function usageAndExit() {
   console.error('Kullanım: node scripts/bootstrap-owner.js <email> <şifre> ["Şirket Adı"] ["Yetkili Ad Soyad"]');
   process.exit(1);
 }
 
-if (!EMAIL || !PASSWORD) usageAndExit();
+if (!RAW_EMAIL || !PASSWORD) usageAndExit();
+if (PASSWORD.length < 6) {
+  console.error("HATA: Şifre en az 6 karakter olmalı.");
+  process.exit(1);
+}
 
 async function run() {
-  const auth = await getAuthClient();
+  const email = normalizeEmail(RAW_EMAIL);
+  const passwordHash = await hashPassword(PASSWORD);
+  const existing = await userPostgresRepository.findByEmailWithPasswordHash(email);
 
-  let userRecord;
-  try {
-    userRecord = await auth.getUserByEmail(EMAIL);
-    console.log(`Firebase Auth kullanıcısı zaten mevcut: ${userRecord.uid}`);
-  } catch {
-    userRecord = await auth.createUser({ email: EMAIL, password: PASSWORD, emailVerified: true });
-    console.log(`Firebase Auth kullanıcısı oluşturuldu: ${userRecord.uid}`);
+  if (existing) {
+    // Owner zaten var — bu çalıştırma bir ŞİFRE SIFIRLAMADIR.
+    const context = { tenantId: existing.tenantId, userId: existing.id, role: existing.role };
+    await userPostgresRepository.update(context, existing.id, withUpdateFields({ passwordHash }));
+    // Eski şifreyle açık kalmış oturumlar (varsa) hemen düşer — bkz.
+    // user.postgres.service.js#updateTeamMember'daki AYNI gerekçe.
+    await sessionRepository.revokeAllForUser(existing.id);
+    console.log(`✅ Şifre güncellendi: ${email}`);
+    console.log(`   Tenant  : ${existing.tenantId}`);
+    return;
   }
 
-  // customClaims'te tenantId zaten varsa (daha önce bootstrap edilmiş) o
-  // tenant'ı yeniden kullan — aksi halde her çalıştırmada yeni bir tenant
-  // (ve slug çakışması) üretmiş oluruz.
-  let tenantId = userRecord.customClaims?.tenantId;
-  if (!tenantId) {
-    const tenant = await createTenantForOwner({ name: COMPANY_NAME, ownerUserId: userRecord.uid });
-    tenantId = tenant.id;
-    console.log(`Tenant oluşturuldu: ${tenant.id} (slug: ${tenant.slug})`);
-  } else {
-    console.log(`Mevcut tenant kullanılıyor: ${tenantId}`);
-  }
+  // Yeni owner: id'yi ÖNCEDEN üretiyoruz — tenant satırı `ownerUserId`
+  // ister ve tenant, user satırından ÖNCE oluşuyor.
+  const userId = randomUUID();
+  const tenant = await createTenantForOwner({ name: COMPANY_NAME, ownerUserId: userId });
+  console.log(`Tenant oluşturuldu: ${tenant.id} (slug: ${tenant.slug})`);
 
-  const context = { tenantId, userId: userRecord.uid, role: "owner" };
+  const context = { tenantId: tenant.id, userId, role: "owner" };
+  const userData = createDefaultUser({ tenantId: tenant.id, email, displayName: OWNER_DISPLAY_NAME, role: "owner" });
+  await userPostgresRepository.createWithUid(context, userId, { ...userData, passwordHash });
+  console.log("Postgres users satırı oluşturuldu.");
 
-  const existingUserRow = await userPostgresRepository.findByUid(context, userRecord.uid);
-  if (!existingUserRow) {
-    const userData = createDefaultUser({ tenantId, email: EMAIL, displayName: OWNER_DISPLAY_NAME, role: "owner" });
-    await userPostgresRepository.createWithUid(context, userRecord.uid, userData);
-    console.log("Postgres users satırı oluşturuldu.");
-  } else {
-    console.log("Postgres users satırı zaten mevcut.");
-  }
-
-  await auth.setCustomUserClaims(userRecord.uid, { tenantId, role: "owner" });
-  console.log("Custom claims ayarlandı:", { tenantId, role: "owner" });
-
-  console.log(`\n✅ Tamamlandı (FIREBASE_MODE=${env.firebaseMode}) — artık bu e-posta/şifre ile giriş yapılabilir.`);
-  console.log(`   E-posta : ${EMAIL}`);
-  console.log(`   Tenant  : ${tenantId}`);
-  if (env.firebaseMode === "mock") {
-    console.log("\nFrontend .env dosyanızda:");
-    console.log(`   VITE_AUTH_MODE=mock`);
-    console.log(`   VITE_TENANT_ID=${tenantId}`);
-  } else {
-    console.log("\nFrontend .env dosyanızda:");
-    console.log(`   VITE_AUTH_MODE= (boş — mock DEĞİL)`);
-    console.log(`   VITE_TENANT_ID=${tenantId}`);
-  }
+  console.log(`\n✅ Tamamlandı — artık bu e-posta/şifre ile giriş yapılabilir.`);
+  console.log(`   E-posta : ${email}`);
+  console.log(`   Tenant  : ${tenant.id}`);
+  console.log("\nFrontend .env dosyanızda:");
+  console.log(`   VITE_TENANT_ID=${tenant.id}`);
 }
 
 run()

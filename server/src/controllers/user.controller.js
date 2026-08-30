@@ -1,4 +1,4 @@
-// server/src/controllers/user.controller.js — AŞAMA 11 CUTOVER: user.postgres.service.js (Auth hâlâ Firebase, bilerek — bkz. o dosyanın yorumu).
+// server/src/controllers/user.controller.js — user.postgres.service.js'e bağlı; kimlik doğrulama da (Firebase Auth kaldırıldı) artık tamamen Postgres.
 import { listTeamMembers, createTeamMember, updateTeamMember, deleteTeamMember } from "../services/user.postgres.service.js";
 import { sendSuccess } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";

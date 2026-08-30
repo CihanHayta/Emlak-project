@@ -39,6 +39,10 @@ const SCOPED_TABLES = [
   "vehicle_media",
   "vehicles",
   "funnels",
+  // AŞAMA (Firebase Auth kaldırma): sessions, users'a ON DELETE CASCADE ile
+  // bağlı (TRUNCATE ... CASCADE onu zaten boşaltırdı) ama diğer tüm
+  // tablolar gibi burada da AÇIKÇA listeleniyor.
+  "sessions",
   "users",
   // AŞAMA (File Store kaldırma): tenants artık Postgres'te (bkz.
   // tenant.postgres.repository.js) — diğer tüm tablolar gibi testler arası

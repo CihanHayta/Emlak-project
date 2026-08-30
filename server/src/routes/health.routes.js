@@ -27,13 +27,12 @@ healthRouter.get("/ready", async (_req, res) => {
   } catch (error) {
     return res.status(503).json({
       success: false,
-      data: { status: "error", firebaseMode: env.firebaseMode, integrationsMode: env.integrationsMode, error: error.message },
+      data: { status: "error", integrationsMode: env.integrationsMode, error: error.message },
     });
   }
   sendSuccess(res, {
     data: {
       status: "ok",
-      firebaseMode: env.firebaseMode,
       integrationsMode: env.integrationsMode,
     },
   });

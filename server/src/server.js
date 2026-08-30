@@ -11,7 +11,7 @@ import { notifyTelegramServerStarted, notifyTelegramFatalError } from "./utils/n
 
 const server = app.listen(env.port, () => {
   logger.info(
-    `Sunucu ayakta: http://localhost:${env.port} (FIREBASE_MODE=${env.firebaseMode}, STORAGE_MODE=${process.env.STORAGE_MODE || "mock"}, INTEGRATIONS_MODE=${env.integrationsMode})`,
+    `Sunucu ayakta: http://localhost:${env.port} (STORAGE_MODE=${process.env.STORAGE_MODE || "mock"}, INTEGRATIONS_MODE=${env.integrationsMode})`,
   );
   notifyTelegramServerStarted();
 });
@@ -39,10 +39,10 @@ if (env.integrationsMode === "live") {
   startWhatsappTokenRefreshJob();
 }
 
-// Firestore/Firebase Storage kaldırıldı (bkz. docs/ARCHITECTURE.md) — iş
-// verisi artık her zaman Postgres'te, dosyalar her zaman R2'de yaşıyor
-// (mock/live ayrımı olan tek şey FIREBASE_MODE üzerinden Auth ve
-// STORAGE_MODE üzerinden R2). Eski `backupTenants.job.js` tamamen geçersiz
+// Firestore/Firebase Storage/Firebase Auth kaldırıldı (bkz.
+// docs/ARCHITECTURE.md) — iş verisi VE kimlik doğrulama artık her zaman
+// Postgres'te, dosyalar her zaman R2'de yaşıyor (tek mock/live ayrımı
+// STORAGE_MODE üzerinden R2 için). Eski `backupTenants.job.js` tamamen geçersiz
 // "her tenant kendi Firebase projesinde yaşar" mimarisine göre yazılmıştı
 // (getTenantFirestore/getTenantStorageBucket ile PER-TENANT bir
 // proje/bucket'tan okuyordu) — silindi. Postgres+R2 için gerçek bir

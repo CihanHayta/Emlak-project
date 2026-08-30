@@ -1,5 +1,11 @@
 // server/src/controllers/auth.controller.js
-import { createSession, createMockLoginToken, getMe, revokeSessions } from "../services/auth.service.js";
+//
+// AŞAMA (Firebase Auth kaldırma): `idToken` kavramı tamamen kalktı — o
+// sadece Firebase'in kendi iki-aşamalı (client SDK idToken al → backend'e
+// gönder → backend session cookie'ye çevirir) akışının bir parçasıydı, bu
+// uygulamaya özgü bir gereklilik değildi. Artık e-posta+şifre doğrudan
+// backend'e gidiyor, backend doğrudan bir oturum açıyor.
+import { login, logout, getMe } from "../services/auth.service.js";
 import { sendSuccess } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { env } from "../config/env.js";
@@ -19,12 +25,12 @@ const COOKIE_OPTIONS = {
   path: "/",
 };
 
-export async function createSessionController(req, res) {
-  const { idToken, rememberMe } = req.body;
-  if (!idToken) throw ApiError.validation("idToken zorunlu.");
+export async function loginController(req, res) {
+  const { email, password, rememberMe } = req.body;
+  if (!email || !password) throw ApiError.validation("E-posta ve şifre zorunlu.");
 
-  const { cookie, maxAgeMs, persistent } = await createSession(idToken, { rememberMe: Boolean(rememberMe) });
-  res.cookie(env.session.cookieName, cookie, {
+  const { token, maxAgeMs, persistent } = await login(email, password, { rememberMe: Boolean(rememberMe) });
+  res.cookie(env.session.cookieName, token, {
     // maxAge verilmezse tarayıcı bunu bir "session cookie" sayar ve
     // tarayıcı tamamen kapanınca siler — "Beni Hatırla" işaretlenmediğinde
     // istenen davranış tam olarak bu.
@@ -34,30 +40,14 @@ export async function createSessionController(req, res) {
   sendSuccess(res, { data: { ok: true } });
 }
 
-/**
- * SADECE FIREBASE_MODE=mock iken anlamlı — gerçek Firebase projesine hiç
- * dokunmadan test edebilmek için, frontend'in normalde Firebase client
- * SDK'sından (`signInWithEmailAndPassword`) aldığı idToken'ın YERİNİ tutar
- * (bkz. admin/lib/auth.js#login, VITE_AUTH_MODE=mock dalı). Asıl mock
- * kontrolü/doğrulaması auth.service.js#createMockLoginToken'da — controller
- * katmanı firebase/* içine doğrudan giremiyor (bkz. eslint
- * no-restricted-imports).
- */
-export async function createMockTokenController(req, res) {
-  const { email, password } = req.body;
-  if (!email || !password) throw ApiError.validation("email ve şifre zorunlu.");
-
-  const idToken = await createMockLoginToken(email, password);
-  sendSuccess(res, { data: { idToken } });
-}
-
 export async function getMeController(req, res) {
   const result = await getMe(req.context);
   sendSuccess(res, { data: result });
 }
 
 export async function logoutController(req, res) {
-  if (req.user?.uid) await revokeSessions(req.user.uid);
+  const token = req.cookies?.[env.session.cookieName];
+  await logout(token);
   res.clearCookie(env.session.cookieName, COOKIE_OPTIONS);
   sendSuccess(res, { data: { ok: true } });
 }
