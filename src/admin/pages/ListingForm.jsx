@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { MapPin, Navigation } from "lucide-react";
+import { MapPin, Navigation, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,7 @@ import { getCustomers } from "../data/customerStore";
 import { findMatchingCustomers } from "../lib/matchCustomers";
 import { formatThousands, parseDigits } from "../lib/formatNumber";
 import MatchedCustomersDialog from "../components/MatchedCustomersDialog";
-import MediaUploadField from "../components/MediaUploadField";
+import PropertyMediaSection from "../components/PropertyMediaSection";
 import { TURKEY_PROVINCES } from "../../data/turkeyLocations";
 import { ISTANBUL_DISTRICTS } from "../../data/istanbulLocations";
 import { cn } from "@/lib/utils";
@@ -52,8 +52,6 @@ function buildInitialForm(listing) {
       description: "",
       amenities: [],
       customAmenity: "",
-      photoRefs: [],
-      videoRefs: [],
       showLocation: true,
       // Yeni bir ilan varsayılan olarak TASLAK (unpublished) açılır — admin
       // fotoğraf/açıklama eklerken yarım bir ilan herkese açık kalmasın
@@ -81,11 +79,6 @@ function buildInitialForm(listing) {
     description: listing.description ?? "",
     amenities: listing.amenities ?? [],
     customAmenity: "",
-    // Both fields accept a mix of plain URLs (existing sample photos) and
-    // "idb:" references (freshly uploaded files) — MediaUploadField/
-    // useResolvedMediaUrl treat the two the same way.
-    photoRefs: listing.images?.length ? listing.images : listing.image ? [listing.image] : [],
-    videoRefs: listing.videoUrl ? [listing.videoUrl] : [],
     showLocation: listing.showLocation ?? true,
     // Eski (bu alan hiç yazılmadan oluşturulmuş) ilanlar "published"
     // sayılır — backend'deki varsayılanla (property.model.js) aynı,
@@ -114,6 +107,48 @@ export default function ListingForm() {
   const [matchDialog, setMatchDialog] = useState(null);
   const isArsa = form.type === "Arsa";
   const isIstanbul = form.province === "İstanbul";
+
+  // Medya (fotoğraf/video) artık property_media tablosuna, gerçek bir
+  // propertyId'ye bağlı olarak yükleniyor (bkz. PropertyMediaSection.jsx,
+  // VehicleForm.jsx'teki AYNI desen) — R2 object key'i `properties/{id}/...`
+  // şeklinde olduğu için yüklemeden ÖNCE gerçek bir ilan ID'si gerekiyor.
+  // Yeni ilan formunda bu ID henüz yok — form açılır açılmaz status=
+  // "unpublished" bir TASLAK kayıt oluşturulur (public sitede zaten gizli),
+  // medya o taslağa yüklenir; kaydet'e basınca aynı kayıt güncellenir.
+  // Kullanıcı formu terk ederse geride boş bir taslak kalabilir — bilinçli
+  // bir kabul (admin panelinden elle silinebilir), karşılığında "önce
+  // kaydet sonra fotoğraf yükle" gibi iki adımlı bir akış yerine tek,
+  // sürekli açık bir form sunuyor.
+  const [propertyId, setPropertyId] = useState(existingListing?.id ?? null);
+  const [isCreatingDraft, setIsCreatingDraft] = useState(!existingListing);
+
+  useEffect(() => {
+    if (existingListing || propertyId) return;
+    let cancelled = false;
+    addListing({
+      category: "satilik",
+      type: "Daire",
+      title: "Yeni İlan (taslak)",
+      price: "0 TL",
+      district: "Belirtilmedi",
+      neighborhood: "Belirtilmedi",
+      status: "unpublished",
+    })
+      .then((created) => {
+        if (cancelled) return;
+        setPropertyId(created.id);
+        setIsCreatingDraft(false);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        toast.error("Taslak oluşturulamadı: " + (error.message || "Bilinmeyen hata."));
+        setIsCreatingDraft(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sadece mount'ta, bir kere çalışmalı.
+  }, []);
 
   const districts = isIstanbul
     ? ISTANBUL_DISTRICTS.map((d) => d.name)
@@ -160,10 +195,12 @@ export default function ListingForm() {
       street: form.street,
       description: form.description,
       amenities: form.amenities,
-      image: form.photoRefs[0] ?? "",
-      images: form.photoRefs,
-      hasVideo: form.videoRefs.length > 0,
-      videoUrl: form.videoRefs[0],
+      // image/images/videoUrl artık BURADAN gönderilmiyor —
+      // PropertyMediaSection kendi uçlarıyla (upload-intent/confirm/cover/
+      // reorder/delete) doğrudan backend'e yazıyor (property_media
+      // tablosu), bu form sadece ilan bilgilerini (skaler alanları)
+      // kaydediyor. `hasVideo` da backend'de medya eklenip silinirken
+      // otomatik güncelleniyor (bkz. property.postgres.service.js).
       showLocation: form.showLocation,
       status: form.status,
       ...(isArsa
@@ -173,17 +210,18 @@ export default function ListingForm() {
 
     setIsSubmitting(true);
     try {
+      // propertyId HER ZAMAN var (yeni ilanda taslak zaten oluşturulmuştu) —
+      // bu yüzden burası artık HİÇBİR ZAMAN addListing çağırmıyor, sadece güncelliyor.
+      const savedListing = await updateListing(propertyId, payload);
       if (isEditing) {
-        await updateListing(existingListing.id, payload);
         toast.success("İlan güncellendi.");
         navigate("/admin/ilanlar");
       } else {
-        const newListing = await addListing(payload);
         toast.success(form.status === "published" ? "İlan yayınlandı." : "İlan taslak olarak kaydedildi — hazır olunca “Yayında” anahtarını açmayı unutmayın.");
         // Only for brand-new listings: immediately show which existing
         // customers might want it, with a one-click WhatsApp message each.
-        const matches = findMatchingCustomers(newListing, getCustomers());
-        setMatchDialog({ listing: newListing, matches });
+        const matches = findMatchingCustomers(savedListing, getCustomers());
+        setMatchDialog({ listing: savedListing, matches });
       }
     } catch (error) {
       toast.error(error.message || "İlan kaydedilemedi.");
@@ -438,29 +476,22 @@ export default function ListingForm() {
         )}
       </section>
 
-      {/* Media — real file uploads (stored in the browser via IndexedDB,
-          see lib/mediaStore.js), not links/URLs. Multiple photos and
-          multiple videos are both supported. */}
+      {/* Medya — gerçek dosya yüklemeleri, R2 presigned-upload akışıyla
+          property_media tablosuna bağlı (bkz. PropertyMediaSection.jsx). */}
       <section className="space-y-4 rounded-2xl border border-border p-5">
         <h3 className="font-semibold">Fotoğraf ve Video</h3>
         <p className="-mt-2 text-xs text-muted-foreground">
           İlk eklediğiniz fotoğraf kapak fotoğrafı olarak kullanılır.
         </p>
 
-        <MediaUploadField
-          label="Fotoğraflar"
-          accept="image/*"
-          value={form.photoRefs}
-          onChange={(refs) => set("photoRefs", refs)}
-        />
-
-        <MediaUploadField
-          label="Videolar"
-          accept="video/*"
-          isVideo
-          value={form.videoRefs}
-          onChange={(refs) => set("videoRefs", refs)}
-        />
+        {isCreatingDraft ? (
+          <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Medya yüklemeye hazırlanıyor…
+          </div>
+        ) : (
+          <PropertyMediaSection propertyId={propertyId} />
+        )}
       </section>
 
       <Separator />
@@ -469,7 +500,11 @@ export default function ListingForm() {
         <Button type="button" variant="outline" onClick={() => navigate("/admin/ilanlar")}>
           Vazgeç
         </Button>
-        <Button type="submit" disabled={isSubmitting} className="bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60">
+        <Button
+          type="submit"
+          disabled={isSubmitting || isCreatingDraft}
+          className="bg-brand-gold text-white hover:bg-brand-gold-dark disabled:opacity-60"
+        >
           {isSubmitting ? "Kaydediliyor…" : isEditing ? "Kaydet" : "İlanı Yayınla"}
         </Button>
       </div>

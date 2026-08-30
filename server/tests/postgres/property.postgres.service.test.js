@@ -108,10 +108,13 @@ describe("property.postgres.service — CRUD ve görünürlük (property.service
     expect(await getProperty(context, property.id)).toBeTruthy(); // hâlâ duruyor, silinmedi
   });
 
-  it("`images`/`videoUrl` gibi eski medya alanları create'e gönderilirse properties tablosuna YAZILMAZ (sessizce yok sayılır)", async () => {
+  it("`images`/`videoUrl` gibi istemciden gelen eski medya alanları properties tablosuna YAZILMAZ — yanıttaki gerçek `images`/`videoUrl` her zaman property_media'dan hesaplanır (henüz medya yoksa boş)", async () => {
     const created = await createProperty(context, baseProperty({ images: ["https://x/1.jpg"], videoUrl: "https://x/v.mp4" }));
-    expect(created.images).toBeUndefined();
-    expect(created.videoUrl).toBeUndefined();
+    // İstemcinin gönderdiği sahte URL'ler asla properties tablosuna yazılmadı
+    // VE yanıta da sızmadı — property_media boş olduğu için gerçek değer boş.
+    expect(created.images).toEqual([]);
+    expect(created.image).toBe("");
+    expect(created.videoUrl).toBeNull();
   });
 });
 

@@ -45,16 +45,49 @@ function isHiddenFromPublic(property) {
   return property.status === "unpublished";
 }
 
+/**
+ * BUG DÜZELTMESİ: `image`/`images`/`videoUrl` artık `properties` tablosunda
+ * YOK (bkz. dosyanın başındaki `MEDIA_ONLY_FIELDS` notu — property_media'ya
+ * ayrıştırıldı), AMA frontend (`PropertyGallery.jsx`, `PropertyCard.jsx`,
+ * `Listings.jsx`) hâlâ tam olarak bu düz alanları bekliyor — Firestore
+ * döneminde bunlar `properties/{id}` dokümanının kendisindeydi. Yazma
+ * tarafı zaten doğru (medya SADECE property_media'ya, presigned-upload
+ * akışıyla yazılıyor); bu, OKUMA tarafında iki tabloyu tek bir yanıtta
+ * birleştiren KÜÇÜK bir katman — property_media TEK doğruluk kaynağı
+ * olmaya devam ediyor, burada hiçbir şey property_media'ya YAZILMIYOR.
+ */
+function toGalleryFields(mediaList) {
+  const images = mediaList.filter((m) => m.kind === "image").map((m) => m.url); // listByProperty zaten position ASC sıralı döner
+  const cover = mediaList.find((m) => m.isCover && m.kind === "image");
+  const video = mediaList.find((m) => m.kind === "video");
+  return {
+    images,
+    image: cover?.url ?? images[0] ?? "",
+    videoUrl: video?.url ?? null,
+  };
+}
+
+async function withGalleryFields(context, property) {
+  const media = await propertyMediaPostgresRepository.listByProperty(context.tenantId, property.id);
+  return { ...property, ...toGalleryFields(media) };
+}
+
 export async function listProperties(context) {
   const properties = await propertyPostgresRepository.findAll(context);
-  return context.role === "public" ? properties.filter((p) => !isHiddenFromPublic(p)) : properties;
+  const visible = context.role === "public" ? properties.filter((p) => !isHiddenFromPublic(p)) : properties;
+  // Liste görünümü için de galeri alanları gerekiyor (kapak fotoğrafı,
+  // kart/grid bileşenlerinde) — ilan sayısı bu ölçekte (bir emlak ofisi)
+  // küçük olduğu için burada N ayrı sorgu kabul edilebilir bir basitlik/
+  // performans dengesi (bkz. "az bakım" ilkesi, gereksiz bir toplu-sorgu
+  // optimizasyonu eklenmedi).
+  return Promise.all(visible.map((property) => withGalleryFields(context, property)));
 }
 
 export async function getProperty(context, id) {
   const property = await propertyPostgresRepository.findById(context, id);
   if (!property) throw ApiError.notFound("İlan bulunamadı.");
   if (context.role === "public" && isHiddenFromPublic(property)) throw ApiError.notFound("İlan bulunamadı.");
-  return property;
+  return withGalleryFields(context, property);
 }
 
 /** property.service.js#notifyIfPublished ile birebir aynı — response'u bloklamayan floating promise. */
@@ -69,7 +102,10 @@ export async function createProperty(context, data) {
   const defaults = stripMediaOnlyFields(createDefaultProperty(data));
   const created = await propertyPostgresRepository.create(context, defaults);
   notifyIfPublished(context, created);
-  return created;
+  // Yeni oluşturulan bir ilanın henüz medyası yoktur ama tutarlılık için
+  // (frontend cache'i — admin/data/listingStore.js — her zaman aynı şekli
+  // beklesin diye) burada da galeri alanları (boş) ekleniyor.
+  return withGalleryFields(context, created);
 }
 
 export async function updateProperty(context, id, updates) {
@@ -81,7 +117,7 @@ export async function updateProperty(context, id, updates) {
   if (previous?.status === "unpublished" && updated.status === "published") {
     notifyIfPublished(context, updated);
   }
-  return updated;
+  return withGalleryFields(context, updated);
 }
 
 /**
