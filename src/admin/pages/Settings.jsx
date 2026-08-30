@@ -52,8 +52,8 @@ const ROLE_BADGE = {
 };
 
 /**
- * "/admin/ayarlar" — Kullanıcılar (gerçek Firebase Auth + Firestore
- * hesapları, sadece admin yönetebilir) ve Yetkiler (rol -> bölüm erişimi,
+ * "/admin/ayarlar" — Kullanıcılar (gerçek Postgres hesapları, şifre
+ * bcrypt ile hash'lenir, sadece admin yönetebilir) ve Yetkiler (rol -> bölüm erişimi,
  * hâlâ yerel/kozmetik bir referans tablosu).
  */
 export default function Settings() {

@@ -21,9 +21,10 @@ const ROLE_TABS = [
 
 /**
  * "/admin/login" — the only unguarded admin route (see RequireAuth.jsx).
- * Real Firebase Authentication (email/password) + the backend's session
- * cookie — see lib/auth.js. Tek firma için kurulan bir SaaS: kayıt olma
- * yok, hesaplar sadece admin tarafından Ayarlar'dan açılır.
+ * E-posta+şifre doğrudan backend'e gider, backend Postgres'te doğrular ve
+ * bir httpOnly session cookie'si döner — see lib/auth.js. Tek firma için
+ * kurulan bir SaaS: kayıt olma yok, hesaplar sadece admin tarafından
+ * Ayarlar'dan açılır.
  */
 export default function Login() {
   const navigate = useNavigate();
@@ -69,11 +70,9 @@ export default function Login() {
       const redirectTo = location.state?.from ?? "/admin";
       navigate(redirectTo, { replace: true });
     } catch (err) {
-      setError(
-        err.code === "auth/invalid-credential" || err.code === "auth/wrong-password" || err.code === "auth/user-not-found"
-          ? "E-posta veya şifre hatalı."
-          : err.message || "Giriş yapılamadı, lütfen tekrar deneyin.",
-      );
+      // Backend zaten okunabilir bir Türkçe mesajla dönüyor (ör. "E-posta
+      // veya şifre hatalı.") — ayrıca bir kod eşleştirmesine gerek yok.
+      setError(err.message || "Giriş yapılamadı, lütfen tekrar deneyin.");
     } finally {
       setIsSubmitting(false);
     }

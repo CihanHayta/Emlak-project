@@ -4,10 +4,9 @@ import { isAuthInitialized, isLoggedIn, subscribeToAuthState } from "../lib/auth
 
 /**
  * Route guard for everything under /admin (except /admin/login itself).
- * Backed by real Firebase Auth + the backend's session cookie now — but
- * Firebase's own "am I logged in" check is asynchronous (it has to restore
- * the persisted session first), so this can't just read a synchronous flag
- * on first render like the old localStorage mock did. Shows a brief loading
+ * Backed entirely by the backend's own httpOnly session cookie (Postgres-
+ * native, no Firebase). The very first `/auth/me` check is asynchronous, so
+ * this can't just read a synchronous flag on first render. Shows a brief loading
  * state until that first check resolves, THEN decides whether to redirect.
  *
  * Remembers where they were trying to go via `state.from`, so Login.jsx can

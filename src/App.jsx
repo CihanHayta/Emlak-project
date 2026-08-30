@@ -14,7 +14,7 @@ import VehicleDetail from "./pages/VehicleDetail";
 import FunnelPage from "./pages/FunnelPage";
 import NotFound from "./pages/NotFound";
 
-// Admin paneli (Firebase Auth SDK + tüm CRM sayfaları/bileşenleri) BİLEREK
+// Admin paneli (giriş/oturum + tüm CRM sayfaları/bileşenleri) BİLEREK
 // lazy-load ediliyor — genel site ziyaretçisi (ilana bakan, form dolduran
 // müşteri adayı) bu kodu hiç indirmemeli. Öncesinde tek pakette birleşince
 // bundle ~1MB'a (288KB gzip) çıkıyordu; `npm run build`'ın kendi uyarısıyla

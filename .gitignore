@@ -26,3 +26,9 @@ dist-ssr
 *.sw?
 .vercel
 .env*
+# .env.example dosyaları GERÇEK bir secret içermez, tam tersi: hangi env
+# değişkenlerinin gerekli olduğunu dokümante eden şablon dosyalardır — bu
+# yüzden yukarıdaki .env* deseninden BİLEREK muaf tutulur (aksi halde repo'yu
+# yeni klonlayan biri hangi değişkenleri dolduracağını hiç göremez).
+!.env.example
+!server/.env.example
