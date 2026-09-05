@@ -26,6 +26,8 @@ const { login, verifySessionToken } = await import("../../src/services/auth.serv
 const { userPostgresRepository } = await import("../../src/repositories/user.postgres.repository.js");
 const { createDefaultUser } = await import("../../src/models/user.model.js");
 const { hashPassword } = await import("../../src/utils/password.util.js");
+const tenantRepo = await import("../../src/repositories/tenant.postgres.repository.js");
+const { createDefaultTenant } = await import("../../src/models/tenant.model.js");
 
 const context = { tenantId: "test-tenant", userId: "owner-uid", role: "owner" };
 
@@ -145,6 +147,90 @@ describe("user.postgres.service — updateTeamMember doğrulama ve oturum iptali
 
     await expect(login("personel@test.com", "ilk-sifre-123")).rejects.toThrow(/hatalı/);
     await expect(login("personel@test.com", "yeni-sifre-456")).resolves.toEqual(expect.objectContaining({ token: expect.any(String) }));
+  });
+});
+
+describe("user.postgres.service — bir üyeyi pasife almak BAŞKA HİÇBİR HESABI etkilemez (P1 güvenlik doğrulaması)", () => {
+  let memberId;
+
+  beforeAll(() => getTestPool());
+  beforeEach(async () => {
+    await truncateAll();
+    await seedOwner();
+    const created = await createTeamMember(context, { email: "normal-uye@test.com", password: "uye-sifresi-1", role: "agent" });
+    memberId = created.id;
+  });
+  afterAll(() => closeTestPool());
+
+  it("normal bir üyeyi pasife almak owner'ın MEVCUT oturumunu bozmaz VE owner tekrar giriş yapabilir", async () => {
+    // Owner zaten açık bir oturuma sahip (senaryo: admin panelde login'li, o an bir üyeyi pasife alıyor).
+    const ownerLogin = await login("owner@test.com", "owner-sifresi");
+    await expect(verifySessionToken(ownerLogin.token)).resolves.toEqual(
+      expect.objectContaining({ uid: "owner-uid", role: "owner" }),
+    );
+
+    await updateTeamMember(context, memberId, { status: "passive" });
+
+    // 1) Owner'ın İŞLEMİ YAPARKEN kullandığı, önceden var olan oturumu hâlâ geçerli.
+    await expect(verifySessionToken(ownerLogin.token)).resolves.toEqual(
+      expect.objectContaining({ uid: "owner-uid", role: "owner" }),
+    );
+
+    // 2) Owner sıfırdan TEKRAR giriş yapabiliyor (bu, raporlanan bug'ın tam olarak iddia ettiği şey — burada BAŞARILI olmalı).
+    await expect(login("owner@test.com", "owner-sifresi")).resolves.toEqual(expect.objectContaining({ token: expect.any(String) }));
+  });
+
+  it("pasife alınan üye ACCOUNT_INACTIVE koduyla reddedilir (yanlış şifre koduyla KARIŞTIRILMAZ)", async () => {
+    await updateTeamMember(context, memberId, { status: "passive" });
+
+    await expect(login("normal-uye@test.com", "uye-sifresi-1")).rejects.toMatchObject({ code: "ACCOUNT_INACTIVE" });
+  });
+
+  it("bir üyeyi pasife almak TENANT'IN KENDİ durumunu değiştirmez", async () => {
+    const tenant = await tenantRepo.createTenant(
+      createDefaultTenant({ name: "Durum Testi Ofisi", slug: `durum-test-${Date.now()}`, ownerUserId: "owner-uid" }),
+    );
+    expect(tenant.status).toBe("trial");
+
+    await updateTeamMember(context, memberId, { status: "passive" });
+
+    const tenantAfter = await tenantRepo.findTenantById(tenant.id);
+    expect(tenantAfter.status).toBe("trial"); // hiç dokunulmadı
+  });
+
+  it("bir üyeyi pasife almak AYNI tenant'taki BAŞKA AKTİF üyeleri etkilemez", async () => {
+    const otherMember = await createTeamMember(context, { email: "diger-uye@test.com", password: "diger-sifre-1", role: "assistant" });
+
+    await updateTeamMember(context, memberId, { status: "passive" });
+
+    await expect(login("diger-uye@test.com", "diger-sifre-1")).resolves.toEqual(expect.objectContaining({ token: expect.any(String) }));
+    const stillActive = await userPostgresRepository.findByUid(context, otherMember.id);
+    expect(stillActive.status).toBe("active");
+  });
+
+  it("bir tenant'taki üyeyi pasife almak BAŞKA BİR TENANT'IN owner'ını KESİNLİKLE etkilemez (tenant izolasyonu)", async () => {
+    const otherTenantContext = { tenantId: "other-tenant", userId: "other-owner-uid", role: "owner" };
+    const otherPasswordHash = await hashPassword("diger-tenant-sifresi");
+    await userPostgresRepository.createWithUid(otherTenantContext, "other-owner-uid", {
+      ...createDefaultUser({ tenantId: "other-tenant", email: "diger-tenant-owner@test.com", role: "owner" }),
+      passwordHash: otherPasswordHash,
+    });
+
+    await updateTeamMember(context, memberId, { status: "passive" });
+
+    const otherLogin = await login("diger-tenant-owner@test.com", "diger-tenant-sifresi");
+    const verified = await verifySessionToken(otherLogin.token);
+    expect(verified).toEqual({ uid: "other-owner-uid", tenantId: "other-tenant", role: "owner" });
+  });
+
+  it("pasif üyenin ÖNCEDEN AÇIK oturumuyla yapılan sonraki bir istek reddedilir (owner'ınki değil)", async () => {
+    const memberLogin = await login("normal-uye@test.com", "uye-sifresi-1");
+    const ownerLogin = await login("owner@test.com", "owner-sifresi");
+
+    await updateTeamMember(context, memberId, { status: "passive" });
+
+    await expect(verifySessionToken(memberLogin.token)).rejects.toThrow(/geçersiz/);
+    await expect(verifySessionToken(ownerLogin.token)).resolves.toEqual(expect.objectContaining({ uid: "owner-uid" }));
   });
 });
 

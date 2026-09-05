@@ -40,6 +40,9 @@ export class ApiError extends Error {
   static conflict(message) {
     return new ApiError(ERROR_CODES.CONFLICT, message);
   }
+  static accountInactive(message = "Bu hesap devre dışı bırakılmış.") {
+    return new ApiError(ERROR_CODES.ACCOUNT_INACTIVE, message);
+  }
   static quotaExceeded(message = "Plan limitinize ulaştınız.") {
     return new ApiError(ERROR_CODES.TENANT_QUOTA_EXCEEDED, message);
   }

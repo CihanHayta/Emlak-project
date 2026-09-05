@@ -22,6 +22,13 @@ export const ERROR_CODES = {
   TENANT_QUOTA_EXCEEDED: "TENANT_QUOTA_EXCEEDED",
   UPSTREAM_ERROR: "UPSTREAM_ERROR",
   INTERNAL_ERROR: "INTERNAL_ERROR",
+  // Kimlik bilgisi (e-posta+şifre) DOĞRU ama hesap owner/admin tarafından
+  // pasife alınmış — UNAUTHENTICATED'ten (yanlış e-posta/şifre) BİLEREK
+  // ayrı bir kod: kapalı, admin yönetimli bir ekipte (kendi kendine kayıt
+  // YOK) "hesabınız pasif" demek hesap varlığını sızdırmaz, sadece
+  // kullanıcıya (ya da onu arayan admin'e) doğru mesajı verir — bkz.
+  // auth.service.js#login/#verifySessionToken.
+  ACCOUNT_INACTIVE: "ACCOUNT_INACTIVE",
 };
 
 // Her hata kodunun döneceği HTTP durum kodu — ApiError bunu kullanır.
@@ -36,6 +43,7 @@ export const ERROR_STATUS = {
   [ERROR_CODES.TENANT_QUOTA_EXCEEDED]: 402,
   [ERROR_CODES.UPSTREAM_ERROR]: 502,
   [ERROR_CODES.INTERNAL_ERROR]: 500,
+  [ERROR_CODES.ACCOUNT_INACTIVE]: 403,
 };
 
 export const PAGINATION = {

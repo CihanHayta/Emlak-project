@@ -38,8 +38,15 @@ export async function login(email, password, { rememberMe = false } = {}) {
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     throw ApiError.unauthenticated("E-posta veya şifre hatalı.");
   }
+  // BİLEREK şifre doğrulamasından SONRA kontrol ediliyor — sırası önemli:
+  // yanlış şifre + pasif hesap kombinasyonunda "şifre yanlış" (hesap
+  // varlığını sızdırmaz) alınmalı, "hesap pasif" değil. Şifre doğruysa
+  // (kişi gerçekten bu hesabın sahibiyse) artık pasif olduğunu bilmesinde
+  // sakınca yok — ayrı bir hata kodu (ACCOUNT_INACTIVE) burada BİLEREK
+  // kullanılıyor, "e-posta/şifre hatalı" ile karıştırılmasın diye (bkz.
+  // constants.js#ERROR_CODES).
   if (user.status === "passive") {
-    throw ApiError.unauthenticated("Bu hesap devre dışı bırakılmış.");
+    throw ApiError.accountInactive();
   }
 
   const token = generateSessionToken();
